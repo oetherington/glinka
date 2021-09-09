@@ -71,6 +71,10 @@ pub const NodeType = enum(u8) {
     Const,
     Int,
     Ident,
+    True,
+    False,
+    Null,
+    Undefined,
     TypeName,
 };
 
@@ -80,11 +84,11 @@ pub const NodeData = union(NodeType) {
     Const: Decl,
     Int: []const u8,
     Ident: []const u8,
+    True: void,
+    False: void,
+    Null: void,
+    Undefined: void,
     TypeName: []const u8,
-
-    pub fn getType(self: NodeData) NodeType {
-        return @as(NodeType, self);
-    }
 
     pub fn dump(
         self: NodeData,
@@ -95,8 +99,13 @@ pub const NodeData = union(NodeType) {
             .Var, .Let, .Const => |decl| try decl.dump(writer, indent),
             .Int => |s| try putInd(writer, indent, "Int: {s}\n", .{s}),
             .Ident => |s| try putInd(writer, indent, "Identifier: {s}\n", .{s}),
+            .True, .False, .Null, .Undefined => try putInd("{s}", .{@tagName(self)}),
             .TypeName => |s| try putInd(writer, indent, "TypeName \"{s}\"\n", .{s}),
         }
+    }
+
+    pub fn getType(self: NodeData) NodeType {
+        return @as(NodeType, self);
     }
 };
 
