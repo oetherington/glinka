@@ -16,7 +16,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const Parser = @import("parser.zig").Parser;
+const Parser = @import("frontend/parser.zig").Parser;
 
 pub fn main() !void {
     std.io.getStdOut().writeAll("Glinka - version 0.0.1\n") catch unreachable;

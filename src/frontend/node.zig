@@ -20,8 +20,8 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualSlices = std.testing.expectEqualSlices;
 const Allocator = std.mem.Allocator;
-const Cursor = @import("cursor.zig").Cursor;
-const genericEql = @import("generic_eql.zig");
+const Cursor = @import("../common/cursor.zig").Cursor;
+const genericEql = @import("../common/generic_eql.zig");
 
 fn putInd(
     writer: anytype,

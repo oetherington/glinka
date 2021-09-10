@@ -17,7 +17,7 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
-const Cursor = @import("cursor.zig").Cursor;
+const Cursor = @import("../common/cursor.zig").Cursor;
 
 pub const TokenType = enum(u8) {
     // Special tokens
