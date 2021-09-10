@@ -32,6 +32,7 @@ const TokenType = @import("token.zig").TokenType;
 const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = parseresult.ParseError;
+const exprParser = @import("expr_parser.zig");
 
 pub const Parser = struct {
     arena: Arena,
@@ -51,30 +52,12 @@ pub const Parser = struct {
         self.arena.deinit();
     }
 
-    fn getAllocator(self: *Parser) *Allocator {
+    pub fn getAllocator(self: *Parser) *Allocator {
         return &self.arena.allocator;
     }
 
-    fn parsePrimaryExpr(self: *Parser) Allocator.Error!ParseResult {
-        const alloc = self.getAllocator();
-        const csr = self.lexer.token.csr;
-
-        const nd = try switch (self.lexer.token.ty) {
-            .Ident => makeNode(alloc, csr, .Ident, self.lexer.token.data),
-            .True => makeNode(alloc, csr, .True, {}),
-            .False => makeNode(alloc, csr, .False, {}),
-            .Null => makeNode(alloc, csr, .Null, {}),
-            .Undefined => makeNode(alloc, csr, .Undefined, {}),
-            else => return ParseResult.noMatch(null),
-        };
-
-        _ = self.lexer.next();
-
-        return ParseResult.success(nd);
-    }
-
     fn parseExpr(self: *Parser) Allocator.Error!ParseResult {
-        return self.parsePrimaryExpr();
+        return exprParser.parseExpr(self);
     }
 
     fn parseType(self: *Parser) Allocator.Error!ParseResult {
@@ -251,71 +234,5 @@ test "parser can parse var, let and const declarations" {
         .expectedNodeType = NodeType.Var,
         .expectedDeclType = numberType,
         .expectedValueIdent = "someOtherVariable",
-    }).run();
-}
-
-test "can parse expressions" {
-    const Runner = struct {
-        expr: []const u8,
-        check: fn (value: Node) anyerror!void,
-
-        pub fn run(comptime self: @This()) !void {
-            const code = "var a = " ++ self.expr ++ ";";
-
-            var parser = Parser.new(std.testing.allocator, code);
-            defer parser.deinit();
-
-            const res = try parser.next();
-            try expect(res.isSuccess());
-
-            const value = res.Success.data.Var.value.?;
-            try self.check(value);
-        }
-    };
-
-    try (Runner{
-        .expr = "aVariableName",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.Ident, value.getType());
-                try expectEqualSlices(u8, "aVariableName", value.data.Ident);
-            }
-        }).check,
-    }).run();
-
-    try (Runner{
-        .expr = "true",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.True, value.getType());
-            }
-        }).check,
-    }).run();
-
-    try (Runner{
-        .expr = "false",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.False, value.getType());
-            }
-        }).check,
-    }).run();
-
-    try (Runner{
-        .expr = "null",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.Null, value.getType());
-            }
-        }).check,
-    }).run();
-
-    try (Runner{
-        .expr = "undefined",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.Undefined, value.getType());
-            }
-        }).check,
     }).run();
 }
