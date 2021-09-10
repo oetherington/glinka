@@ -99,8 +99,18 @@ pub const NodeData = union(NodeType) {
             .Var, .Let, .Const => |decl| try decl.dump(writer, indent),
             .Int => |s| try putInd(writer, indent, "Int: {s}\n", .{s}),
             .Ident => |s| try putInd(writer, indent, "Identifier: {s}\n", .{s}),
-            .True, .False, .Null, .Undefined => try putInd("{s}", .{@tagName(self)}),
-            .TypeName => |s| try putInd(writer, indent, "TypeName \"{s}\"\n", .{s}),
+            .True, .False, .Null, .Undefined => try putInd(
+                writer,
+                indent,
+                "{s}",
+                .{@tagName(self)},
+            ),
+            .TypeName => |s| try putInd(
+                writer,
+                indent,
+                "TypeName \"{s}\"\n",
+                .{s},
+            ),
         }
     }
 
