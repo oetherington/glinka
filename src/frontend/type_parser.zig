@@ -20,8 +20,7 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualSlices = std.testing.expectEqualSlices;
 const Allocator = std.mem.Allocator;
-const Arena = std.heap.ArenaAllocator;
-const Lexer = @import("lexer.zig").Lexer;
+const Parser = @import("parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("node.zig");
 const Node = node.Node;
@@ -32,54 +31,34 @@ const TokenType = @import("token.zig").TokenType;
 const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = parseresult.ParseError;
-const exprParser = @import("expr_parser.zig");
-const typeParser = @import("type_parser.zig");
-const stmtParser = @import("stmt_parser.zig");
 
-pub const Parser = struct {
-    pub const Error = Allocator.Error;
+pub fn parseType(psr: *Parser) Parser.Error!ParseResult {
+    switch (psr.lexer.token.ty) {
+        .Ident => {
+            const nd = try makeNode(
+                psr.getAllocator(),
+                psr.lexer.token.csr,
+                NodeType.TypeName,
+                psr.lexer.token.data,
+            );
 
-    arena: Arena,
-    lexer: Lexer,
+            _ = psr.lexer.next();
 
-    pub fn new(alloc: *Allocator, code: []const u8) Parser {
-        var lexer = Lexer.new(code);
-        _ = lexer.next();
-
-        return Parser{
-            .arena = Arena.init(alloc),
-            .lexer = lexer,
-        };
+            return ParseResult.success(nd);
+        },
+        else => return ParseResult.noMatch(null),
     }
+}
 
-    pub fn deinit(self: Parser) void {
-        self.arena.deinit();
-    }
+test "can parse type names" {
+    const code = " SomeTypeName ";
 
-    pub fn getAllocator(self: *Parser) *Allocator {
-        return &self.arena.allocator;
-    }
-
-    pub fn parseExpr(self: *Parser) Parser.Error!ParseResult {
-        return exprParser.parseExpr(self);
-    }
-
-    pub fn parseType(self: *Parser) Parser.Error!ParseResult {
-        return typeParser.parseType(self);
-    }
-
-    pub fn parseStmt(self: *Parser) Parser.Error!ParseResult {
-        return stmtParser.parseStmt(self);
-    }
-
-    pub fn next(self: *Parser) Parser.Error!ParseResult {
-        return self.parseStmt();
-    }
-};
-
-test "parser can be initialized" {
-    const code: []const u8 = "some sample code";
     var parser = Parser.new(std.testing.allocator, code);
     defer parser.deinit();
-    try expectEqualSlices(u8, code, parser.lexer.code);
+
+    const res = try parser.parseType();
+    try expect(res.isSuccess());
+    try expectEqual(Cursor.new(1, 2), res.Success.csr);
+    try expectEqual(NodeType.TypeName, res.Success.data.getType());
+    try expectEqualSlices(u8, "SomeTypeName", res.Success.data.TypeName);
 }
