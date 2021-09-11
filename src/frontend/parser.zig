@@ -33,9 +33,10 @@ const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = parseresult.ParseError;
 const exprParser = @import("expr_parser.zig");
+const stmtParser = @import("stmt_parser.zig");
 
 pub const Parser = struct {
-    const Error = Allocator.Error;
+    pub const Error = Allocator.Error;
 
     arena: Arena,
     lexer: Lexer,
@@ -58,11 +59,11 @@ pub const Parser = struct {
         return &self.arena.allocator;
     }
 
-    fn parseExpr(self: *Parser) Parser.Error!ParseResult {
+    pub fn parseExpr(self: *Parser) Parser.Error!ParseResult {
         return exprParser.parseExpr(self);
     }
 
-    fn parseType(self: *Parser) Parser.Error!ParseResult {
+    pub fn parseType(self: *Parser) Parser.Error!ParseResult {
         switch (self.lexer.token.ty) {
             .Ident => {
                 const nd = try makeNode(
@@ -80,62 +81,12 @@ pub const Parser = struct {
         }
     }
 
-    fn parseDecl(
-        self: *Parser,
-        comptime ty: NodeType,
-    ) Parser.Error!ParseResult {
-        const csr = self.lexer.token.csr;
-
-        const name = self.lexer.next();
-        if (name.ty != .Ident)
-            return ParseResult.expected(TokenType.Ident, name);
-
-        var declTy: ?Node = null;
-
-        var tkn = self.lexer.next();
-        if (tkn.ty == .Colon) {
-            _ = self.lexer.next();
-            const tyRes = try self.parseType();
-            if (!tyRes.isSuccess())
-                return tyRes;
-            declTy = tyRes.Success;
-            tkn = self.lexer.token;
-        }
-
-        var expr: ?Node = null;
-
-        if (tkn.ty == TokenType.Eq) {
-            _ = self.lexer.next();
-            const exprRes = try self.parseExpr();
-            if (!exprRes.isSuccess())
-                return exprRes;
-            expr = exprRes.Success;
-            tkn = self.lexer.token;
-        }
-
-        if (tkn.ty != TokenType.Semi)
-            return ParseResult.expected(TokenType.Semi, self.lexer.token);
-
-        const decl = Decl.new(name.data, declTy, expr);
-        const result = try makeNode(self.getAllocator(), csr, ty, decl);
-
-        return ParseResult.success(result);
-    }
-
-    fn parseTopLevel(self: *Parser) Parser.Error!ParseResult {
-        return switch (self.lexer.token.ty) {
-            .Var => self.parseDecl(.Var),
-            .Let => self.parseDecl(.Let),
-            .Const => self.parseDecl(.Const),
-            else => ParseResult.expected(
-                "a top-level statement",
-                self.lexer.token,
-            ),
-        };
+    pub fn parseStmt(self: *Parser) Parser.Error!ParseResult {
+        return stmtParser.parseStmt(self);
     }
 
     pub fn next(self: *Parser) Parser.Error!ParseResult {
-        return self.parseTopLevel();
+        return self.parseStmt();
     }
 };
 
@@ -144,97 +95,4 @@ test "parser can be initialized" {
     var parser = Parser.new(std.testing.allocator, code);
     defer parser.deinit();
     try expectEqualSlices(u8, code, parser.lexer.code);
-}
-
-test "parser can parse var, let and const declarations" {
-    const Runner = struct {
-        code: []const u8,
-        expectedNodeType: NodeType,
-        expectedDeclType: ?Node,
-        expectedValueIdent: ?[]const u8,
-
-        fn run(self: @This()) !void {
-            var parser = Parser.new(std.testing.allocator, self.code);
-            defer parser.deinit();
-
-            const res = try parser.next();
-
-            try expect(res.isSuccess());
-            try expectEqual(self.expectedNodeType, res.Success.getType());
-
-            switch (res.Success.data) {
-                .Var, .Let, .Const => |d| {
-                    try expectEqualSlices(u8, "test", d.name);
-
-                    if (self.expectedDeclType) |t| {
-                        try expect(t.eql(d.ty));
-                    } else {
-                        try expect(d.ty == null);
-                    }
-
-                    if (self.expectedValueIdent) |i| {
-                        if (d.value) |value| {
-                            try expectEqual(NodeType.Ident, value.getType());
-                            try expectEqualSlices(u8, i, value.data.Ident);
-                        } else {
-                            std.debug.panic("Value should not be null", .{});
-                        }
-                    } else {
-                        try expect(d.value == null);
-                    }
-                },
-                else => std.debug.panic("Invalid test result", .{}),
-            }
-        }
-    };
-
-    const numberType = try makeNode(
-        std.testing.allocator,
-        Cursor.new(1, 11),
-        NodeType.TypeName,
-        "number",
-    );
-    defer std.testing.allocator.destroy(numberType);
-
-    try (Runner{
-        .code = "var test;",
-        .expectedNodeType = NodeType.Var,
-        .expectedDeclType = null,
-        .expectedValueIdent = null,
-    }).run();
-
-    try (Runner{
-        .code = "let test;",
-        .expectedNodeType = NodeType.Let,
-        .expectedDeclType = null,
-        .expectedValueIdent = null,
-    }).run();
-
-    try (Runner{
-        .code = "const test;",
-        .expectedNodeType = NodeType.Const,
-        .expectedDeclType = null,
-        .expectedValueIdent = null,
-    }).run();
-
-    try (Runner{
-        .code = "var test: number;",
-        .expectedNodeType = NodeType.Var,
-        .expectedDeclType = numberType,
-        .expectedValueIdent = null,
-    }).run();
-
-    try (Runner{
-        .code = "var test = someOtherVariable;",
-        .expectedNodeType = NodeType.Var,
-        .expectedDeclType = null,
-        .expectedValueIdent = "someOtherVariable",
-    }).run();
-
-    try (Runner{
-        .code = "var test: number = someOtherVariable;",
-        .expectedNodeType = NodeType.Var,
-        .expectedDeclType = numberType,
-        .expectedValueIdent = "someOtherVariable",
-    }).run();
 }

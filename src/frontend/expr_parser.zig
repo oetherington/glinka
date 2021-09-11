@@ -51,7 +51,7 @@ const ExprTestCase = struct {
     }
 };
 
-fn parsePrimaryExpr(psr: *Parser) Allocator.Error!ParseResult {
+fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
 
@@ -127,6 +127,6 @@ test "can parse 'undefined' primary expression" {
     }).run();
 }
 
-pub fn parseExpr(psr: *Parser) Allocator.Error!ParseResult {
+pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {
     return parsePrimaryExpr(psr);
 }
