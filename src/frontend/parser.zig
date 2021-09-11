@@ -35,6 +35,8 @@ const ParseError = parseresult.ParseError;
 const exprParser = @import("expr_parser.zig");
 
 pub const Parser = struct {
+    const Error = Allocator.Error;
+
     arena: Arena,
     lexer: Lexer,
 
@@ -56,11 +58,11 @@ pub const Parser = struct {
         return &self.arena.allocator;
     }
 
-    fn parseExpr(self: *Parser) Allocator.Error!ParseResult {
+    fn parseExpr(self: *Parser) Parser.Error!ParseResult {
         return exprParser.parseExpr(self);
     }
 
-    fn parseType(self: *Parser) Allocator.Error!ParseResult {
+    fn parseType(self: *Parser) Parser.Error!ParseResult {
         switch (self.lexer.token.ty) {
             .Ident => {
                 const nd = try makeNode(
@@ -81,7 +83,7 @@ pub const Parser = struct {
     fn parseDecl(
         self: *Parser,
         comptime ty: NodeType,
-    ) Allocator.Error!ParseResult {
+    ) Parser.Error!ParseResult {
         const csr = self.lexer.token.csr;
 
         const name = self.lexer.next();
@@ -120,7 +122,7 @@ pub const Parser = struct {
         return ParseResult.success(result);
     }
 
-    fn parseTopLevel(self: *Parser) Allocator.Error!ParseResult {
+    fn parseTopLevel(self: *Parser) Parser.Error!ParseResult {
         return switch (self.lexer.token.ty) {
             .Var => self.parseDecl(.Var),
             .Let => self.parseDecl(.Let),
@@ -132,7 +134,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn next(self: *Parser) Allocator.Error!ParseResult {
+    pub fn next(self: *Parser) Parser.Error!ParseResult {
         return self.parseTopLevel();
     }
 };
