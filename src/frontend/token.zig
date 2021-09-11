@@ -24,9 +24,11 @@ pub const TokenType = enum(u8) {
     EOF,
     Invalid,
 
-    // Complex tokens
+    // Literal tokens
     Ident,
     Int,
+    String,
+    Template,
 
     // Atom tokens
     Dot,

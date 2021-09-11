@@ -24,7 +24,7 @@ pub fn main() !void {
     var alloc = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = alloc.deinit();
 
-    const code: []const u8 = "var test: number = abc;";
+    const code: []const u8 = "var test: number = 'abc';";
 
     var parser = Parser.new(&alloc.allocator, code);
     defer parser.deinit();

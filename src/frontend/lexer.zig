@@ -137,6 +137,53 @@ pub const Lexer = struct {
         return self.token;
     }
 
+    fn string(self: *Lexer) Token {
+        const delim = self.code[self.index];
+        assert(delim == '\'' or delim == '"' or delim == '`');
+
+        const csr = self.csr;
+        const start = self.index;
+        self.index += 1;
+        self.csr.ch += 1;
+
+        var slashes: usize = 0;
+        while (self.index < self.code.len) {
+            const ch = self.code[self.index];
+
+            if (ch == '\\') {
+                slashes += 1;
+                self.index += 1;
+                self.csr.ch += 1;
+                continue;
+            } else if (ch == '\n') {
+                // TODO: New lines should only be valid inside templates
+                self.csr.ln += 1;
+                self.csr.ch = 1;
+            } else if (ch == delim and slashes & 1 == 0) {
+                break;
+            } else {
+                self.csr.ch += 1;
+            }
+
+            self.index += 1;
+            slashes = 0;
+        }
+
+        if (self.index >= self.code.len or self.code[self.index] != delim) {
+            self.token = Token.new(.Invalid, csr);
+            return self.token;
+        }
+
+        self.index += 1;
+        self.csr.ch += 1;
+
+        const ty: TokenType = if (delim == '`') .Template else .String;
+        const data = self.code[start..self.index];
+        self.token = Token.newData(ty, csr, data);
+
+        return self.token;
+    }
+
     pub fn next(self: *Lexer) Token {
         nextLoop: while (self.index < self.code.len) {
             switch (self.code[self.index]) {
@@ -152,6 +199,7 @@ pub const Lexer = struct {
                 },
                 'a'...'z', 'A'...'Z', '_' => return self.ident(),
                 '0'...'9' => return self.number(),
+                '\'', '"', '`' => return self.string(),
                 '.' => return self.atom(TokenType.Dot),
                 ',' => return self.atom(TokenType.Comma),
                 ':' => return self.atom(TokenType.Colon),
@@ -304,4 +352,36 @@ test "lexer can lex integers" {
     try expectEqual(TokenType.Dot, dot.ty);
     try expectEqual(@intCast(u32, 1), dot.csr.ln);
     try expectEqual(@intCast(u32, 9), dot.csr.ch);
+}
+
+test "lexer can lex strings" {
+    const StringTestCase = struct {
+        code: []const u8,
+        expectedType: TokenType = .String,
+
+        pub fn run(comptime self: @This()) anyerror!void {
+            const input = " " ++ self.code ++ " . ";
+            var lexer = Lexer.new(input[0..]);
+
+            const str = lexer.next();
+            try expectEqual(self.expectedType, str.ty);
+            try expectEqualSlices(u8, self.code, str.data);
+
+            const dot = lexer.next();
+            try expectEqual(TokenType.Dot, dot.ty);
+            try expectEqual(@intCast(u32, 1), dot.csr.ln);
+            try expectEqual(@intCast(u32, self.code.len + 3), dot.csr.ch);
+        }
+    };
+
+    try (StringTestCase{ .code = "\"hello world\"" }).run();
+    try (StringTestCase{ .code = "'hello world'" }).run();
+    try (StringTestCase{ .code = "\"\"" }).run();
+    try (StringTestCase{ .code = "\"hello\\\"world\"" }).run();
+    try (StringTestCase{ .code = "\"hello\\\\\"" }).run();
+    try (StringTestCase{ .code = "\"hello\\\\\\\"world\"" }).run();
+    try (StringTestCase{
+        .code = "`hello world`",
+        .expectedType = .Template,
+    }).run();
 }

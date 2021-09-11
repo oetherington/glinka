@@ -71,6 +71,8 @@ pub const NodeType = enum(u8) {
     Const,
     Int,
     Ident,
+    String,
+    Template,
     True,
     False,
     Null,
@@ -84,6 +86,8 @@ pub const NodeData = union(NodeType) {
     Const: Decl,
     Int: []const u8,
     Ident: []const u8,
+    String: []const u8,
+    Template: []const u8,
     True: void,
     False: void,
     Null: void,
@@ -97,19 +101,17 @@ pub const NodeData = union(NodeType) {
     ) std.os.WriteError!void {
         switch (self) {
             .Var, .Let, .Const => |decl| try decl.dump(writer, indent),
-            .Int => |s| try putInd(writer, indent, "Int: {s}\n", .{s}),
-            .Ident => |s| try putInd(writer, indent, "Identifier: {s}\n", .{s}),
+            .Int, .TypeName, .Ident, .String, .Template => |s| try putInd(
+                writer,
+                indent,
+                "{s}: \"{s}\"\n",
+                .{ @tagName(self), s },
+            ),
             .True, .False, .Null, .Undefined => try putInd(
                 writer,
                 indent,
                 "{s}",
                 .{@tagName(self)},
-            ),
-            .TypeName => |s| try putInd(
-                writer,
-                indent,
-                "TypeName \"{s}\"\n",
-                .{s},
             ),
         }
     }

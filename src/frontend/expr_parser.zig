@@ -46,6 +46,7 @@ const ExprTestCase = struct {
         try expect(res.isSuccess());
 
         const value = res.Success.data.Var.value.?;
+        try expectEqual(Cursor.new(1, 9), value.csr);
         try self.check(value);
     }
 };
@@ -56,6 +57,8 @@ fn parsePrimaryExpr(psr: *Parser) Allocator.Error!ParseResult {
 
     const nd = try switch (psr.lexer.token.ty) {
         .Ident => makeNode(alloc, csr, .Ident, psr.lexer.token.data),
+        .String => makeNode(alloc, csr, .String, psr.lexer.token.data),
+        .Template => makeNode(alloc, csr, .Template, psr.lexer.token.data),
         .True => makeNode(alloc, csr, .True, {}),
         .False => makeNode(alloc, csr, .False, {}),
         .Null => makeNode(alloc, csr, .Null, {}),
