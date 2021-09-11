@@ -16,7 +16,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
+const Cursor = @import("../common/cursor.zig").Cursor;
 const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const compileError = @import("compile_error.zig");
 const CompileErrorType = compileError.CompileErrorType;
@@ -40,4 +42,27 @@ pub const ErrorContext = struct {
     pub fn append(self: *ErrorContext, err: CompileError) !void {
         try self.list.append(err);
     }
+
+    pub fn count(self: ErrorContext) usize {
+        return self.list.items.len;
+    }
+
+    pub fn get(self: ErrorContext, index: usize) CompileError {
+        return self.list.items[index];
+    }
 };
+
+test "can append errors to an ErrorContext" {
+    var ctx = ErrorContext.new(std.testing.allocator);
+    defer ctx.deinit();
+
+    const cursor = Cursor.new(3, 5);
+    const message = "Some error message";
+    const parseError = ParseError.message(cursor, message);
+    const err = CompileError.parseError(parseError);
+
+    try expectEqual(@intCast(usize, 0), ctx.count());
+    try ctx.append(err);
+    try expectEqual(@intCast(usize, 1), ctx.count());
+    try expectEqual(err, ctx.get(0));
+}

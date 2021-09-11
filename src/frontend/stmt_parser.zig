@@ -71,6 +71,16 @@ fn parseDecl(psr: *Parser, comptime ty: NodeType) Parser.Error!ParseResult {
     return ParseResult.success(result);
 }
 
+test "can parse end-of-file" {
+    var parser = Parser.new(std.testing.allocator, "");
+    defer parser.deinit();
+
+    const res = try parser.next();
+
+    try expect(res.isSuccess());
+    try expectEqual(NodeType.EOF, res.Success.getType());
+}
+
 test "can parse var, let and const declarations" {
     const Runner = struct {
         code: []const u8,
