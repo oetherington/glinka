@@ -169,6 +169,12 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .Var => parseDecl(psr, .Var),
         .Let => parseDecl(psr, .Let),
         .Const => parseDecl(psr, .Const),
+        .EOF => ParseResult.success(try makeNode(
+            psr.getAllocator(),
+            psr.lexer.token.csr,
+            .EOF,
+            {},
+        )),
         else => ParseResult.expected("a statement", psr.lexer.token),
     };
 }

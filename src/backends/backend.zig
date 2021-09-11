@@ -16,25 +16,5 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const Parser = @import("frontend/parser.zig").Parser;
-const Backend = @import("backends/backend.zig").Backend;
-const JsBackend = @import("backends/js_backend.zig").JsBackend;
-const Compiler = @import("compiler/compiler.zig").Compiler;
 
-pub fn main() !void {
-    std.io.getStdOut().writeAll("Glinka - version 0.0.1\n") catch unreachable;
-
-    var alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = alloc.deinit();
-
-    const code: []const u8 = "var test: number = 'abc';";
-
-    var parser = Parser.new(&alloc.allocator, code);
-    defer parser.deinit();
-
-    var backend = JsBackend.new();
-
-    var compiler = Compiler.new(&alloc.allocator, &parser, &backend.backend);
-    defer compiler.deinit();
-    try compiler.run();
-}
+pub const Backend = struct {};

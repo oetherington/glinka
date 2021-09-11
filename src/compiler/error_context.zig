@@ -16,25 +16,28 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const Parser = @import("frontend/parser.zig").Parser;
-const Backend = @import("backends/backend.zig").Backend;
-const JsBackend = @import("backends/js_backend.zig").JsBackend;
-const Compiler = @import("compiler/compiler.zig").Compiler;
+const Allocator = std.mem.Allocator;
+const ParseError = @import("../frontend/parse_result.zig").ParseError;
+const compileError = @import("compile_error.zig");
+const CompileErrorType = compileError.CompileErrorType;
+const CompileError = compileError.CompileError;
 
-pub fn main() !void {
-    std.io.getStdOut().writeAll("Glinka - version 0.0.1\n") catch unreachable;
+pub const ErrorContext = struct {
+    const ErrorList = std.ArrayList(CompileError);
 
-    var alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = alloc.deinit();
+    list: ErrorList,
 
-    const code: []const u8 = "var test: number = 'abc';";
+    pub fn new(alloc: *Allocator) ErrorContext {
+        return ErrorContext{
+            .list = ErrorList.init(alloc),
+        };
+    }
 
-    var parser = Parser.new(&alloc.allocator, code);
-    defer parser.deinit();
+    pub fn deinit(self: *ErrorContext) void {
+        self.list.deinit();
+    }
 
-    var backend = JsBackend.new();
-
-    var compiler = Compiler.new(&alloc.allocator, &parser, &backend.backend);
-    defer compiler.deinit();
-    try compiler.run();
-}
+    pub fn append(self: *ErrorContext, err: CompileError) !void {
+        try self.list.append(err);
+    }
+};

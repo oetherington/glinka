@@ -266,8 +266,8 @@ pub const ParseResult = union(ParseResultType) {
         };
     }
 
-    pub fn errMessage(message: []const u8) ParseResult {
-        return ParseResult.err(ParseError.message(message));
+    pub fn errMessage(csr: Cursor, message: []const u8) ParseResult {
+        return ParseResult.err(ParseError.message(csr, message));
     }
 
     pub fn expected(expectedData: anytype, foundData: anytype) ParseResult {

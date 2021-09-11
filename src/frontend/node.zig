@@ -66,6 +66,7 @@ pub const Decl = struct {
 };
 
 pub const NodeType = enum(u8) {
+    EOF,
     Var,
     Let,
     Const,
@@ -81,6 +82,7 @@ pub const NodeType = enum(u8) {
 };
 
 pub const NodeData = union(NodeType) {
+    EOF: void,
     Var: Decl,
     Let: Decl,
     Const: Decl,
@@ -107,7 +109,7 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
-            .True, .False, .Null, .Undefined => try putInd(
+            .EOF, .True, .False, .Null, .Undefined => try putInd(
                 writer,
                 indent,
                 "{s}",
