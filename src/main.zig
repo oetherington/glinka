@@ -18,7 +18,7 @@
 const std = @import("std");
 const Parser = @import("frontend/parser.zig").Parser;
 const Backend = @import("backends/backend.zig").Backend;
-const JsBackend = @import("backends/js_backend.zig").JsBackend;
+const JsBackend = @import("backends/js/js_backend.zig").JsBackend;
 const Compiler = @import("compiler/compiler.zig").Compiler;
 
 pub fn main() !void {

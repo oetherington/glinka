@@ -112,7 +112,7 @@ pub const NodeData = union(NodeType) {
             .EOF, .True, .False, .Null, .Undefined => try putInd(
                 writer,
                 indent,
-                "{s}",
+                "{s}\n",
                 .{@tagName(self)},
             ),
         }
