@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Parser = @import("parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -101,7 +101,7 @@ test "can parse var, let and const declarations" {
 
             switch (res.Success.data) {
                 .Var, .Let, .Const => |d| {
-                    try expectEqualSlices(u8, "test", d.name);
+                    try expectEqualStrings("test", d.name);
 
                     if (self.expectedDeclType) |t| {
                         try expect(t.eql(d.ty));
@@ -112,7 +112,7 @@ test "can parse var, let and const declarations" {
                     if (self.expectedValueIdent) |i| {
                         if (d.value) |value| {
                             try expectEqual(NodeType.Ident, value.getType());
-                            try expectEqualSlices(u8, i, value.data.Ident);
+                            try expectEqualStrings(i, value.data.Ident);
                         } else {
                             std.debug.panic("Value should not be null", .{});
                         }

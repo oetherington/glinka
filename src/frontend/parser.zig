@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
 const Lexer = @import("lexer.zig").Lexer;
@@ -81,5 +81,5 @@ test "parser can be initialized" {
     const code: []const u8 = "some sample code";
     var parser = Parser.new(std.testing.allocator, code);
     defer parser.deinit();
-    try expectEqualSlices(u8, code, parser.lexer.code);
+    try expectEqualStrings(code, parser.lexer.code);
 }

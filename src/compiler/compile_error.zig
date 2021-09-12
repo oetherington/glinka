@@ -17,7 +17,7 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const Parser = @import("../frontend/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -53,5 +53,5 @@ test "can create a CompilerError from a ParseError" {
     const compileError = CompileError.parseError(parseError);
     try expectEqual(CompileErrorType.ParseError, compileError.getType());
     try expectEqual(cursor, compileError.ParseError.csr);
-    try expectEqualSlices(u8, message, compileError.ParseError.data.Message);
+    try expectEqualStrings(message, compileError.ParseError.data.Message);
 }

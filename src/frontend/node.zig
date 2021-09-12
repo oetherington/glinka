@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const genericEql = @import("../common/generic_eql.zig");
@@ -181,7 +181,7 @@ test "can initialize a var node" {
     );
     defer std.testing.allocator.destroy(node);
     try expectEqual(node.getType(), NodeType.Var);
-    try expectEqualSlices(u8, name, node.data.Var.name);
+    try expectEqualStrings(name, node.data.Var.name);
 }
 
 test "can compare Nodes for equality" {

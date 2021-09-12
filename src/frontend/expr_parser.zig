@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Parser = @import("parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -77,7 +77,7 @@ test "can parse variable name primary expression" {
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Ident, value.getType());
-                try expectEqualSlices(u8, "aVariableName", value.data.Ident);
+                try expectEqualStrings("aVariableName", value.data.Ident);
             }
         }).check,
     }).run();

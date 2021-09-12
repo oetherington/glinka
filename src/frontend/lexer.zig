@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const assert = std.debug.assert;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const token = @import("token.zig");
@@ -312,7 +312,7 @@ test "lexer can lex identifiers" {
 
     const ident = lexer.next();
     try expectEqual(TokenType.Ident, ident.ty);
-    try expectEqualSlices(u8, "anIdent0_", ident.data);
+    try expectEqualStrings("anIdent0_", ident.data);
     try expectEqual(@intCast(u32, 1), ident.csr.ln);
     try expectEqual(@intCast(u32, 2), ident.csr.ch);
 
@@ -328,7 +328,7 @@ test "lexer can lex keywords" {
 
     const ident = lexer.next();
     try expectEqual(TokenType.Null, ident.ty);
-    try expectEqualSlices(u8, "null", ident.data);
+    try expectEqualStrings("null", ident.data);
     try expectEqual(@intCast(u32, 1), ident.csr.ln);
     try expectEqual(@intCast(u32, 2), ident.csr.ch);
 
@@ -344,7 +344,7 @@ test "lexer can lex integers" {
 
     const ident = lexer.next();
     try expectEqual(TokenType.Int, ident.ty);
-    try expectEqualSlices(u8, "123456", ident.data);
+    try expectEqualStrings("123456", ident.data);
     try expectEqual(@intCast(u32, 1), ident.csr.ln);
     try expectEqual(@intCast(u32, 2), ident.csr.ch);
 
@@ -365,7 +365,7 @@ test "lexer can lex strings" {
 
             const str = lexer.next();
             try expectEqual(self.expectedType, str.ty);
-            try expectEqualSlices(u8, self.code, str.data);
+            try expectEqualStrings(self.code, str.data);
 
             const dot = lexer.next();
             try expectEqual(TokenType.Dot, dot.ty);

@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const token = @import("token.zig");
 const TokenType = token.TokenType;
@@ -69,7 +69,7 @@ test "can initialize 'ExpectedData' with a string" {
     const str: []const u8 = "some expected thing";
     const data = ExpectedData.new(str);
     try expectEqual(ExpectedData.String, data.getType());
-    try expectEqualSlices(u8, str, data.String);
+    try expectEqualStrings(str, data.String);
 }
 
 pub const FoundDataType = enum {
@@ -238,7 +238,7 @@ test "can initialize a 'ParseError' with an error message string" {
     const err = ParseError.message(csr, message);
     try expectEqual(ParseErrorType.Message, err.getType());
     try expectEqual(csr, err.csr);
-    try expectEqualSlices(u8, message, err.data.Message);
+    try expectEqualStrings(message, err.data.Message);
 }
 
 pub const ParseResultType = enum {

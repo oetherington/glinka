@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Parser = @import("parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -60,5 +60,5 @@ test "can parse type names" {
     try expect(res.isSuccess());
     try expectEqual(Cursor.new(1, 2), res.Success.csr);
     try expectEqual(NodeType.TypeName, res.Success.data.getType());
-    try expectEqualSlices(u8, "SomeTypeName", res.Success.data.TypeName);
+    try expectEqualStrings("SomeTypeName", res.Success.data.TypeName);
 }
