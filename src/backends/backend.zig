@@ -16,5 +16,30 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const node = @import("../frontend/node.zig");
+const Node = node.Node;
 
-pub const Backend = struct {};
+pub const Backend = struct {
+    pub const Error = anyerror;
+
+    pub const Callback = fn (be: *Backend) Error!void;
+    pub const NodeCallback = fn (be: *Backend, nd: Node) Error!void;
+
+    callbacks: struct {
+        prolog: Callback,
+        epilog: Callback,
+        declaration: NodeCallback,
+    },
+
+    pub fn prolog(self: *Backend) Error!void {
+        try self.callbacks.prolog(self);
+    }
+
+    pub fn epilog(self: *Backend) Error!void {
+        try self.callbacks.epilog(self);
+    }
+
+    pub fn declaration(self: *Backend, nd: Node) Error!void {
+        try self.callbacks.declaration(self, nd);
+    }
+};

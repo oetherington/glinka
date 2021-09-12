@@ -204,10 +204,8 @@ pub const ParseError = struct {
         return @as(ParseErrorType, self.data);
     }
 
-    pub fn report(self: ParseError) !void {
-        const writer = std.io.getStdErr().writer();
-
-        try writer.print("Error: {d}:{d}: ", .{
+    pub fn report(self: ParseError, writer: anytype) !void {
+        try writer.print("Parse Error: {d}:{d}: ", .{
             self.csr.ln,
             self.csr.ch,
         });

@@ -65,6 +65,8 @@ fn parseDecl(psr: *Parser, comptime ty: NodeType) Parser.Error!ParseResult {
     if (tkn.ty != TokenType.Semi)
         return ParseResult.expected(TokenType.Semi, psr.lexer.token);
 
+    _ = psr.lexer.next();
+
     const decl = Decl.new(name.data, declTy, expr);
     const result = try makeNode(psr.getAllocator(), csr, ty, decl);
 

@@ -44,12 +44,29 @@ pub const Compiler = struct {
         self.errors.deinit();
     }
 
+    pub fn hasErrors(self: Compiler) bool {
+        return self.errors.count() > 0;
+    }
+
+    pub fn reportErrors(self: Compiler) !void {
+        try self.errors.report();
+    }
+
     pub fn processNode(self: *Compiler, node: Node) !void {
         _ = self;
         node.dump();
+
+        switch (node.data) {
+            .Var, .Let, .Const => {
+                try self.backend.declaration(node);
+            },
+            else => {},
+        }
     }
 
     pub fn run(self: *Compiler) !void {
+        try self.backend.prolog();
+
         while (true) {
             const res = try self.parser.next();
 
@@ -78,5 +95,7 @@ pub const Compiler = struct {
                 else => try self.processNode(node),
             }
         }
+
+        try self.backend.epilog();
     }
 };

@@ -50,6 +50,12 @@ pub const ErrorContext = struct {
     pub fn get(self: ErrorContext, index: usize) CompileError {
         return self.list.items[index];
     }
+
+    pub fn report(self: ErrorContext) !void {
+        const writer = std.io.getStdErr().writer();
+        for (self.list.items) |err|
+            try err.report(writer);
+    }
 };
 
 test "can append errors to an ErrorContext" {

@@ -38,6 +38,12 @@ pub const CompileError = union(CompileErrorType) {
     pub fn getType(self: CompileError) CompileErrorType {
         return @as(CompileErrorType, self);
     }
+
+    pub fn report(self: CompileError, writer: anytype) !void {
+        switch (self) {
+            .ParseError => |err| try err.report(writer),
+        }
+    }
 };
 
 test "can create a CompilerError from a ParseError" {

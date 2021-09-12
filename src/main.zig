@@ -24,17 +24,27 @@ const Compiler = @import("compiler/compiler.zig").Compiler;
 pub fn main() !void {
     std.io.getStdOut().writeAll("Glinka - version 0.0.1\n") catch unreachable;
 
+    const code: []const u8 = "var test: number = true;";
+
     var alloc = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = alloc.deinit();
-
-    const code: []const u8 = "var test: number = 'abc';";
 
     var parser = Parser.new(&alloc.allocator, code);
     defer parser.deinit();
 
-    var backend = JsBackend.new();
+    var backend = try JsBackend.new(&alloc.allocator);
+    defer backend.deinit();
 
     var compiler = Compiler.new(&alloc.allocator, &parser, &backend.backend);
     defer compiler.deinit();
+
     try compiler.run();
+
+    if (compiler.hasErrors()) {
+        try compiler.reportErrors();
+    } else {
+        var res = try backend.toString();
+        defer backend.freeString(res);
+        std.log.info("Result: {s}", .{res});
+    }
 }
