@@ -24,12 +24,12 @@ const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const Parser = @import("../frontend/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 
-pub const CompileErrorType = enum(u8) {
-    TypeError,
-    ParseError,
-};
+pub const CompileError = union(CompileError.Type) {
+    pub const Type = enum(u8) {
+        TypeError,
+        ParseError,
+    };
 
-pub const CompileError = union(CompileErrorType) {
     TypeError: TypeError,
     ParseError: ParseError,
 
@@ -45,8 +45,8 @@ pub const CompileError = union(CompileErrorType) {
         };
     }
 
-    pub fn getType(self: CompileError) CompileErrorType {
-        return @as(CompileErrorType, self);
+    pub fn getType(self: CompileError) CompileError.Type {
+        return @as(CompileError.Type, self);
     }
 
     pub fn report(self: CompileError, writer: anytype) !void {
@@ -63,7 +63,7 @@ test "can create a CompileError from a TypeError" {
     const targetTy = Type.newBoolean();
     const typeError = TypeError.new(cursor, valueTy, targetTy);
     const compileError = CompileError.typeError(typeError);
-    try expectEqual(CompileErrorType.TypeError, compileError.getType());
+    try expectEqual(CompileError.Type.TypeError, compileError.getType());
     try expectEqual(cursor, compileError.TypeError.csr);
     try expectEqual(valueTy, compileError.TypeError.valueTy);
     try expectEqual(targetTy, compileError.TypeError.targetTy);
@@ -74,7 +74,7 @@ test "can create a CompileError from a ParseError" {
     const message = "Some error message";
     const parseError = ParseError.message(cursor, message);
     const compileError = CompileError.parseError(parseError);
-    try expectEqual(CompileErrorType.ParseError, compileError.getType());
+    try expectEqual(CompileError.Type.ParseError, compileError.getType());
     try expectEqual(cursor, compileError.ParseError.csr);
     try expectEqualStrings(message, compileError.ParseError.data.Message);
 }
