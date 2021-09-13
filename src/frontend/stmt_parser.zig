@@ -56,7 +56,7 @@ fn parseDecl(
 
     var expr: ?Node = null;
 
-    if (tkn.ty == TokenType.Eq) {
+    if (tkn.ty == TokenType.Assign) {
         _ = psr.lexer.next();
         const exprRes = try psr.parseExpr();
         if (!exprRes.isSuccess())

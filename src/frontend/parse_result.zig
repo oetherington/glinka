@@ -107,7 +107,7 @@ pub const FoundData = union(Type) {
 };
 
 test "can initialize 'FoundData' with a Token" {
-    const tkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
+    const tkn = Token.new(Token.Type.Assign, Cursor.new(0, 0));
     const data = FoundData.new(tkn);
     try expectEqual(FoundData.Token, data.getType());
     try expectEqual(tkn, data.Token);
@@ -151,7 +151,7 @@ pub const Expected = struct {
 
 test "can initialize Expected" {
     const tokenType = Token.Type.Dot;
-    const foundTkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
+    const foundTkn = Token.new(Token.Type.Assign, Cursor.new(0, 0));
     const expected = Expected.new(tokenType, foundTkn);
     try expectEqual(ExpectedData.Type.Token, expected.expected.getType());
     try expectEqual(FoundData.Type.Token, expected.found.getType());
@@ -222,7 +222,7 @@ pub const ParseError = struct {
 
 test "can initialize a 'ParseError' with an expected type" {
     const tokenType = Token.Type.Dot;
-    const foundTkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
+    const foundTkn = Token.new(Token.Type.Assign, Cursor.new(0, 0));
     const err = ParseError.expected(tokenType, foundTkn);
     try expectEqual(ParseError.Type.Expected, err.getType());
     try expectEqual(foundTkn.csr, err.csr);

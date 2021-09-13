@@ -22,32 +22,47 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const assert = std.debug.assert;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const Token = @import("token.zig").Token;
+const lexOperator = @import("operator_lexer.zig").lexOperator;
 
 const keywordMap = std.ComptimeStringMap(Token.Type, .{
-    .{ "class", .Class },
-    .{ "const", .Const },
-    .{ "constructor", .Constructor },
-    .{ "declare", .Declare },
-    .{ "default", .Default },
-    .{ "enum", .Enum },
-    .{ "export", .Export },
-    .{ "extends", .Extends },
-    .{ "false", .False },
-    .{ "function", .Function },
-    .{ "implements", .Implements },
-    .{ "import", .Import },
-    .{ "interface", .Interface },
-    .{ "let", .Let },
-    .{ "new", .New },
-    .{ "null", .Null },
-    .{ "private", .Private },
-    .{ "public", .Public },
-    .{ "require", .Require },
-    .{ "static", .Static },
-    .{ "true", .True },
-    .{ "typeof", .Typeof },
-    .{ "undefined", .Undefined },
     .{ "var", .Var },
+    .{ "let", .Let },
+    .{ "const", .Const },
+    .{ "function", .Function },
+    .{ "async", .Async },
+    .{ "await", .Await },
+    .{ "yield", .Yield },
+    .{ "declare", .Declare },
+    .{ "new", .New },
+    .{ "delete", .Delete },
+    .{ "class", .Class },
+    .{ "extends", .Extends },
+    .{ "implements", .Implements },
+    .{ "constructor", .Constructor },
+    .{ "super", .Super },
+    .{ "static", .Static },
+    .{ "public", .Public },
+    .{ "private", .Private },
+    .{ "enum", .Enum },
+    .{ "interface", .Interface },
+    .{ "import", .Import },
+    .{ "export", .Export },
+    .{ "require", .Require },
+    .{ "true", .True },
+    .{ "false", .False },
+    .{ "null", .Null },
+    .{ "undefined", .Undefined },
+    .{ "typeof", .TypeOf },
+    .{ "instanceof", .InstanceOf },
+    .{ "if", .If },
+    .{ "else", .Else },
+    .{ "while", .While },
+    .{ "for", .For },
+    .{ "in", .In },
+    .{ "of", .Of },
+    .{ "Switch", .Switch },
+    .{ "Case", .Case },
+    .{ "default", .Default },
 });
 
 fn getIdentTokenType(ident: []const u8) Token.Type {
@@ -182,7 +197,20 @@ pub const Lexer = struct {
         return self.token;
     }
 
+    fn operator(self: *Lexer) Token {
+        if (lexOperator(self.code[self.index..])) |res| {
+            self.token = Token.new(res.ty, self.csr);
+            self.index += res.len;
+            self.csr.ch += res.len;
+            return self.token;
+        } else {
+            return self.atomData(Token.Type.Invalid);
+        }
+    }
+
     pub fn next(self: *Lexer) Token {
+        _ = lexOperator("");
+
         nextLoop: while (self.index < self.code.len) {
             switch (self.code[self.index]) {
                 0 => break :nextLoop,
@@ -198,18 +226,31 @@ pub const Lexer = struct {
                 'a'...'z', 'A'...'Z', '_' => return self.ident(),
                 '0'...'9' => return self.number(),
                 '\'', '"', '`' => return self.string(),
-                '.' => return self.atom(Token.Type.Dot),
-                ',' => return self.atom(Token.Type.Comma),
-                ':' => return self.atom(Token.Type.Colon),
-                ';' => return self.atom(Token.Type.Semi),
-                '?' => return self.atom(Token.Type.Question),
-                '=' => return self.atom(Token.Type.Eq),
                 '{' => return self.atom(Token.Type.LBrace),
                 '}' => return self.atom(Token.Type.RBrace),
                 '[' => return self.atom(Token.Type.LBrack),
                 ']' => return self.atom(Token.Type.RBrack),
                 '(' => return self.atom(Token.Type.LParen),
                 ')' => return self.atom(Token.Type.RParen),
+                ',' => return self.atom(Token.Type.Comma),
+                ':' => return self.atom(Token.Type.Colon),
+                ';' => return self.atom(Token.Type.Semi),
+                '.',
+                '=',
+                '+',
+                '-',
+                '*',
+                '/',
+                '%',
+                '!',
+                '>',
+                '<',
+                '&',
+                '|',
+                '~',
+                '^',
+                '?',
+                => return self.operator(),
                 else => return self.atomData(Token.Type.Invalid),
             }
         }
@@ -274,11 +315,23 @@ test "lexer can detect EOF" {
     try expectEqual(Token.Type.EOF, tkn.ty);
 }
 
-test "lexer can lex single character token" {
-    const code = ".";
+test "lexer can lex simple atoms" {
+    const code = "{";
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
-    try expectEqual(Token.Type.Dot, tkn.ty);
+    try expectEqual(Token.Type.LBrace, tkn.ty);
+    try expectEqual(@intCast(u64, 1), tkn.csr.ln);
+    try expectEqual(@intCast(u64, 1), tkn.csr.ch);
+    try expectEqual(@intCast(u64, 1), lexer.csr.ln);
+    try expectEqual(@intCast(u64, 2), lexer.csr.ch);
+    try expectEqual(@intCast(u64, 1), lexer.index);
+}
+
+test "lexer can lex operators" {
+    const code = "+";
+    var lexer = Lexer.new(code[0..]);
+    const tkn = lexer.next();
+    try expectEqual(Token.Type.Add, tkn.ty);
     try expectEqual(@intCast(u64, 1), tkn.csr.ln);
     try expectEqual(@intCast(u64, 1), tkn.csr.ch);
     try expectEqual(@intCast(u64, 1), lexer.csr.ln);
