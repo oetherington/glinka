@@ -235,12 +235,54 @@ pub const Lexer = struct {
                 ',' => return self.atom(Token.Type.Comma),
                 ':' => return self.atom(Token.Type.Colon),
                 ';' => return self.atom(Token.Type.Semi),
+                '/' => {
+                    if (self.index + 1 >= self.code.len)
+                        return self.operator();
+
+                    self.index += 1;
+
+                    switch (self.code[self.index]) {
+                        '*' => {
+                            self.index += 1;
+
+                            while (self.index < self.code.len) {
+                                if (self.code[self.index] == '/' and self.code[self.index - 1] == '*') {
+                                    break;
+                                } else if (self.code[self.index] == '\n') {
+                                    self.csr.ln += 1;
+                                    self.csr.ch = 1;
+                                }
+
+                                self.index += 1;
+                                self.csr.ch += 1;
+                            }
+
+                            self.index += 1;
+                            continue :nextLoop;
+                        },
+                        '/' => {
+                            self.index += 1;
+
+                            while (self.index < self.code.len) {
+                                if (self.code[self.index] == '\n')
+                                    break;
+
+                                self.index += 1;
+                            }
+
+                            self.index += 1;
+                            self.csr.ln += 1;
+                            self.csr.ch = 1;
+                            continue :nextLoop;
+                        },
+                        else => return self.operator(),
+                    }
+                },
                 '.',
                 '=',
                 '+',
                 '-',
                 '*',
-                '/',
                 '%',
                 '!',
                 '>',
@@ -337,6 +379,31 @@ test "lexer can lex operators" {
     try expectEqual(@intCast(u64, 1), lexer.csr.ln);
     try expectEqual(@intCast(u64, 2), lexer.csr.ch);
     try expectEqual(@intCast(u64, 1), lexer.index);
+}
+
+test "lexer can lex divide" {
+    const code = "/";
+    var lexer = Lexer.new(code[0..]);
+    const tkn = lexer.next();
+    try expectEqual(Token.Type.Div, tkn.ty);
+}
+
+test "lexer can skip C-style comments" {
+    const code = "/* A \ncomment*/.";
+    var lexer = Lexer.new(code[0..]);
+    const tkn = lexer.next();
+    try expectEqual(Token.Type.Dot, tkn.ty);
+    try expectEqual(@intCast(u64, 2), tkn.csr.ln);
+    try expectEqual(@intCast(u64, 10), tkn.csr.ch);
+}
+
+test "lexer can skip C++-style comments" {
+    const code = "// A comment\n.";
+    var lexer = Lexer.new(code[0..]);
+    const tkn = lexer.next();
+    try expectEqual(Token.Type.Dot, tkn.ty);
+    try expectEqual(@intCast(u64, 2), tkn.csr.ln);
+    try expectEqual(@intCast(u64, 1), tkn.csr.ch);
 }
 
 test "lexer can skip whitespace" {
