@@ -21,11 +21,9 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const assert = std.debug.assert;
 const Cursor = @import("../common/cursor.zig").Cursor;
-const token = @import("token.zig");
-const Token = token.Token;
-const TokenType = token.TokenType;
+const Token = @import("token.zig").Token;
 
-const keywordMap = std.ComptimeStringMap(TokenType, .{
+const keywordMap = std.ComptimeStringMap(Token.Type, .{
     .{ "class", .Class },
     .{ "const", .Const },
     .{ "constructor", .Constructor },
@@ -52,7 +50,7 @@ const keywordMap = std.ComptimeStringMap(TokenType, .{
     .{ "var", .Var },
 });
 
-fn getIdentTokenType(ident: []const u8) TokenType {
+fn getIdentTokenType(ident: []const u8) Token.Type {
     return keywordMap.get(ident) orelse .Ident;
 }
 
@@ -83,14 +81,14 @@ pub const Lexer = struct {
         };
     }
 
-    fn atom(self: *Lexer, ty: TokenType) Token {
+    fn atom(self: *Lexer, ty: Token.Type) Token {
         self.token = Token.new(ty, self.csr);
         self.csr.ch += 1;
         self.index += 1;
         return self.token;
     }
 
-    fn atomData(self: *Lexer, ty: TokenType) Token {
+    fn atomData(self: *Lexer, ty: Token.Type) Token {
         const data = self.code[self.index .. self.index + 1];
         self.token = Token.newData(ty, self.csr, data);
         self.csr.ch += 1;
@@ -127,7 +125,7 @@ pub const Lexer = struct {
         }
 
         self.token = Token.newData(
-            TokenType.Int,
+            Token.Type.Int,
             self.csr,
             self.code[start..self.index],
         );
@@ -177,7 +175,7 @@ pub const Lexer = struct {
         self.index += 1;
         self.csr.ch += 1;
 
-        const ty: TokenType = if (delim == '`') .Template else .String;
+        const ty: Token.Type = if (delim == '`') .Template else .String;
         const data = self.code[start..self.index];
         self.token = Token.newData(ty, csr, data);
 
@@ -200,30 +198,30 @@ pub const Lexer = struct {
                 'a'...'z', 'A'...'Z', '_' => return self.ident(),
                 '0'...'9' => return self.number(),
                 '\'', '"', '`' => return self.string(),
-                '.' => return self.atom(TokenType.Dot),
-                ',' => return self.atom(TokenType.Comma),
-                ':' => return self.atom(TokenType.Colon),
-                ';' => return self.atom(TokenType.Semi),
-                '?' => return self.atom(TokenType.Question),
-                '=' => return self.atom(TokenType.Eq),
-                '{' => return self.atom(TokenType.LBrace),
-                '}' => return self.atom(TokenType.RBrace),
-                '[' => return self.atom(TokenType.LBrack),
-                ']' => return self.atom(TokenType.RBrack),
-                '(' => return self.atom(TokenType.LParen),
-                ')' => return self.atom(TokenType.RParen),
-                else => return self.atomData(TokenType.Invalid),
+                '.' => return self.atom(Token.Type.Dot),
+                ',' => return self.atom(Token.Type.Comma),
+                ':' => return self.atom(Token.Type.Colon),
+                ';' => return self.atom(Token.Type.Semi),
+                '?' => return self.atom(Token.Type.Question),
+                '=' => return self.atom(Token.Type.Eq),
+                '{' => return self.atom(Token.Type.LBrace),
+                '}' => return self.atom(Token.Type.RBrace),
+                '[' => return self.atom(Token.Type.LBrack),
+                ']' => return self.atom(Token.Type.RBrack),
+                '(' => return self.atom(Token.Type.LParen),
+                ')' => return self.atom(Token.Type.RParen),
+                else => return self.atomData(Token.Type.Invalid),
             }
         }
 
-        return self.atom(TokenType.EOF);
+        return self.atom(Token.Type.EOF);
     }
 };
 
 test "Can classify keywords" {
-    try expectEqual(TokenType.Ident, getIdentTokenType("not_a_keyword"));
-    try expectEqual(TokenType.Class, getIdentTokenType("class"));
-    try expectEqual(TokenType.True, getIdentTokenType("true"));
+    try expectEqual(Token.Type.Ident, getIdentTokenType("not_a_keyword"));
+    try expectEqual(Token.Type.Class, getIdentTokenType("class"));
+    try expectEqual(Token.Type.True, getIdentTokenType("true"));
 }
 
 test "Can classify identifier characters" {
@@ -266,21 +264,21 @@ test "lexer can be initialized" {
     try expectEqual(@intCast(u64, 0), lexer.index);
     try expectEqual(@intCast(u64, 1), lexer.csr.ln);
     try expectEqual(@intCast(u64, 1), lexer.csr.ch);
-    try expectEqual(TokenType.Invalid, lexer.token.ty);
+    try expectEqual(Token.Type.Invalid, lexer.token.ty);
 }
 
 test "lexer can detect EOF" {
     const code = "";
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
-    try expectEqual(TokenType.EOF, tkn.ty);
+    try expectEqual(Token.Type.EOF, tkn.ty);
 }
 
 test "lexer can lex single character token" {
     const code = ".";
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
-    try expectEqual(TokenType.Dot, tkn.ty);
+    try expectEqual(Token.Type.Dot, tkn.ty);
     try expectEqual(@intCast(u64, 1), tkn.csr.ln);
     try expectEqual(@intCast(u64, 1), tkn.csr.ch);
     try expectEqual(@intCast(u64, 1), lexer.csr.ln);
@@ -292,7 +290,7 @@ test "lexer can skip whitespace" {
     const code = " \t\r\n .";
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
-    try expectEqual(TokenType.Dot, tkn.ty);
+    try expectEqual(Token.Type.Dot, tkn.ty);
     try expectEqual(@intCast(u64, 2), tkn.csr.ln);
     try expectEqual(@intCast(u64, 2), tkn.csr.ch);
 }
@@ -302,7 +300,7 @@ test "lexer can lex invalid characters" {
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
     const expectedCode: []const u8 = code[0..1];
-    try expectEqual(TokenType.Invalid, tkn.ty);
+    try expectEqual(Token.Type.Invalid, tkn.ty);
     try expectEqual(expectedCode, tkn.data);
 }
 
@@ -311,13 +309,13 @@ test "lexer can lex identifiers" {
     var lexer = Lexer.new(code[0..]);
 
     const ident = lexer.next();
-    try expectEqual(TokenType.Ident, ident.ty);
+    try expectEqual(Token.Type.Ident, ident.ty);
     try expectEqualStrings("anIdent0_", ident.data);
     try expectEqual(@intCast(u32, 1), ident.csr.ln);
     try expectEqual(@intCast(u32, 2), ident.csr.ch);
 
     const dot = lexer.next();
-    try expectEqual(TokenType.Dot, dot.ty);
+    try expectEqual(Token.Type.Dot, dot.ty);
     try expectEqual(@intCast(u32, 1), dot.csr.ln);
     try expectEqual(@intCast(u32, 12), dot.csr.ch);
 }
@@ -327,13 +325,13 @@ test "lexer can lex keywords" {
     var lexer = Lexer.new(code[0..]);
 
     const ident = lexer.next();
-    try expectEqual(TokenType.Null, ident.ty);
+    try expectEqual(Token.Type.Null, ident.ty);
     try expectEqualStrings("null", ident.data);
     try expectEqual(@intCast(u32, 1), ident.csr.ln);
     try expectEqual(@intCast(u32, 2), ident.csr.ch);
 
     const dot = lexer.next();
-    try expectEqual(TokenType.Dot, dot.ty);
+    try expectEqual(Token.Type.Dot, dot.ty);
     try expectEqual(@intCast(u32, 1), dot.csr.ln);
     try expectEqual(@intCast(u32, 7), dot.csr.ch);
 }
@@ -343,13 +341,13 @@ test "lexer can lex integers" {
     var lexer = Lexer.new(code[0..]);
 
     const ident = lexer.next();
-    try expectEqual(TokenType.Int, ident.ty);
+    try expectEqual(Token.Type.Int, ident.ty);
     try expectEqualStrings("123456", ident.data);
     try expectEqual(@intCast(u32, 1), ident.csr.ln);
     try expectEqual(@intCast(u32, 2), ident.csr.ch);
 
     const dot = lexer.next();
-    try expectEqual(TokenType.Dot, dot.ty);
+    try expectEqual(Token.Type.Dot, dot.ty);
     try expectEqual(@intCast(u32, 1), dot.csr.ln);
     try expectEqual(@intCast(u32, 9), dot.csr.ch);
 }
@@ -357,7 +355,7 @@ test "lexer can lex integers" {
 test "lexer can lex strings" {
     const StringTestCase = struct {
         code: []const u8,
-        expectedType: TokenType = .String,
+        expectedType: Token.Type = .String,
 
         pub fn run(comptime self: @This()) anyerror!void {
             const input = " " ++ self.code ++ " . ";
@@ -368,7 +366,7 @@ test "lexer can lex strings" {
             try expectEqualStrings(self.code, str.data);
 
             const dot = lexer.next();
-            try expectEqual(TokenType.Dot, dot.ty);
+            try expectEqual(Token.Type.Dot, dot.ty);
             try expectEqual(@intCast(u32, 1), dot.csr.ln);
             try expectEqual(@intCast(u32, self.code.len + 3), dot.csr.ch);
         }

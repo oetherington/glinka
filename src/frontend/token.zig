@@ -19,68 +19,68 @@ const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const Cursor = @import("../common/cursor.zig").Cursor;
 
-pub const TokenType = enum(u8) {
-    // Special tokens
-    EOF,
-    Invalid,
-
-    // Literal tokens
-    Ident,
-    Int,
-    String,
-    Template,
-
-    // Atom tokens
-    Dot,
-    Comma,
-    Colon,
-    Semi,
-
-    // Operators
-    Question,
-    Eq,
-
-    // Control flow
-    LBrace,
-    RBrace,
-    LBrack,
-    RBrack,
-    LParen,
-    RParen,
-
-    // Keywords
-    Class,
-    Const,
-    Constructor,
-    Declare,
-    Default,
-    Enum,
-    Export,
-    Extends,
-    False,
-    Function,
-    Implements,
-    Import,
-    Interface,
-    Let,
-    New,
-    Null,
-    Private,
-    Public,
-    Require,
-    Static,
-    True,
-    Typeof,
-    Undefined,
-    Var,
-};
-
 pub const Token = struct {
-    ty: TokenType,
+    pub const Type = enum {
+        // Special tokens
+        EOF,
+        Invalid,
+
+        // Literal tokens
+        Ident,
+        Int,
+        String,
+        Template,
+
+        // Atom tokens
+        Dot,
+        Comma,
+        Colon,
+        Semi,
+
+        // Operators
+        Question,
+        Eq,
+
+        // Control flow
+        LBrace,
+        RBrace,
+        LBrack,
+        RBrack,
+        LParen,
+        RParen,
+
+        // Keywords
+        Class,
+        Const,
+        Constructor,
+        Declare,
+        Default,
+        Enum,
+        Export,
+        Extends,
+        False,
+        Function,
+        Implements,
+        Import,
+        Interface,
+        Let,
+        New,
+        Null,
+        Private,
+        Public,
+        Require,
+        Static,
+        True,
+        Typeof,
+        Undefined,
+        Var,
+    };
+
+    ty: Type,
     csr: Cursor,
     data: []const u8,
 
-    pub fn new(ty: TokenType, csr: Cursor) Token {
+    pub fn new(ty: Type, csr: Cursor) Token {
         return Token{
             .ty = ty,
             .csr = csr,
@@ -88,7 +88,7 @@ pub const Token = struct {
         };
     }
 
-    pub fn newData(ty: TokenType, csr: Cursor, data: []const u8) Token {
+    pub fn newData(ty: Type, csr: Cursor, data: []const u8) Token {
         return Token{
             .ty = ty,
             .csr = csr,
@@ -97,7 +97,7 @@ pub const Token = struct {
     }
 
     pub fn newInvalid() Token {
-        return Token.new(TokenType.Invalid, Cursor.new(0, 0));
+        return Token.new(Type.Invalid, Cursor.new(0, 0));
     }
 
     pub fn dump(self: Token) void {
@@ -107,7 +107,7 @@ pub const Token = struct {
 };
 
 test "token can be initialized with no data" {
-    const ty: TokenType = TokenType.Int;
+    const ty: Token.Type = .Int;
     const ln: u32 = 3;
     const ch: u32 = 4;
     const csr = Cursor.new(ln, ch);
@@ -122,7 +122,7 @@ test "token can be initialized with no data" {
 }
 
 test "token can be initialized with data" {
-    const ty: TokenType = TokenType.Int;
+    const ty: Token.Type = .Int;
     const ln: u32 = 3;
     const ch: u32 = 4;
     const csr = Cursor.new(ln, ch);

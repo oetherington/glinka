@@ -20,9 +20,7 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Cursor = @import("../common/cursor.zig").Cursor;
-const token = @import("token.zig");
-const TokenType = token.TokenType;
-const Token = token.Token;
+const Token = @import("token.zig").Token;
 const node = @import("node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
@@ -35,14 +33,14 @@ pub const ExpectedDataType = enum {
 };
 
 pub const ExpectedData = union(ExpectedDataType) {
-    Token: TokenType,
+    Token: Token.Type,
     String: []const u8,
 
     pub fn new(data: anytype) ExpectedData {
         return switch (@typeInfo(@TypeOf(data))) {
             .Enum => ExpectedData{ .Token = data },
             .Pointer => ExpectedData{ .String = data },
-            else => @compileError("expected must be a TokenType or a string"),
+            else => @compileError("expected must be a Token.Type or a string"),
         };
     }
 
@@ -58,8 +56,8 @@ pub const ExpectedData = union(ExpectedDataType) {
     }
 };
 
-test "can initialize 'ExpectedData' with a TokenType" {
-    const tt = TokenType.Dot;
+test "can initialize 'ExpectedData' with a Token.Type" {
+    const tt = Token.Type.Dot;
     const data = ExpectedData.new(tt);
     try expectEqual(ExpectedData.Token, data.getType());
     try expectEqual(tt, data.Token);
@@ -109,7 +107,7 @@ pub const FoundData = union(FoundDataType) {
 };
 
 test "can initialize 'FoundData' with a Token" {
-    const tkn = Token.new(TokenType.Eq, Cursor.new(0, 0));
+    const tkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
     const data = FoundData.new(tkn);
     try expectEqual(FoundData.Token, data.getType());
     try expectEqual(tkn, data.Token);
@@ -152,8 +150,8 @@ pub const Expected = struct {
 };
 
 test "can initialize Expected" {
-    const tokenType = TokenType.Dot;
-    const foundTkn = Token.new(TokenType.Eq, Cursor.new(0, 0));
+    const tokenType = Token.Type.Dot;
+    const foundTkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
     const expected = Expected.new(tokenType, foundTkn);
     try expectEqual(ExpectedDataType.Token, expected.expected.getType());
     try expectEqual(FoundDataType.Token, expected.found.getType());
@@ -217,8 +215,8 @@ pub const ParseError = struct {
 };
 
 test "can initialize a 'ParseError' with an expected type" {
-    const tokenType = TokenType.Dot;
-    const foundTkn = Token.new(TokenType.Eq, Cursor.new(0, 0));
+    const tokenType = Token.Type.Dot;
+    const foundTkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
     const err = ParseError.expected(tokenType, foundTkn);
     try expectEqual(ParseErrorType.Expected, err.getType());
     try expectEqual(foundTkn.csr, err.csr);
@@ -312,7 +310,7 @@ test "can initialize 'Success' parse result" {
 }
 
 test "can initialize 'Error' parse result" {
-    const expected = TokenType.Dot;
+    const expected = Token.Type.Dot;
     const found = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
@@ -335,7 +333,7 @@ test "can initialize 'NoMatch' parse result without a payload" {
 }
 
 test "can initialize 'NoMatch' parse result with a payload" {
-    const expected = TokenType.Dot;
+    const expected = Token.Type.Dot;
     const found = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
