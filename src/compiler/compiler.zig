@@ -19,28 +19,40 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const Parser = @import("../frontend/parser.zig").Parser;
-const Node = @import("../frontend/node.zig").Node;
+const node = @import("../frontend/node.zig");
+const Node = node.Node;
+const NodeType = node.NodeType;
 const Backend = @import("../backends/backend.zig").Backend;
-const errorContext = @import("error_context.zig");
-const ErrorContext = errorContext.ErrorContext;
+const Scope = @import("scope.zig").Scope;
+const Type = @import("types/type.zig").Type;
+const TypeError = @import("types/type_error.zig").TypeError;
+const ErrorContext = @import("error_context.zig").ErrorContext;
 const CompileError = @import("compile_error.zig").CompileError;
+const inferrer = @import("inferrer.zig");
 
 pub const Compiler = struct {
     alloc: *Allocator,
     parser: *Parser,
     backend: *Backend,
+    scope: *Scope,
     errors: ErrorContext,
 
-    pub fn new(alloc: *Allocator, parser: *Parser, backend: *Backend) Compiler {
+    pub fn new(
+        alloc: *Allocator,
+        parser: *Parser,
+        backend: *Backend,
+    ) !Compiler {
         return Compiler{
             .alloc = alloc,
             .parser = parser,
             .backend = backend,
+            .scope = try Scope.new(alloc, null),
             .errors = ErrorContext.new(alloc),
         };
     }
 
     pub fn deinit(self: *Compiler) void {
+        self.scope.deinit();
         self.errors.deinit();
     }
 
@@ -52,14 +64,38 @@ pub const Compiler = struct {
         try self.errors.report();
     }
 
-    pub fn processNode(self: *Compiler, node: Node) !void {
-        _ = self;
-        node.dump();
+    fn processDecl(self: *Compiler, nd: Node) !void {
+        std.debug.assert(nd.getType() == NodeType.Decl);
 
-        switch (node.data) {
-            .Var, .Let, .Const => {
-                try self.backend.declaration(node);
-            },
+        const decl = nd.data.Decl;
+
+        const tyHint = if (decl.ty) |ty|
+            try inferrer.findType(self.scope, ty)
+        else
+            Type.newAny(); // TODO: Error for implicit any
+
+        const valTy = if (decl.value) |value|
+            inferrer.inferExprType(self.scope, value)
+        else
+            Type.newAny(); // TODO: Error for implicit any
+
+        if (!valTy.isAssignableTo(tyHint)) {
+            try self.errors.append(CompileError.typeError(
+                TypeError.new(nd.csr, valTy, tyHint),
+            ));
+            return;
+        }
+
+        // TODO Insert into scope
+
+        try self.backend.declaration(nd);
+    }
+
+    pub fn processNode(self: *Compiler, nd: Node) !void {
+        nd.dump(); // TODO: TMP
+
+        switch (nd.data) {
+            .Decl => try self.processDecl(nd),
             else => {},
         }
     }
@@ -70,7 +106,7 @@ pub const Compiler = struct {
         while (true) {
             const res = try self.parser.next();
 
-            const node = switch (res) {
+            const nd = switch (res) {
                 .Success => |node| node,
                 .Error => |err| {
                     try self.errors.append(CompileError.parseError(err));
@@ -90,9 +126,9 @@ pub const Compiler = struct {
                 },
             };
 
-            switch (node.getType()) {
+            switch (nd.getType()) {
                 .EOF => break,
-                else => try self.processNode(node),
+                else => try self.processNode(nd),
             }
         }
 

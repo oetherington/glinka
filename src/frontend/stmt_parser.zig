@@ -32,7 +32,10 @@ const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = parseresult.ParseError;
 
-fn parseDecl(psr: *Parser, comptime ty: NodeType) Parser.Error!ParseResult {
+fn parseDecl(
+    psr: *Parser,
+    comptime scoping: Decl.Scoping,
+) Parser.Error!ParseResult {
     const csr = psr.lexer.token.csr;
 
     const name = psr.lexer.next();
@@ -67,8 +70,8 @@ fn parseDecl(psr: *Parser, comptime ty: NodeType) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    const decl = Decl.new(name.data, declTy, expr);
-    const result = try makeNode(psr.getAllocator(), csr, ty, decl);
+    const decl = Decl.new(scoping, name.data, declTy, expr);
+    const result = try makeNode(psr.getAllocator(), csr, .Decl, decl);
 
     return ParseResult.success(result);
 }
@@ -86,7 +89,7 @@ test "can parse end-of-file" {
 test "can parse var, let and const declarations" {
     const Runner = struct {
         code: []const u8,
-        expectedNodeType: NodeType,
+        expectedScoping: Decl.Scoping,
         expectedDeclType: ?Node,
         expectedValueIdent: ?[]const u8,
 
@@ -97,30 +100,27 @@ test "can parse var, let and const declarations" {
             const res = try parser.next();
 
             try expect(res.isSuccess());
-            try expectEqual(self.expectedNodeType, res.Success.getType());
+            try expectEqual(NodeType.Decl, res.Success.getType());
 
-            switch (res.Success.data) {
-                .Var, .Let, .Const => |d| {
-                    try expectEqualStrings("test", d.name);
+            const d = res.Success.data.Decl;
 
-                    if (self.expectedDeclType) |t| {
-                        try expect(t.eql(d.ty));
-                    } else {
-                        try expect(d.ty == null);
-                    }
+            try expectEqualStrings("test", d.name);
 
-                    if (self.expectedValueIdent) |i| {
-                        if (d.value) |value| {
-                            try expectEqual(NodeType.Ident, value.getType());
-                            try expectEqualStrings(i, value.data.Ident);
-                        } else {
-                            std.debug.panic("Value should not be null", .{});
-                        }
-                    } else {
-                        try expect(d.value == null);
-                    }
-                },
-                else => std.debug.panic("Invalid test result", .{}),
+            if (self.expectedDeclType) |t| {
+                try expect(t.eql(d.ty));
+            } else {
+                try expect(d.ty == null);
+            }
+
+            if (self.expectedValueIdent) |i| {
+                if (d.value) |value| {
+                    try expectEqual(NodeType.Ident, value.getType());
+                    try expectEqualStrings(i, value.data.Ident);
+                } else {
+                    std.debug.panic("Value should not be null", .{});
+                }
+            } else {
+                try expect(d.value == null);
             }
         }
     };
@@ -135,42 +135,42 @@ test "can parse var, let and const declarations" {
 
     try (Runner{
         .code = "var test;",
-        .expectedNodeType = NodeType.Var,
+        .expectedScoping = .Var,
         .expectedDeclType = null,
         .expectedValueIdent = null,
     }).run();
 
     try (Runner{
         .code = "let test;",
-        .expectedNodeType = NodeType.Let,
+        .expectedScoping = .Let,
         .expectedDeclType = null,
         .expectedValueIdent = null,
     }).run();
 
     try (Runner{
         .code = "const test;",
-        .expectedNodeType = NodeType.Const,
+        .expectedScoping = .Const,
         .expectedDeclType = null,
         .expectedValueIdent = null,
     }).run();
 
     try (Runner{
         .code = "var test: number;",
-        .expectedNodeType = NodeType.Var,
+        .expectedScoping = .Var,
         .expectedDeclType = numberType,
         .expectedValueIdent = null,
     }).run();
 
     try (Runner{
         .code = "var test = someOtherVariable;",
-        .expectedNodeType = NodeType.Var,
+        .expectedScoping = .Var,
         .expectedDeclType = null,
         .expectedValueIdent = "someOtherVariable",
     }).run();
 
     try (Runner{
         .code = "var test: number = someOtherVariable;",
-        .expectedNodeType = NodeType.Var,
+        .expectedScoping = .Var,
         .expectedDeclType = numberType,
         .expectedValueIdent = "someOtherVariable",
     }).run();

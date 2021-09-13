@@ -24,18 +24,19 @@ const Compiler = @import("compiler/compiler.zig").Compiler;
 pub fn main() !void {
     std.io.getStdOut().writeAll("Glinka - version 0.0.1\n") catch unreachable;
 
-    const code: []const u8 = "var test: number = true;";
+    const code: []const u8 = "var test: string = 'hello';";
 
-    var alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = alloc.deinit();
+    var allocator = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = allocator.deinit();
+    var alloc = &allocator.allocator;
 
-    var parser = Parser.new(&alloc.allocator, code);
+    var parser = Parser.new(alloc, code);
     defer parser.deinit();
 
-    var backend = try JsBackend.new(&alloc.allocator);
+    var backend = try JsBackend.new(alloc);
     defer backend.deinit();
 
-    var compiler = Compiler.new(&alloc.allocator, &parser, &backend.backend);
+    var compiler = try Compiler.new(alloc, &parser, &backend.backend);
     defer compiler.deinit();
 
     try compiler.run();

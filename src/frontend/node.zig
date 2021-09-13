@@ -20,6 +20,7 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
+const Token = @import("token.zig").Token;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const genericEql = @import("../common/generic_eql.zig");
 
@@ -38,12 +39,41 @@ fn putInd(
 }
 
 pub const Decl = struct {
+    pub const Scoping = enum {
+        Var,
+        Let,
+        Const,
+
+        pub fn fromTokenType(tkn: Token.Type) !Scoping {
+            return switch (tkn) {
+                .Var => .Var,
+                .Let => .Let,
+                .Const => .Const,
+            };
+        }
+
+        pub fn toString(self: Scoping) []const u8 {
+            return switch (self) {
+                .Var => "var",
+                .Let => "let",
+                .Const => "const",
+            };
+        }
+    };
+
+    scoping: Scoping,
     name: []const u8,
     ty: ?Node,
     value: ?Node,
 
-    pub fn new(name: []const u8, ty: ?Node, value: ?Node) Decl {
+    pub fn new(
+        scoping: Scoping,
+        name: []const u8,
+        ty: ?Node,
+        value: ?Node,
+    ) Decl {
         return Decl{
+            .scoping = scoping,
             .name = name,
             .ty = ty,
             .value = value,
@@ -55,7 +85,10 @@ pub const Decl = struct {
         writer: anytype,
         indent: usize,
     ) std.os.WriteError!void {
-        try putInd(writer, indent, "Decl \"{s}\"\n", .{self.name});
+        try putInd(writer, indent, "{s} Decl \"{s}\"\n", .{
+            @tagName(self.scoping),
+            self.name,
+        });
 
         if (self.ty) |ty|
             try ty.dumpIndented(writer, indent + 2);
@@ -67,9 +100,7 @@ pub const Decl = struct {
 
 pub const NodeType = enum(u8) {
     EOF,
-    Var,
-    Let,
-    Const,
+    Decl,
     Int,
     Ident,
     String,
@@ -83,9 +114,7 @@ pub const NodeType = enum(u8) {
 
 pub const NodeData = union(NodeType) {
     EOF: void,
-    Var: Decl,
-    Let: Decl,
-    Const: Decl,
+    Decl: Decl,
     Int: []const u8,
     Ident: []const u8,
     String: []const u8,
@@ -102,7 +131,7 @@ pub const NodeData = union(NodeType) {
         indent: usize,
     ) std.os.WriteError!void {
         switch (self) {
-            .Var, .Let, .Const => |decl| try decl.dump(writer, indent),
+            .Decl => |decl| try decl.dump(writer, indent),
             .Int, .TypeName, .Ident, .String, .Template => |s| try putInd(
                 writer,
                 indent,
@@ -176,12 +205,13 @@ test "can initialize a var node" {
     const node = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new(name, null, null),
+        NodeType.Decl,
+        Decl.new(.Var, name, null, null),
     );
     defer std.testing.allocator.destroy(node);
-    try expectEqual(node.getType(), NodeType.Var);
-    try expectEqualStrings(name, node.data.Var.name);
+    try expectEqual(node.getType(), NodeType.Decl);
+    try expectEqual(node.data.Decl.scoping, .Var);
+    try expectEqualStrings(name, node.data.Decl.name);
 }
 
 test "can compare Nodes for equality" {
@@ -190,22 +220,22 @@ test "can compare Nodes for equality" {
     const a = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new(name, null, null),
+        NodeType.Decl,
+        Decl.new(.Var, name, null, null),
     );
 
     const b = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new(name, null, null),
+        NodeType.Decl,
+        Decl.new(.Var, name, null, null),
     );
 
     const c = try makeNode(
         std.testing.allocator,
         Cursor.new(1, 1),
-        NodeType.Let,
-        Decl.new(name, null, null),
+        NodeType.Decl,
+        Decl.new(.Var, name, null, null),
     );
 
     defer std.testing.allocator.destroy(a);

@@ -23,6 +23,7 @@ const Cursor = @import("../../common/cursor.zig").Cursor;
 const WriteContext = @import("../../common/writer.zig").WriteContext;
 const node = @import("../../frontend/node.zig");
 const Node = node.Node;
+const NodeType = node.NodeType;
 const exprEmitter = @import("expr_emitter.zig");
 const declEmitter = @import("decl_emitter.zig");
 
@@ -79,17 +80,10 @@ pub const JsBackend = struct {
     }
 
     fn declaration(be: *Backend, nd: Node) Backend.Error!void {
+        std.debug.assert(nd.getType() == NodeType.Decl);
         const self = JsBackend.getSelf(be);
-
-        switch (nd.data) {
-            .Var => |decl| try declEmitter.emitDecl(self, "var", decl),
-            .Let => |decl| try declEmitter.emitDecl(self, "let", decl),
-            .Const => |decl| try declEmitter.emitDecl(self, "const", decl),
-            else => std.debug.panic(
-                "Invalid Node type generating declaration: {?}",
-                .{nd},
-            ),
-        }
+        const decl = nd.data.Decl;
+        try declEmitter.emitDecl(self, decl);
     }
 };
 

@@ -45,7 +45,7 @@ const ExprTestCase = struct {
         const res = try parser.next();
         try expect(res.isSuccess());
 
-        const value = res.Success.data.Var.value.?;
+        const value = res.Success.data.Decl.value.?;
         try expectEqual(Cursor.new(1, 9), value.csr);
         try self.check(value);
     }
@@ -63,7 +63,10 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
         .False => makeNode(alloc, csr, .False, {}),
         .Null => makeNode(alloc, csr, .Null, {}),
         .Undefined => makeNode(alloc, csr, .Undefined, {}),
-        else => return ParseResult.noMatch(null),
+        else => return ParseResult.noMatchExpected(
+            "a primary expression",
+            psr.lexer.token,
+        ),
     };
 
     _ = psr.lexer.next();

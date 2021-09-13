@@ -119,8 +119,8 @@ test "can initialize 'FoundData' with a Node" {
     const found = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new("aName", null, null),
+        NodeType.Decl,
+        Decl.new(.Var, "aName", null, null),
     );
     defer std.testing.allocator.destroy(found);
     const data = FoundData.new(found);
@@ -278,6 +278,16 @@ pub const ParseResult = union(ParseResultType) {
         };
     }
 
+    pub fn noMatchExpected(
+        expectedData: anytype,
+        foundData: anytype,
+    ) ParseResult {
+        return ParseResult.noMatch(ParseError.expected(
+            expectedData,
+            foundData,
+        ));
+    }
+
     pub fn getType(self: ParseResult) ParseResultType {
         return @as(ParseResultType, self);
     }
@@ -291,8 +301,8 @@ test "can initialize 'Success' parse result" {
     const n = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new("aName", null, null),
+        NodeType.Decl,
+        Decl.new(.Var, "aName", null, null),
     );
     defer std.testing.allocator.destroy(n);
     const res = ParseResult.success(n);
@@ -306,8 +316,8 @@ test "can initialize 'Error' parse result" {
     const found = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new("aName", null, null),
+        NodeType.Decl,
+        Decl.new(.Var, "aName", null, null),
     );
     defer std.testing.allocator.destroy(found);
     const err = ParseError.expected(expected, found);
@@ -329,8 +339,8 @@ test "can initialize 'NoMatch' parse result with a payload" {
     const found = try makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
-        NodeType.Var,
-        Decl.new("aName", null, null),
+        NodeType.Decl,
+        Decl.new(.Var, "aName", null, null),
     );
     defer std.testing.allocator.destroy(found);
     const err = ParseError.expected(expected, found);

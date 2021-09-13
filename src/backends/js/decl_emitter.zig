@@ -23,12 +23,8 @@ const Cursor = @import("../../common/cursor.zig").Cursor;
 const Backend = @import("../backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
 
-pub fn emitDecl(
-    self: *JsBackend,
-    ty: []const u8,
-    decl: node.Decl,
-) Backend.Error!void {
-    try self.out.print("{s} {s}", .{ ty, decl.name });
+pub fn emitDecl(self: *JsBackend, decl: node.Decl) Backend.Error!void {
+    try self.out.print("{s} {s}", .{ decl.scoping.toString(), decl.name });
 
     if (decl.value) |value| {
         try self.out.print(" = ", .{});
@@ -38,80 +34,61 @@ pub fn emitDecl(
     try self.out.print(";\n", .{});
 }
 
-fn DeclTestCase(comptime declType: node.NodeType) type {
-    return struct {
-        const This = @This();
+const DeclTestCase = struct {
+    inputTy: []const u8,
+    scoping: node.Decl.Scoping,
+    expectedOutput: []const u8,
 
-        inputTy: []const u8,
-        getData: fn (nd: Node) node.Decl,
-        expectedOutput: []const u8,
+    pub fn run(self: DeclTestCase) !void {
+        var value = try DeclTestCase.makeNode(.Null, {});
+        defer std.testing.allocator.destroy(value);
 
-        pub fn run(self: This) !void {
-            var value = try This.makeNode(.Null, {});
-            defer std.testing.allocator.destroy(value);
+        var decl = try DeclTestCase.makeNode(
+            .Decl,
+            node.Decl.new(self.scoping, "test", null, value),
+        );
+        defer std.testing.allocator.destroy(decl);
 
-            var decl = try This.makeNode(
-                declType,
-                node.Decl.new("test", null, value),
-            );
-            defer std.testing.allocator.destroy(decl);
+        var backend = try JsBackend.new(std.testing.allocator);
+        defer backend.deinit();
 
-            var backend = try JsBackend.new(std.testing.allocator);
-            defer backend.deinit();
+        try emitDecl(&backend, decl.data.Decl);
 
-            try emitDecl(&backend, self.inputTy, self.getData(decl));
+        const str = try backend.toString();
+        defer backend.freeString(str);
+        try expectEqualStrings(self.expectedOutput, str);
+    }
 
-            const str = try backend.toString();
-            defer backend.freeString(str);
-            try expectEqualStrings(self.expectedOutput, str);
-        }
-
-        pub fn makeNode(comptime ty: node.NodeType, data: anytype) !Node {
-            return try node.makeNode(
-                std.testing.allocator,
-                Cursor.new(0, 0),
-                ty,
-                data,
-            );
-        }
-
-        pub fn getVar(nd: Node) node.Decl {
-            return nd.data.Var;
-        }
-
-        pub fn getLet(nd: Node) node.Decl {
-            return nd.data.Let;
-        }
-
-        pub fn getConst(nd: Node) node.Decl {
-            return nd.data.Const;
-        }
-    };
-}
+    pub fn makeNode(comptime ty: node.NodeType, data: anytype) !Node {
+        return try node.makeNode(
+            std.testing.allocator,
+            Cursor.new(0, 0),
+            ty,
+            data,
+        );
+    }
+};
 
 test "JsBackend can emit var declaration" {
-    const TestCase = DeclTestCase(.Var);
-    try (TestCase{
+    try (DeclTestCase{
         .inputTy = "var",
-        .getData = TestCase.getVar,
+        .scoping = .Var,
         .expectedOutput = "var test = null;\n",
     }).run();
 }
 
 test "JsBackend can emit let declaration" {
-    const TestCase = DeclTestCase(.Let);
-    try (TestCase{
+    try (DeclTestCase{
         .inputTy = "let",
-        .getData = TestCase.getLet,
+        .scoping = .Let,
         .expectedOutput = "let test = null;\n",
     }).run();
 }
 
 test "JsBackend can emit const declaration" {
-    const TestCase = DeclTestCase(.Const);
-    try (TestCase{
+    try (DeclTestCase{
         .inputTy = "const",
-        .getData = TestCase.getConst,
+        .scoping = .Const,
         .expectedOutput = "const test = null;\n",
     }).run();
 }
