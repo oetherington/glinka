@@ -27,12 +27,12 @@ const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
 
-pub const ExpectedDataType = enum {
-    Token,
-    String,
-};
+pub const ExpectedData = union(Type) {
+    pub const Type = enum {
+        Token,
+        String,
+    };
 
-pub const ExpectedData = union(ExpectedDataType) {
     Token: Token.Type,
     String: []const u8,
 
@@ -44,8 +44,8 @@ pub const ExpectedData = union(ExpectedDataType) {
         };
     }
 
-    pub fn getType(self: ExpectedData) ExpectedDataType {
-        return @as(ExpectedDataType, self);
+    pub fn getType(self: ExpectedData) Type {
+        return @as(Type, self);
     }
 
     pub fn write(self: ExpectedData, writer: anytype) !void {
@@ -70,12 +70,12 @@ test "can initialize 'ExpectedData' with a string" {
     try expectEqualStrings(str, data.String);
 }
 
-pub const FoundDataType = enum {
-    Token,
-    Node,
-};
+pub const FoundData = union(Type) {
+    pub const Type = enum {
+        Token,
+        Node,
+    };
 
-pub const FoundData = union(FoundDataType) {
     Token: Token,
     Node: Node,
 
@@ -94,8 +94,8 @@ pub const FoundData = union(FoundDataType) {
         };
     }
 
-    pub fn getType(self: FoundData) FoundDataType {
-        return @as(FoundDataType, self);
+    pub fn getType(self: FoundData) Type {
+        return @as(Type, self);
     }
 
     pub fn write(self: FoundData, writer: anytype) !void {
@@ -153,17 +153,17 @@ test "can initialize Expected" {
     const tokenType = Token.Type.Dot;
     const foundTkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
     const expected = Expected.new(tokenType, foundTkn);
-    try expectEqual(ExpectedDataType.Token, expected.expected.getType());
-    try expectEqual(FoundDataType.Token, expected.found.getType());
+    try expectEqual(ExpectedData.Type.Token, expected.expected.getType());
+    try expectEqual(FoundData.Type.Token, expected.found.getType());
     try expectEqual(foundTkn.csr, expected.getCursor());
 }
 
-pub const ParseErrorType = enum {
-    Expected,
-    Message,
-};
+pub const ParseErrorData = union(Type) {
+    pub const Type = enum {
+        Expected,
+        Message,
+    };
 
-pub const ParseErrorData = union(ParseErrorType) {
     Expected: Expected,
     Message: []const u8,
 
@@ -173,9 +173,15 @@ pub const ParseErrorData = union(ParseErrorType) {
             .Message => |m| try writer.print("{s}", .{m}),
         }
     }
+
+    pub fn getType(self: ParseErrorData) Type {
+        return @as(Type, self);
+    }
 };
 
 pub const ParseError = struct {
+    const Type = ParseErrorData.Type;
+
     csr: Cursor,
     data: ParseErrorData,
 
@@ -198,8 +204,8 @@ pub const ParseError = struct {
         };
     }
 
-    pub fn getType(self: ParseError) ParseErrorType {
-        return @as(ParseErrorType, self.data);
+    pub fn getType(self: ParseError) ParseErrorData.Type {
+        return self.data.getType();
     }
 
     pub fn report(self: ParseError, writer: anytype) !void {
@@ -218,14 +224,14 @@ test "can initialize a 'ParseError' with an expected type" {
     const tokenType = Token.Type.Dot;
     const foundTkn = Token.new(Token.Type.Eq, Cursor.new(0, 0));
     const err = ParseError.expected(tokenType, foundTkn);
-    try expectEqual(ParseErrorType.Expected, err.getType());
+    try expectEqual(ParseError.Type.Expected, err.getType());
     try expectEqual(foundTkn.csr, err.csr);
     try expectEqual(
-        ExpectedDataType.Token,
+        ExpectedData.Type.Token,
         err.data.Expected.expected.getType(),
     );
     try expectEqual(
-        FoundDataType.Token,
+        FoundData.Type.Token,
         err.data.Expected.found.getType(),
     );
 }
@@ -234,7 +240,7 @@ test "can initialize a 'ParseError' with an error message string" {
     const csr = Cursor.new(2, 4);
     const message: []const u8 = "any error message";
     const err = ParseError.message(csr, message);
-    try expectEqual(ParseErrorType.Message, err.getType());
+    try expectEqual(ParseError.Type.Message, err.getType());
     try expectEqual(csr, err.csr);
     try expectEqualStrings(message, err.data.Message);
 }
