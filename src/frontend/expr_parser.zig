@@ -57,6 +57,7 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
 
     const nd = try switch (psr.lexer.token.ty) {
         .Ident => makeNode(alloc, csr, .Ident, psr.lexer.token.data),
+        .Int => makeNode(alloc, csr, .Int, psr.lexer.token.data),
         .String => makeNode(alloc, csr, .String, psr.lexer.token.data),
         .Template => makeNode(alloc, csr, .Template, psr.lexer.token.data),
         .True => makeNode(alloc, csr, .True, {}),
@@ -81,6 +82,42 @@ test "can parse variable name primary expression" {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Ident, value.getType());
                 try expectEqualStrings("aVariableName", value.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse int primary expression" {
+    try (ExprTestCase{
+        .expr = "123456",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Int, value.getType());
+                try expectEqualStrings("123456", value.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse string primary expression" {
+    try (ExprTestCase{
+        .expr = "'a test string'",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.String, value.getType());
+                try expectEqualStrings("'a test string'", value.data.String);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse template primary expression" {
+    try (ExprTestCase{
+        .expr = "`a test template`",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Template, value.getType());
+                try expectEqualStrings("`a test template`", value.data.Template);
             }
         }).check,
     }).run();

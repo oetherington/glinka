@@ -25,6 +25,8 @@ const JsBackend = @import("js_backend.zig").JsBackend;
 
 pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
     try switch (value.data) {
+        .Ident => |i| self.out.print("{s}", .{i}),
+        .Int => |i| self.out.print("{s}", .{i}),
         .String => |s| self.out.print("{s}", .{s}),
         .Template => |t| self.out.print("{s}", .{t}),
         .True => self.out.print("true", .{}),
@@ -64,6 +66,20 @@ const ExprTestCase = struct {
         );
     }
 };
+
+test "JsBackend can emit ident expression" {
+    try (ExprTestCase{
+        .inputNode = try ExprTestCase.makeNode(.Ident, "anIdentifier"),
+        .expectedOutput = "anIdentifier",
+    }).run();
+}
+
+test "JsBackend can emit int expression" {
+    try (ExprTestCase{
+        .inputNode = try ExprTestCase.makeNode(.Int, "123"),
+        .expectedOutput = "123",
+    }).run();
+}
 
 test "JsBackend can emit string expression" {
     try (ExprTestCase{

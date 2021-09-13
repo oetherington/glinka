@@ -24,7 +24,7 @@ const Compiler = @import("compiler/compiler.zig").Compiler;
 pub fn main() !void {
     std.io.getStdOut().writeAll("Glinka - version 0.0.1\n") catch unreachable;
 
-    const code: []const u8 = "var test: string = 'hello';";
+    const code: []const u8 = "var test: number = 123;";
 
     var allocator = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = allocator.deinit();
