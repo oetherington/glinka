@@ -65,6 +65,7 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
         .False => makeNode(alloc, csr, .False, {}),
         .Null => makeNode(alloc, csr, .Null, {}),
         .Undefined => makeNode(alloc, csr, .Undefined, {}),
+        .This => makeNode(alloc, csr, .This, {}),
         .LParen => {
             _ = psr.lexer.next();
             const expr = try psr.parseExpr();
@@ -173,6 +174,17 @@ test "can parse 'undefined' primary expression" {
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Undefined, value.getType());
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse 'this' primary expression" {
+    try (ExprTestCase{
+        .expr = "this",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.This, value.getType());
             }
         }).check,
     }).run();

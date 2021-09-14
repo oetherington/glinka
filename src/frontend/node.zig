@@ -109,6 +109,7 @@ pub const NodeType = enum(u8) {
     False,
     Null,
     Undefined,
+    This,
     TypeName,
 };
 
@@ -123,6 +124,7 @@ pub const NodeData = union(NodeType) {
     False: void,
     Null: void,
     Undefined: void,
+    This: void,
     TypeName: []const u8,
 
     pub fn dump(
@@ -138,7 +140,7 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
-            .EOF, .True, .False, .Null, .Undefined => try putInd(
+            .EOF, .True, .False, .Null, .Undefined, .This => try putInd(
                 writer,
                 indent,
                 "{s}\n",
