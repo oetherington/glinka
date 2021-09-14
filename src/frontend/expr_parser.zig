@@ -44,6 +44,7 @@ const ExprTestCase = struct {
         defer parser.deinit();
 
         const res = try parser.next();
+        try res.reportIfError(std.io.getStdErr().writer());
         try expect(res.isSuccess());
 
         const value = res.Success.data.Decl.value.?;
@@ -203,8 +204,53 @@ test "can parse paren primary expression" {
     }).run();
 }
 
+fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {
+    const res = try parsePrimaryExpr(psr);
+    if (!res.isSuccess())
+        return res;
+
+    var left = res.Success;
+
+    while (true) {
+        if (psr.lexer.token.ty == .Inc) {
+            left = try makeNode(
+                psr.getAllocator(),
+                psr.lexer.token.csr,
+                .PostfixInc,
+                left,
+            );
+            _ = psr.lexer.next();
+        } else if (psr.lexer.token.ty == .Dec) {
+            left = try makeNode(
+                psr.getAllocator(),
+                psr.lexer.token.csr,
+                .PostfixDec,
+                left,
+            );
+            _ = psr.lexer.next();
+        } else {
+            return ParseResult.success(left);
+        }
+    }
+}
+
+test "can parse postfix increment and decrement expressions" {
+    try (ExprTestCase{
+        .expr = "b++",
+        .startingCh = 10,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.PostfixInc, value.getType());
+                const subExpr = value.data.PostfixInc;
+                try expectEqual(NodeType.Ident, subExpr.getType());
+                try expectEqualStrings("b", subExpr.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
 fn parseBinaryExpr(psr: *Parser) Parser.Error!ParseResult {
-    const left = parsePrimaryExpr(psr);
+    const left = parsePostfixExpr(psr);
 
     return left;
 }

@@ -110,6 +110,8 @@ pub const NodeType = enum(u8) {
     Null,
     Undefined,
     This,
+    PostfixInc,
+    PostfixDec,
     TypeName,
 };
 
@@ -125,6 +127,8 @@ pub const NodeData = union(NodeType) {
     Null: void,
     Undefined: void,
     This: void,
+    PostfixInc: Node,
+    PostfixDec: Node,
     TypeName: []const u8,
 
     pub fn dump(
@@ -146,6 +150,10 @@ pub const NodeData = union(NodeType) {
                 "{s}\n",
                 .{@tagName(self)},
             ),
+            .PostfixInc, .PostfixDec => |nd| {
+                try putInd(writer, indent, "{s}\n", .{@tagName(self)});
+                try nd.dumpIndented(writer, indent + 2);
+            },
         }
     }
 

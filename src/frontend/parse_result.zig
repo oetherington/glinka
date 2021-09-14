@@ -299,6 +299,14 @@ pub const ParseResult = union(ParseResultType) {
     pub fn isSuccess(self: ParseResult) bool {
         return @as(ParseResultType, self) == .Success;
     }
+
+    pub fn reportIfError(self: ParseResult, writer: anytype) !void {
+        switch (self) {
+            .Success => {},
+            .Error => |err| try err.report(writer),
+            .NoMatch => |err| if (err) |e| try e.report(writer),
+        }
+    }
 };
 
 test "can initialize 'Success' parse result" {

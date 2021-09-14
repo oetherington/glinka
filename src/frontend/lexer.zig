@@ -379,15 +379,15 @@ test "lexer can lex simple atoms" {
 }
 
 test "lexer can lex operators" {
-    const code = "+";
+    const code = "++";
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
-    try expectEqual(Token.Type.Add, tkn.ty);
+    try expectEqual(Token.Type.Inc, tkn.ty);
     try expectEqual(@intCast(u64, 1), tkn.csr.ln);
     try expectEqual(@intCast(u64, 1), tkn.csr.ch);
     try expectEqual(@intCast(u64, 1), lexer.csr.ln);
-    try expectEqual(@intCast(u64, 2), lexer.csr.ch);
-    try expectEqual(@intCast(u64, 1), lexer.index);
+    try expectEqual(@intCast(u64, 3), lexer.csr.ch);
+    try expectEqual(@intCast(u64, 2), lexer.index);
 }
 
 test "lexer can lex divide" {

@@ -34,7 +34,7 @@ pub fn main() !void {
         },
     );
 
-    const code: []const u8 = "var test: number = 123;";
+    const code: []const u8 = "var test: number = (123);";
 
     var allocator = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = allocator.deinit();

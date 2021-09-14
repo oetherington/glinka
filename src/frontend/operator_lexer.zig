@@ -65,7 +65,7 @@ const OperatorLexer = struct {
                     code[1..],
                     depth + 1,
                 ) orelse if (branch.lexer.terminal) |terminal|
-                    Result.new(terminal, depth)
+                    Result.new(terminal, depth + 1)
                 else
                     null;
 
@@ -308,7 +308,7 @@ const operatorLexer = OperatorLexer.new(
 );
 
 pub fn lexOperator(code: []const u8) ?OperatorLexer.Result {
-    return operatorLexer.lex(code, 1);
+    return operatorLexer.lex(code, 0);
 }
 
 test "OperatorLexer returns null at EOF" {
