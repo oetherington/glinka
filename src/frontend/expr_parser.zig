@@ -216,16 +216,16 @@ fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {
             left = try makeNode(
                 psr.getAllocator(),
                 psr.lexer.token.csr,
-                .PostfixInc,
-                left,
+                .PostfixOp,
+                node.UnaryOp.new(.Inc, left),
             );
             _ = psr.lexer.next();
         } else if (psr.lexer.token.ty == .Dec) {
             left = try makeNode(
                 psr.getAllocator(),
                 psr.lexer.token.csr,
-                .PostfixDec,
-                left,
+                .PostfixOp,
+                node.UnaryOp.new(.Dec, left),
             );
             _ = psr.lexer.next();
         } else {
@@ -234,23 +234,68 @@ fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {
     }
 }
 
-test "can parse postfix increment and decrement expressions" {
+test "can parse postfix unary operator expressions" {
     try (ExprTestCase{
         .expr = "b++",
         .startingCh = 10,
         .check = (struct {
             fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.PostfixInc, value.getType());
-                const subExpr = value.data.PostfixInc;
-                try expectEqual(NodeType.Ident, subExpr.getType());
-                try expectEqualStrings("b", subExpr.data.Ident);
+                try expectEqual(NodeType.PostfixOp, value.getType());
+                const data = value.data.PostfixOp;
+                try expectEqual(TokenType.Inc, data.op);
+                try expectEqual(NodeType.Ident, data.expr.getType());
+                try expectEqualStrings("b", data.expr.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
+fn parsePrefixExpr(psr: *Parser) Parser.Error!ParseResult {
+    const op = switch (psr.lexer.token.ty) {
+        .Delete,
+        .Void,
+        .TypeOf,
+        .Inc,
+        .Dec,
+        .Add,
+        .Sub,
+        .BitNot,
+        .LogicalNot,
+        => psr.lexer.token,
+        else => return try parsePostfixExpr(psr),
+    };
+
+    _ = psr.lexer.next();
+
+    const expr = try parsePrefixExpr(psr);
+    if (!expr.isSuccess())
+        return expr;
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        op.csr,
+        .PrefixOp,
+        node.UnaryOp.new(op.ty, expr.Success),
+    ));
+}
+
+test "can parse prefix unary operator expressions" {
+    try (ExprTestCase{
+        .expr = "++b",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.PrefixOp, value.getType());
+                const data = value.data.PrefixOp;
+                try expectEqual(TokenType.Inc, data.op);
+                try expectEqual(NodeType.Ident, data.expr.getType());
+                try expectEqualStrings("b", data.expr.data.Ident);
             }
         }).check,
     }).run();
 }
 
 fn parseBinaryExpr(psr: *Parser) Parser.Error!ParseResult {
-    const left = parsePostfixExpr(psr);
+    const left = parsePrefixExpr(psr);
 
     return left;
 }

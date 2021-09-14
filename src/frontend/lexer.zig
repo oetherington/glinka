@@ -29,6 +29,7 @@ const keywordMap = std.ComptimeStringMap(Token.Type, .{
     .{ "let", .Let },
     .{ "const", .Const },
     .{ "function", .Function },
+    .{ "void", .Void },
     .{ "async", .Async },
     .{ "await", .Await },
     .{ "yield", .Yield },

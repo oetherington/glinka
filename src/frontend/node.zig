@@ -98,6 +98,27 @@ pub const Decl = struct {
     }
 };
 
+pub const UnaryOp = struct {
+    op: Token.Type,
+    expr: Node,
+
+    pub fn new(op: Token.Type, expr: Node) UnaryOp {
+        return UnaryOp{
+            .op = op,
+            .expr = expr,
+        };
+    }
+
+    pub fn dump(
+        self: UnaryOp,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "{s} Unary Op\n", .{@tagName(self.op)});
+        try self.expr.dumpIndented(writer, indent + 2);
+    }
+};
+
 pub const NodeType = enum(u8) {
     EOF,
     Decl,
@@ -110,8 +131,8 @@ pub const NodeType = enum(u8) {
     Null,
     Undefined,
     This,
-    PostfixInc,
-    PostfixDec,
+    PostfixOp,
+    PrefixOp,
     TypeName,
 };
 
@@ -127,8 +148,8 @@ pub const NodeData = union(NodeType) {
     Null: void,
     Undefined: void,
     This: void,
-    PostfixInc: Node,
-    PostfixDec: Node,
+    PostfixOp: UnaryOp,
+    PrefixOp: UnaryOp,
     TypeName: []const u8,
 
     pub fn dump(
@@ -150,9 +171,9 @@ pub const NodeData = union(NodeType) {
                 "{s}\n",
                 .{@tagName(self)},
             ),
-            .PostfixInc, .PostfixDec => |nd| {
+            .PostfixOp, .PrefixOp => |unaryOp| {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
-                try nd.dumpIndented(writer, indent + 2);
+                try unaryOp.dump(writer, indent);
             },
         }
     }

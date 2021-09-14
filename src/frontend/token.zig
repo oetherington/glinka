@@ -98,6 +98,7 @@ pub const Token = struct {
         Let,
         Const,
         Function,
+        Void,
         Async,
         Await,
         Yield,
