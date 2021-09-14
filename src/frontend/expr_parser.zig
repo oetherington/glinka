@@ -27,13 +27,14 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
-const TokenType = @import("token.zig").TokenType;
+const TokenType = @import("token.zig").Token.Type;
 const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = parseresult.ParseError;
 
 const ExprTestCase = struct {
     expr: []const u8,
+    startingCh: u32 = 9,
     check: fn (value: Node) anyerror!void,
 
     pub fn run(comptime self: @This()) !void {
@@ -46,7 +47,7 @@ const ExprTestCase = struct {
         try expect(res.isSuccess());
 
         const value = res.Success.data.Decl.value.?;
-        try expectEqual(Cursor.new(1, 9), value.csr);
+        try expectEqual(Cursor.new(1, self.startingCh), value.csr);
         try self.check(value);
     }
 };
@@ -64,6 +65,16 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
         .False => makeNode(alloc, csr, .False, {}),
         .Null => makeNode(alloc, csr, .Null, {}),
         .Undefined => makeNode(alloc, csr, .Undefined, {}),
+        .LParen => {
+            _ = psr.lexer.next();
+            const expr = try psr.parseExpr();
+            if (!expr.isSuccess())
+                return expr;
+            if (psr.lexer.token.ty != .RParen)
+                return ParseResult.expected(TokenType.RParen, psr.lexer.token);
+            _ = psr.lexer.next();
+            return expr;
+        },
         else => return ParseResult.noMatchExpected(
             "a primary expression",
             psr.lexer.token,
@@ -167,6 +178,25 @@ test "can parse 'undefined' primary expression" {
     }).run();
 }
 
+test "can parse paren primary expression" {
+    try (ExprTestCase{
+        .expr = "(123456)",
+        .startingCh = 10,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Int, value.getType());
+                try expectEqualStrings("123456", value.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
+fn parseBinaryExpr(psr: *Parser) Parser.Error!ParseResult {
+    const left = parsePrimaryExpr(psr);
+
+    return left;
+}
+
 pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {
-    return parsePrimaryExpr(psr);
+    return parseBinaryExpr(psr);
 }
