@@ -24,8 +24,6 @@ const Token = @import("token.zig").Token;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const genericEql = @import("../common/generic_eql.zig");
 
-pub const NodeList = std.ArrayListUnmanaged(Node);
-
 fn putInd(
     writer: anytype,
     indent: usize,
@@ -39,6 +37,36 @@ fn putInd(
 
     try writer.print(fmt, args);
 }
+
+pub const NodeList = std.ArrayListUnmanaged(Node);
+
+pub const Object = std.ArrayListUnmanaged(ObjectProperty);
+
+pub const ObjectProperty = struct {
+    key: Node,
+    value: Node,
+
+    pub fn new(key: Node, value: Node) ObjectProperty {
+        return ObjectProperty{
+            .key = key,
+            .value = value,
+        };
+    }
+
+    pub fn dump(
+        self: ObjectProperty,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Property\n", .{});
+        try self.key.dumpIndented(writer, indent + 2);
+        try self.value.dumpIndented(writer, indent + 2);
+    }
+
+    pub fn eql(self: ObjectProperty, other: ObjectProperty) bool {
+        return genericEql.eql(self, other);
+    }
+};
 
 pub const Decl = struct {
     pub const Scoping = enum {
@@ -178,6 +206,7 @@ pub const NodeType = enum(u8) {
     String,
     Template,
     Array,
+    Object,
     True,
     False,
     Null,
@@ -198,6 +227,7 @@ pub const NodeData = union(NodeType) {
     String: []const u8,
     Template: []const u8,
     Array: NodeList,
+    Object: Object,
     True: void,
     False: void,
     Null: void,
@@ -226,6 +256,11 @@ pub const NodeData = union(NodeType) {
                 try putInd(writer, indent, "Array Literal\n", .{});
                 for (array.items) |item|
                     try item.dumpIndented(writer, indent + 2);
+            },
+            .Object => |object| {
+                try putInd(writer, indent, "Object Literal\n", .{});
+                for (object.items) |item|
+                    try item.dump(writer, indent + 2);
             },
             .EOF, .True, .False, .Null, .Undefined, .This => try putInd(
                 writer,

@@ -18,6 +18,20 @@
 const std = @import("std");
 const activeTag = std.meta.activeTag;
 
+pub fn memEql(comptime T: type, a: []const T, b: []const T) bool {
+    if (a.len != b.len)
+        return false;
+    if (a.ptr == b.ptr)
+        return true;
+    for (a) |item, index| {
+        switch (@typeInfo(T)) {
+            .Struct => if (!b[index].eql(item)) return false,
+            else => if (b[index] != item) return false,
+        }
+    }
+    return true;
+}
+
 /// This is the same as std.meta.eql except slices are compared with
 /// std.mem.eql instead of a simple pointer comparison
 pub fn eql(a: anytype, b: @TypeOf(a)) bool {
@@ -69,7 +83,7 @@ pub fn eql(a: anytype, b: @TypeOf(a)) bool {
         .Pointer => |info| {
             return switch (info.size) {
                 .One, .Many, .C => a == b,
-                .Slice => std.mem.eql(info.child, a, b),
+                .Slice => memEql(info.child, a, b),
             };
         },
         .Optional => {

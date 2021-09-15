@@ -70,6 +70,19 @@ fn parseParenExpr(psr: *Parser) Parser.Error!ParseResult {
     return expr;
 }
 
+test "can parse paren primary expression" {
+    try (ExprTestCase{
+        .expr = "(123456)",
+        .startingCh = 1,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Int, value.getType());
+                try expectEqualStrings("123456", value.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
 fn parseArrayLiteral(psr: *Parser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrack);
 
@@ -86,9 +99,12 @@ fn parseArrayLiteral(psr: *Parser) Parser.Error!ParseResult {
         const item = try psr.parseExpr();
         if (!item.isSuccess())
             return item;
+
         try nd.data.Array.append(psr.getAllocator(), item.Success);
+
         if (psr.lexer.token.ty != .Comma)
             break;
+
         _ = psr.lexer.next();
     }
 
@@ -98,6 +114,116 @@ fn parseArrayLiteral(psr: *Parser) Parser.Error!ParseResult {
     _ = psr.lexer.next();
 
     return ParseResult.success(nd);
+}
+
+test "can parse array literal primary expression" {
+    try (ExprTestCase{
+        .expr = "[ 123, 'abc', true ]",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Array, value.getType());
+                const items = value.data.Array.items;
+                try expectEqual(@intCast(usize, 3), items.len);
+                try expectEqual(NodeType.Int, items[0].getType());
+                try expectEqualStrings("123", items[0].data.Int);
+                try expectEqual(NodeType.String, items[1].getType());
+                try expectEqualStrings("'abc'", items[1].data.String);
+                try expectEqual(NodeType.True, items[2].getType());
+            }
+        }).check,
+    }).run();
+}
+
+fn parsePropertyKey(psr: *Parser) Parser.Error!ParseResult {
+    const alloc = psr.getAllocator();
+    const csr = psr.lexer.token.csr;
+    const data = psr.lexer.token.data;
+
+    const nd = switch (psr.lexer.token.ty) {
+        .Ident => try makeNode(alloc, csr, .Ident, data),
+        .String => try makeNode(alloc, csr, .String, data),
+        .Int => try makeNode(alloc, csr, .Int, data),
+        else => return ParseResult.expected("property key", psr.lexer.token),
+    };
+
+    _ = psr.lexer.next();
+
+    return ParseResult.success(nd);
+}
+
+fn parseObjectLiteral(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .LBrace);
+
+    const nd = try makeNode(
+        psr.getAllocator(),
+        psr.lexer.token.csr,
+        .Object,
+        node.Object{},
+    );
+
+    _ = psr.lexer.next();
+
+    while (psr.lexer.token.ty != .RBrace) {
+        const key = try parsePropertyKey(psr);
+        if (!key.isSuccess())
+            return key;
+
+        if (psr.lexer.token.ty == .Colon) {
+            _ = psr.lexer.next();
+
+            const value = try parseBinaryExpr(psr);
+            if (!value.isSuccess())
+                return value;
+
+            try nd.data.Object.append(
+                psr.getAllocator(),
+                node.ObjectProperty.new(key.Success, value.Success),
+            );
+        } else if (key.Success.getType() == .Ident) {
+            try nd.data.Object.append(
+                psr.getAllocator(),
+                node.ObjectProperty.new(key.Success, key.Success),
+            );
+        } else {
+            return ParseResult.expected("property value", psr.lexer.token);
+        }
+
+        if (psr.lexer.token.ty != .Comma)
+            break;
+
+        _ = psr.lexer.next();
+    }
+
+    if (psr.lexer.token.ty != .RBrace)
+        return ParseResult.expected(TokenType.RBrace, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return ParseResult.success(nd);
+}
+
+test "can parse object literal primary expression" {
+    try (ExprTestCase{
+        .expr = "{ a: 'hello', 'b': true, c }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Object, value.getType());
+                const items = value.data.Object.items;
+                try expectEqual(@intCast(usize, 3), items.len);
+                try expectEqual(NodeType.Ident, items[0].key.getType());
+                try expectEqualStrings("a", items[0].key.data.Ident);
+                try expectEqual(NodeType.String, items[0].value.getType());
+                try expectEqualStrings("'hello'", items[0].value.data.String);
+                try expectEqual(NodeType.String, items[1].key.getType());
+                try expectEqualStrings("'b'", items[1].key.data.String);
+                try expectEqual(NodeType.True, items[1].value.getType());
+                try expectEqual(NodeType.Ident, items[2].key.getType());
+                try expectEqualStrings("c", items[2].key.data.Ident);
+                try expectEqual(NodeType.Ident, items[2].value.getType());
+                try expectEqualStrings("c", items[2].value.data.Ident);
+            }
+        }).check,
+    }).run();
 }
 
 fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
@@ -116,6 +242,7 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
         .This => makeNode(alloc, csr, .This, {}),
         .LParen => return parseParenExpr(psr),
         .LBrack => return parseArrayLiteral(psr),
+        .LBrace => return parseObjectLiteral(psr),
         else => return ParseResult.noMatchExpected(
             "a primary expression",
             psr.lexer.token,
@@ -225,37 +352,6 @@ test "can parse 'this' primary expression" {
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.This, value.getType());
-            }
-        }).check,
-    }).run();
-}
-
-test "can parse paren primary expression" {
-    try (ExprTestCase{
-        .expr = "(123456)",
-        .startingCh = 1,
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.Int, value.getType());
-                try expectEqualStrings("123456", value.data.Int);
-            }
-        }).check,
-    }).run();
-}
-
-test "can parse array literal primary expression" {
-    try (ExprTestCase{
-        .expr = "[ 123, 'abc', true ]",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.Array, value.getType());
-                const items = value.data.Array.items;
-                try expectEqual(@intCast(usize, 3), items.len);
-                try expectEqual(NodeType.Int, items[0].getType());
-                try expectEqualStrings("123", items[0].data.Int);
-                try expectEqual(NodeType.String, items[1].getType());
-                try expectEqualStrings("'abc'", items[1].data.String);
-                try expectEqual(NodeType.True, items[2].getType());
             }
         }).check,
     }).run();
