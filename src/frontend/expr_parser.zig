@@ -34,7 +34,7 @@ const ParseError = parseresult.ParseError;
 
 const ExprTestCase = struct {
     expr: []const u8,
-    startingCh: u32 = 9,
+    startingCh: u32 = 0,
     check: fn (value: Node) anyerror!void,
 
     pub fn run(comptime self: @This()) !void {
@@ -48,7 +48,7 @@ const ExprTestCase = struct {
         try expect(res.isSuccess());
 
         const value = res.Success.data.Decl.value.?;
-        try expectEqual(Cursor.new(1, self.startingCh), value.csr);
+        try expectEqual(Cursor.new(1, 9 + self.startingCh), value.csr);
         try self.check(value);
     }
 };
@@ -194,7 +194,7 @@ test "can parse 'this' primary expression" {
 test "can parse paren primary expression" {
     try (ExprTestCase{
         .expr = "(123456)",
-        .startingCh = 10,
+        .startingCh = 1,
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Int, value.getType());
@@ -237,7 +237,7 @@ fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {
 test "can parse postfix unary operator expressions" {
     try (ExprTestCase{
         .expr = "b++",
-        .startingCh = 10,
+        .startingCh = 1,
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.PostfixOp, value.getType());
@@ -294,10 +294,208 @@ test "can parse prefix unary operator expressions" {
     }).run();
 }
 
-fn parseBinaryExpr(psr: *Parser) Parser.Error!ParseResult {
-    const left = parsePrefixExpr(psr);
+fn BinaryOpParser(
+    next: fn (psr: *Parser) Parser.Error!ParseResult,
+    tokens: []const TokenType,
+) type {
+    return struct {
+        pub fn parse(psr: *Parser) Parser.Error!ParseResult {
+            const res = try next(psr);
+            if (!res.isSuccess())
+                return res;
 
-    return left;
+            var left = res.Success;
+
+            opLoop: while (true) {
+                inline for (tokens) |tkn| {
+                    if (psr.lexer.token.ty == tkn) {
+                        const op = psr.lexer.token;
+                        _ = psr.lexer.next();
+
+                        const right = try next(psr);
+                        if (!right.isSuccess())
+                            return right;
+
+                        left = try makeNode(
+                            psr.getAllocator(),
+                            op.csr,
+                            .BinaryOp,
+                            node.BinaryOp.new(op.ty, left, right.Success),
+                        );
+
+                        continue :opLoop;
+                    }
+                }
+
+                return ParseResult.success(left);
+            }
+        }
+    };
+}
+
+const mulOpParser = BinaryOpParser(
+    parsePrefixExpr,
+    &[_]TokenType{ .Mul, .Div, .Mod },
+);
+
+const addOpParser = BinaryOpParser(
+    mulOpParser.parse,
+    &[_]TokenType{ .Add, .Sub },
+);
+
+const shiftOpParser = BinaryOpParser(
+    addOpParser.parse,
+    &[_]TokenType{ .ShiftLeft, .ShiftRight, .ShiftRightUnsigned },
+);
+
+const relationalOpParser = BinaryOpParser(
+    shiftOpParser.parse,
+    &[_]TokenType{
+        .CmpGreater,
+        .CmpLess,
+        .CmpGreaterEq,
+        .CmpLessEq,
+        .InstanceOf,
+        .In,
+    },
+);
+
+const equalityOpParser = BinaryOpParser(
+    relationalOpParser.parse,
+    &[_]TokenType{ .CmpEq, .CmpNotEq, .CmpStrictEq, .CmpStrictNotEq },
+);
+
+const bitAndOpParser = BinaryOpParser(
+    equalityOpParser.parse,
+    &[_]TokenType{.BitAnd},
+);
+
+const bitXorOpParser = BinaryOpParser(
+    bitAndOpParser.parse,
+    &[_]TokenType{.BitXor},
+);
+
+const bitOrOpParser = BinaryOpParser(
+    bitXorOpParser.parse,
+    &[_]TokenType{.BitOr},
+);
+
+const logAndOpParser = BinaryOpParser(
+    bitOrOpParser.parse,
+    &[_]TokenType{.LogicalAnd},
+);
+
+const logOrOpParser = BinaryOpParser(
+    logAndOpParser.parse,
+    &[_]TokenType{.LogicalOr},
+);
+
+fn parseTernaryExpr(psr: *Parser) Parser.Error!ParseResult {
+    // TODO parse ternary expressions
+    return logOrOpParser.parse(psr);
+}
+
+const assignOpParser = BinaryOpParser(
+    parseTernaryExpr,
+    &[_]TokenType{
+        .Assign,
+        .AddAssign,
+        .SubAssign,
+        .MulAssign,
+        .DivAssign,
+        .ModAssign,
+        .ShiftLeftAssign,
+        .ShiftRightAssign,
+        .ShiftRightUnsignedAssign,
+        .BitAndAssign,
+        .BitOrAssign,
+        .BitXorAssign,
+    },
+);
+
+fn parseBinaryExpr(psr: *Parser) Parser.Error!ParseResult {
+    return assignOpParser.parse(psr);
+}
+
+fn BinaryOpTestCase(op: []const u8, ty: TokenType) type {
+    return struct {
+        pub fn run() !void {
+            try (ExprTestCase{
+                .expr = "a " ++ op ++ " b",
+                .startingCh = 2,
+                .check = @This().check,
+            }).run();
+        }
+
+        fn check(value: Node) anyerror!void {
+            try expectEqual(NodeType.BinaryOp, value.getType());
+            const data = value.data.BinaryOp;
+            try expectEqual(ty, data.op);
+            try expectEqual(NodeType.Ident, data.left.getType());
+            try expectEqualStrings("a", data.left.data.Ident);
+            try expectEqual(NodeType.Ident, data.right.getType());
+            try expectEqualStrings("b", data.right.data.Ident);
+        }
+    };
+}
+
+test "can parse mul binary expressions" {
+    try BinaryOpTestCase("*", .Mul).run();
+    try BinaryOpTestCase("/", .Div).run();
+    try BinaryOpTestCase("%", .Mod).run();
+}
+
+test "can parse add binary expressions" {
+    try BinaryOpTestCase("+", .Add).run();
+    try BinaryOpTestCase("-", .Sub).run();
+}
+
+test "can parse shift binary expressions" {
+    try BinaryOpTestCase("<<", .ShiftLeft).run();
+    try BinaryOpTestCase(">>", .ShiftRight).run();
+    try BinaryOpTestCase(">>>", .ShiftRightUnsigned).run();
+}
+
+test "can parse relational binary expressions" {
+    try BinaryOpTestCase(">", .CmpGreater).run();
+    try BinaryOpTestCase("<", .CmpLess).run();
+    try BinaryOpTestCase(">=", .CmpGreaterEq).run();
+    try BinaryOpTestCase("<=", .CmpLessEq).run();
+    try BinaryOpTestCase("instanceof", .InstanceOf).run();
+    try BinaryOpTestCase("in", .In).run();
+}
+
+test "can parse equality binary expressions" {
+    try BinaryOpTestCase("==", .CmpEq).run();
+    try BinaryOpTestCase("!=", .CmpNotEq).run();
+    try BinaryOpTestCase("===", .CmpStrictEq).run();
+    try BinaryOpTestCase("!==", .CmpStrictNotEq).run();
+}
+
+test "can parse bitwise binary expressions" {
+    try BinaryOpTestCase("&", .BitAnd).run();
+    try BinaryOpTestCase("^", .BitXor).run();
+    try BinaryOpTestCase("|", .BitOr).run();
+}
+
+test "can parse logical binary expressions" {
+    try BinaryOpTestCase("&&", .LogicalAnd).run();
+    try BinaryOpTestCase("||", .LogicalOr).run();
+}
+
+test "can parse assignment binary expressions" {
+    try BinaryOpTestCase("=", .Assign).run();
+    try BinaryOpTestCase("+=", .AddAssign).run();
+    try BinaryOpTestCase("-=", .SubAssign).run();
+    try BinaryOpTestCase("*=", .MulAssign).run();
+    try BinaryOpTestCase("/=", .DivAssign).run();
+    try BinaryOpTestCase("%=", .ModAssign).run();
+    try BinaryOpTestCase("<<=", .ShiftLeftAssign).run();
+    try BinaryOpTestCase(">>=", .ShiftRightAssign).run();
+    try BinaryOpTestCase(">>>=", .ShiftRightUnsignedAssign).run();
+    try BinaryOpTestCase("&=", .BitAndAssign).run();
+    try BinaryOpTestCase("|=", .BitOrAssign).run();
+    try BinaryOpTestCase("^=", .BitXorAssign).run();
 }
 
 pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {

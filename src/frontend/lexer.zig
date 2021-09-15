@@ -285,7 +285,10 @@ pub const Lexer = struct {
                             self.csr.ch = 1;
                             continue :nextLoop;
                         },
-                        else => return self.operator(),
+                        else => {
+                            self.index -= 1;
+                            return self.operator();
+                        },
                     }
                 },
                 '.',

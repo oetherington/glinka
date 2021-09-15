@@ -119,6 +119,30 @@ pub const UnaryOp = struct {
     }
 };
 
+pub const BinaryOp = struct {
+    op: Token.Type,
+    left: Node,
+    right: Node,
+
+    pub fn new(op: Token.Type, left: Node, right: Node) BinaryOp {
+        return BinaryOp{
+            .op = op,
+            .left = left,
+            .right = right,
+        };
+    }
+
+    pub fn dump(
+        self: BinaryOp,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "{s} Binary Op\n", .{@tagName(self.op)});
+        try self.left.dumpIndented(writer, indent + 2);
+        try self.right.dumpIndented(writer, indent + 2);
+    }
+};
+
 pub const NodeType = enum(u8) {
     EOF,
     Decl,
@@ -133,6 +157,7 @@ pub const NodeType = enum(u8) {
     This,
     PostfixOp,
     PrefixOp,
+    BinaryOp,
     TypeName,
 };
 
@@ -150,6 +175,7 @@ pub const NodeData = union(NodeType) {
     This: void,
     PostfixOp: UnaryOp,
     PrefixOp: UnaryOp,
+    BinaryOp: BinaryOp,
     TypeName: []const u8,
 
     pub fn dump(
@@ -175,6 +201,7 @@ pub const NodeData = union(NodeType) {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 try unaryOp.dump(writer, indent);
             },
+            .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
         }
     }
 
