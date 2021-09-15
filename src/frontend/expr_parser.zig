@@ -96,7 +96,7 @@ fn parseArrayLiteral(psr: *Parser) Parser.Error!ParseResult {
     _ = psr.lexer.next();
 
     while (psr.lexer.token.ty != .RBrack) {
-        const item = try psr.parseExpr();
+        const item = try parseBinaryExpr(psr);
         if (!item.isSuccess())
             return item;
 
@@ -698,6 +698,55 @@ test "can parse ternary expressions" {
     }).run();
 }
 
+fn parseCommaExpr(psr: *Parser) Parser.Error!ParseResult {
+    const res = try parseBinaryExpr(psr);
+    if (!res.isSuccess() or psr.lexer.token.ty != .Comma)
+        return res;
+
+    const alloc = psr.getAllocator();
+
+    var list = try makeNode(
+        alloc,
+        psr.lexer.token.csr,
+        .Comma,
+        node.NodeList{},
+    );
+
+    try list.data.Comma.append(alloc, res.Success);
+
+    while (psr.lexer.token.ty == .Comma) {
+        _ = psr.lexer.next();
+
+        const right = try parseBinaryExpr(psr);
+        if (!right.isSuccess())
+            return right;
+
+        try list.data.Comma.append(alloc, right.Success);
+    }
+
+    return ParseResult.success(list);
+}
+
+test "can parse comma expressions" {
+    try (ExprTestCase{
+        .expr = "a, 1, 'abc'",
+        .startingCh = 1,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Comma, value.getType());
+                const items = value.data.Comma.items;
+                try expectEqual(@intCast(usize, 3), items.len);
+                try expectEqual(NodeType.Ident, items[0].getType());
+                try expectEqualStrings("a", items[0].data.Ident);
+                try expectEqual(NodeType.Int, items[1].getType());
+                try expectEqualStrings("1", items[1].data.Int);
+                try expectEqual(NodeType.String, items[2].getType());
+                try expectEqualStrings("'abc'", items[2].data.String);
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {
-    return parseBinaryExpr(psr);
+    return parseCommaExpr(psr);
 }

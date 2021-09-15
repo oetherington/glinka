@@ -205,6 +205,7 @@ pub const NodeType = enum(u8) {
     Ident,
     String,
     Template,
+    Comma,
     Array,
     Object,
     True,
@@ -226,6 +227,7 @@ pub const NodeData = union(NodeType) {
     Ident: []const u8,
     String: []const u8,
     Template: []const u8,
+    Comma: NodeList,
     Array: NodeList,
     Object: Object,
     True: void,
@@ -252,13 +254,13 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
-            .Array => |array| {
-                try putInd(writer, indent, "Array Literal\n", .{});
-                for (array.items) |item|
+            .Comma, .Array => |list| {
+                try putInd(writer, indent, "{s}\n", .{@tagName(self)});
+                for (list.items) |item|
                     try item.dumpIndented(writer, indent + 2);
             },
             .Object => |object| {
-                try putInd(writer, indent, "Object Literal\n", .{});
+                try putInd(writer, indent, "Object\n", .{});
                 for (object.items) |item|
                     try item.dump(writer, indent + 2);
             },
