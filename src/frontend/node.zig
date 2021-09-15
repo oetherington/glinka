@@ -143,6 +143,31 @@ pub const BinaryOp = struct {
     }
 };
 
+pub const Ternary = struct {
+    cond: Node,
+    ifTrue: Node,
+    ifFalse: Node,
+
+    pub fn new(cond: Node, ifTrue: Node, ifFalse: Node) Ternary {
+        return Ternary{
+            .cond = cond,
+            .ifTrue = ifTrue,
+            .ifFalse = ifFalse,
+        };
+    }
+
+    pub fn dump(
+        self: Ternary,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Ternary Expression\n", .{});
+        try self.cond.dumpIndented(writer, indent + 2);
+        try self.ifTrue.dumpIndented(writer, indent + 2);
+        try self.ifFalse.dumpIndented(writer, indent + 2);
+    }
+};
+
 pub const NodeType = enum(u8) {
     EOF,
     Decl,
@@ -158,6 +183,7 @@ pub const NodeType = enum(u8) {
     PostfixOp,
     PrefixOp,
     BinaryOp,
+    Ternary,
     TypeName,
 };
 
@@ -176,6 +202,7 @@ pub const NodeData = union(NodeType) {
     PostfixOp: UnaryOp,
     PrefixOp: UnaryOp,
     BinaryOp: BinaryOp,
+    Ternary: Ternary,
     TypeName: []const u8,
 
     pub fn dump(
@@ -202,6 +229,7 @@ pub const NodeData = union(NodeType) {
                 try unaryOp.dump(writer, indent);
             },
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
+            .Ternary => |ternary| try ternary.dump(writer, indent),
         }
     }
 

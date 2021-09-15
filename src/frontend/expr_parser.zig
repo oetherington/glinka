@@ -391,8 +391,36 @@ const logOrOpParser = BinaryOpParser(
 );
 
 fn parseTernaryExpr(psr: *Parser) Parser.Error!ParseResult {
-    // TODO parse ternary expressions
-    return logOrOpParser.parse(psr);
+    const left = try logOrOpParser.parse(psr);
+    if (!left.isSuccess())
+        return left;
+
+    if (psr.lexer.token.ty != .Question)
+        return left;
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    const ifTrue = try assignOpParser.parse(psr);
+    if (!ifTrue.isSuccess())
+        return ifTrue;
+
+    if (psr.lexer.token.ty != .Colon)
+        return ParseResult.expected(TokenType.Colon, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    const ifFalse = try assignOpParser.parse(psr);
+    if (!ifFalse.isSuccess())
+        return ifFalse;
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        csr,
+        .Ternary,
+        node.Ternary.new(left.Success, ifTrue.Success, ifFalse.Success),
+    ));
 }
 
 const assignOpParser = BinaryOpParser(
@@ -496,6 +524,25 @@ test "can parse assignment binary expressions" {
     try BinaryOpTestCase("&=", .BitAndAssign).run();
     try BinaryOpTestCase("|=", .BitOrAssign).run();
     try BinaryOpTestCase("^=", .BitXorAssign).run();
+}
+
+test "can parse ternary expressions" {
+    try (ExprTestCase{
+        .expr = "a ? 1 : 'abc'",
+        .startingCh = 2,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Ternary, value.getType());
+                const ternary = value.data.Ternary;
+                try expectEqual(NodeType.Ident, ternary.cond.getType());
+                try expectEqualStrings("a", ternary.cond.data.Ident);
+                try expectEqual(NodeType.Int, ternary.ifTrue.getType());
+                try expectEqualStrings("1", ternary.ifTrue.data.Int);
+                try expectEqual(NodeType.String, ternary.ifFalse.getType());
+                try expectEqualStrings("'abc'", ternary.ifFalse.data.String);
+            }
+        }).check,
+    }).run();
 }
 
 pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {
