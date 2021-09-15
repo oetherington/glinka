@@ -24,6 +24,8 @@ const Token = @import("token.zig").Token;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const genericEql = @import("../common/generic_eql.zig");
 
+pub const NodeList = std.ArrayListUnmanaged(Node);
+
 fn putInd(
     writer: anytype,
     indent: usize,
@@ -175,6 +177,7 @@ pub const NodeType = enum(u8) {
     Ident,
     String,
     Template,
+    Array,
     True,
     False,
     Null,
@@ -194,6 +197,7 @@ pub const NodeData = union(NodeType) {
     Ident: []const u8,
     String: []const u8,
     Template: []const u8,
+    Array: NodeList,
     True: void,
     False: void,
     Null: void,
@@ -218,6 +222,11 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
+            .Array => |array| {
+                try putInd(writer, indent, "Array Literal\n", .{});
+                for (array.items) |item|
+                    try item.dumpIndented(writer, indent + 2);
+            },
             .EOF, .True, .False, .Null, .Undefined, .This => try putInd(
                 writer,
                 indent,

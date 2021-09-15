@@ -53,6 +53,53 @@ const ExprTestCase = struct {
     }
 };
 
+fn parseParenExpr(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .LParen);
+
+    _ = psr.lexer.next();
+
+    const expr = try psr.parseExpr();
+    if (!expr.isSuccess())
+        return expr;
+
+    if (psr.lexer.token.ty != .RParen)
+        return ParseResult.expected(TokenType.RParen, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return expr;
+}
+
+fn parseArrayLiteral(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .LBrack);
+
+    const nd = try makeNode(
+        psr.getAllocator(),
+        psr.lexer.token.csr,
+        .Array,
+        node.NodeList{},
+    );
+
+    _ = psr.lexer.next();
+
+    while (psr.lexer.token.ty != .RBrack) {
+        const item = try psr.parseExpr();
+        if (!item.isSuccess())
+            return item;
+        try nd.data.Array.append(psr.getAllocator(), item.Success);
+        if (psr.lexer.token.ty != .Comma)
+            break;
+        _ = psr.lexer.next();
+    }
+
+    if (psr.lexer.token.ty != .RBrack)
+        return ParseResult.expected(TokenType.RBrack, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return ParseResult.success(nd);
+}
+
 fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
@@ -67,16 +114,8 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
         .Null => makeNode(alloc, csr, .Null, {}),
         .Undefined => makeNode(alloc, csr, .Undefined, {}),
         .This => makeNode(alloc, csr, .This, {}),
-        .LParen => {
-            _ = psr.lexer.next();
-            const expr = try psr.parseExpr();
-            if (!expr.isSuccess())
-                return expr;
-            if (psr.lexer.token.ty != .RParen)
-                return ParseResult.expected(TokenType.RParen, psr.lexer.token);
-            _ = psr.lexer.next();
-            return expr;
-        },
+        .LParen => return parseParenExpr(psr),
+        .LBrack => return parseArrayLiteral(psr),
         else => return ParseResult.noMatchExpected(
             "a primary expression",
             psr.lexer.token,
@@ -199,6 +238,24 @@ test "can parse paren primary expression" {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Int, value.getType());
                 try expectEqualStrings("123456", value.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse array literal primary expression" {
+    try (ExprTestCase{
+        .expr = "[ 123, 'abc', true ]",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Array, value.getType());
+                const items = value.data.Array.items;
+                try expectEqual(@intCast(usize, 3), items.len);
+                try expectEqual(NodeType.Int, items[0].getType());
+                try expectEqualStrings("123", items[0].data.Int);
+                try expectEqual(NodeType.String, items[1].getType());
+                try expectEqualStrings("'abc'", items[1].data.String);
+                try expectEqual(NodeType.True, items[2].getType());
             }
         }).check,
     }).run();
