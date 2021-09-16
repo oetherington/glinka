@@ -226,6 +226,126 @@ test "can parse object literal primary expression" {
     }).run();
 }
 
+fn parseFunctionExpr(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Function);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    var func: node.Function = undefined;
+    func.isArrow = false;
+
+    if (psr.lexer.token.ty == .Ident) {
+        func.name = psr.lexer.token.data;
+        _ = psr.lexer.next();
+    } else {
+        func.name = null;
+    }
+
+    if (psr.lexer.token.ty != .LParen)
+        return ParseResult.expected("function argument list", psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    func.args = node.Function.ArgList{};
+
+    while (psr.lexer.token.ty != .RParen) {
+        const arg = psr.lexer.token;
+        if (arg.ty != .Ident)
+            return ParseResult.expected("a function argument", arg);
+
+        _ = psr.lexer.next();
+
+        var ty: ?Node = null;
+
+        if (psr.lexer.token.ty == .Colon) {
+            _ = psr.lexer.next();
+
+            const tyRes = try psr.parseType();
+            if (!tyRes.isSuccess())
+                return tyRes;
+
+            ty = tyRes.Success;
+        }
+
+        try func.args.append(psr.getAllocator(), node.Function.Arg{
+            .csr = arg.csr,
+            .name = arg.data,
+            .ty = ty,
+        });
+
+        if (psr.lexer.token.ty != .Comma)
+            break;
+
+        _ = psr.lexer.next();
+    }
+
+    if (psr.lexer.token.ty != .RParen)
+        return ParseResult.expected(TokenType.RParen, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    if (psr.lexer.token.ty == .Colon) {
+        _ = psr.lexer.next();
+
+        const retTy = try psr.parseType();
+        if (!retTy.isSuccess())
+            return retTy;
+
+        func.retTy = retTy.Success;
+    } else {
+        func.retTy = null;
+    }
+
+    const body = try psr.parseBlock();
+    if (!body.isSuccess())
+        return body;
+
+    func.body = body.Success;
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        csr,
+        .Function,
+        func,
+    ));
+}
+
+test "can parse function definition" {
+    try (ExprTestCase{
+        .expr = "function hello(world: number, foo: string, bar) : bool {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Function, value.getType());
+
+                const func = value.data.Function;
+                try expectEqual(false, func.isArrow);
+                try expectEqualStrings("hello", func.name.?);
+
+                const retTy = func.retTy.?;
+                try expectEqual(NodeType.TypeName, retTy.getType());
+                try expectEqualStrings("bool", retTy.data.TypeName);
+
+                const args = func.args.items;
+                try expectEqual(@intCast(usize, 3), args.len);
+                try expectEqualStrings("world", args[0].name);
+                try expectEqual(NodeType.TypeName, args[0].ty.?.getType());
+                try expectEqualStrings("number", args[0].ty.?.data.TypeName);
+                try expectEqualStrings("foo", args[1].name);
+                try expectEqual(NodeType.TypeName, args[1].ty.?.getType());
+                try expectEqualStrings("string", args[1].ty.?.data.TypeName);
+                try expectEqualStrings("bar", args[2].name);
+                try expect(args[2].ty == null);
+
+                const body = func.body;
+                try expectEqual(NodeType.Block, body.getType());
+                try expectEqual(@intCast(usize, 0), body.data.Block.items.len);
+            }
+        }).check,
+    }).run();
+}
+
 fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
@@ -243,6 +363,7 @@ fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
         .LParen => return parseParenExpr(psr),
         .LBrack => return parseArrayLiteral(psr),
         .LBrace => return parseObjectLiteral(psr),
+        .Function => return parseFunctionExpr(psr),
         else => return ParseResult.noMatchExpected(
             "a primary expression",
             psr.lexer.token,
@@ -357,8 +478,16 @@ test "can parse 'this' primary expression" {
     }).run();
 }
 
+fn parseMemberExpr(psr: *Parser) Parser.Error!ParseResult {
+    const left = parsePrimaryExpr(psr);
+
+    // TODO: Parse array access here
+
+    return left;
+}
+
 fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {
-    const res = try parsePrimaryExpr(psr);
+    const res = try parseMemberExpr(psr);
     if (!res.isSuccess())
         return res;
 

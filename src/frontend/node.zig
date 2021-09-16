@@ -198,6 +198,50 @@ pub const Ternary = struct {
     }
 };
 
+pub const Function = struct {
+    pub const Arg = struct {
+        csr: Cursor,
+        name: []const u8,
+        ty: ?Node,
+
+        pub fn eql(a: Arg, b: Arg) bool {
+            return genericEql.eql(a, b);
+        }
+    };
+
+    pub const ArgList = std.ArrayListUnmanaged(Arg);
+
+    isArrow: bool,
+    name: ?[]const u8,
+    retTy: ?Node,
+    args: ArgList,
+    body: Node,
+
+    pub fn dump(
+        self: Function,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        const arrow = if (self.isArrow) "Arrow " else "";
+        const name = if (self.name) |name| name else "<anonymous>";
+
+        try putInd(writer, indent, "{s}Function: {s}\n", .{ arrow, name });
+
+        if (self.retTy) |retTy|
+            try retTy.dumpIndented(writer, indent + 2);
+
+        try putInd(writer, indent, "Arguments:\n", .{});
+        for (self.args.items) |arg| {
+            try putInd(writer, indent + 2, "'{s}'\n", .{arg.name});
+            if (arg.ty) |ty|
+                try ty.dumpIndented(writer, indent + 4);
+        }
+
+        try putInd(writer, indent, "Body:\n", .{});
+        try self.body.dumpIndented(writer, indent + 2);
+    }
+};
+
 pub const NodeType = enum(u8) {
     EOF,
     Decl,
@@ -218,6 +262,8 @@ pub const NodeType = enum(u8) {
     BinaryOp,
     Ternary,
     TypeName,
+    Function,
+    Block,
 };
 
 pub const NodeData = union(NodeType) {
@@ -240,6 +286,8 @@ pub const NodeData = union(NodeType) {
     BinaryOp: BinaryOp,
     Ternary: Ternary,
     TypeName: []const u8,
+    Function: Function,
+    Block: NodeList,
 
     pub fn dump(
         self: NodeData,
@@ -254,7 +302,7 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
-            .Comma, .Array => |list| {
+            .Comma, .Array, .Block => |list| {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 for (list.items) |item|
                     try item.dumpIndented(writer, indent + 2);
@@ -276,6 +324,7 @@ pub const NodeData = union(NodeType) {
             },
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
             .Ternary => |ternary| try ternary.dump(writer, indent),
+            .Function => |func| try func.dump(writer, indent),
         }
     }
 

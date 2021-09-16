@@ -30,6 +30,10 @@ pub const Cursor = struct {
             .ch = ch,
         };
     }
+
+    pub fn eql(a: Cursor, b: Cursor) bool {
+        return a.ln == b.ln and a.ch == b.ch;
+    }
 };
 
 test "cursor can be initialized" {

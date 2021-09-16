@@ -176,11 +176,46 @@ test "can parse var, let and const declarations" {
     }).run();
 }
 
+pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
+    if (psr.lexer.token.ty != .LBrace)
+        return ParseResult.noMatch(
+            ParseError.expected("a block", psr.lexer.token),
+        );
+
+    var nd = try makeNode(
+        psr.getAllocator(),
+        psr.lexer.token.csr,
+        .Block,
+        node.NodeList{},
+    );
+
+    _ = psr.lexer.next();
+
+    // TODO
+
+    if (psr.lexer.token.ty != .RBrace)
+        return ParseResult.expected("'}' after block", psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return ParseResult.success(nd);
+}
+
+test "can parse empty block" {
+    var parser = Parser.new(std.testing.allocator, "{}");
+    defer parser.deinit();
+    const res = try parser.next();
+    try expect(res.isSuccess());
+    try expectEqual(NodeType.Block, res.Success.getType());
+    try expectEqual(@intCast(usize, 0), res.Success.data.Block.items.len);
+}
+
 pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
     return switch (psr.lexer.token.ty) {
         .Var => parseDecl(psr, .Var),
         .Let => parseDecl(psr, .Let),
         .Const => parseDecl(psr, .Const),
+        .LBrace => parseBlock(psr),
         .EOF => ParseResult.success(try makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,

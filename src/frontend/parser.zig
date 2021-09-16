@@ -68,6 +68,10 @@ pub const Parser = struct {
         return typeParser.parseType(self);
     }
 
+    pub fn parseBlock(self: *Parser) Parser.Error!ParseResult {
+        return stmtParser.parseBlock(self);
+    }
+
     pub fn parseStmt(self: *Parser) Parser.Error!ParseResult {
         return stmtParser.parseStmt(self);
     }

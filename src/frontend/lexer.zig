@@ -314,13 +314,13 @@ pub const Lexer = struct {
     }
 };
 
-test "Can classify keywords" {
+test "can classify keywords" {
     try expectEqual(Token.Type.Ident, getIdentTokenType("not_a_keyword"));
     try expectEqual(Token.Type.Class, getIdentTokenType("class"));
     try expectEqual(Token.Type.True, getIdentTokenType("true"));
 }
 
-test "Can classify identifier characters" {
+test "can classify identifier characters" {
     var c: u8 = 'a';
     while (c <= 'z') : (c += 1) {
         try expect(isIdent0(c));
@@ -346,7 +346,7 @@ test "Can classify identifier characters" {
     try expect(isIdent('$'));
 }
 
-test "Can classify integer characters" {
+test "can classify integer characters" {
     var c: u8 = '0';
     while (c <= '9') : (c += 1) {
         try expect(isNum(c));
