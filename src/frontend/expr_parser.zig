@@ -50,6 +50,10 @@ const ExprTestCase = struct {
         const value = res.Success.data.Decl.value.?;
         try expectEqual(Cursor.new(1, 9 + self.startingCh), value.csr);
         try self.check(value);
+
+        const eof = try parser.next();
+        try expect(eof.isSuccess());
+        try expectEqual(NodeType.EOF, eof.Success.getType());
     }
 };
 

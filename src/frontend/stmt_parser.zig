@@ -32,6 +32,26 @@ const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = parseresult.ParseError;
 
+const StmtTestCase = struct {
+    code: []const u8,
+    check: fn (value: Node) anyerror!void,
+
+    pub fn run(comptime self: @This()) !void {
+        var parser = Parser.new(std.testing.allocator, self.code);
+        defer parser.deinit();
+
+        const res = try parser.next();
+        try res.reportIfError(std.io.getStdErr().writer());
+        try expect(res.isSuccess());
+
+        try self.check(res.Success);
+
+        const eof = try parser.next();
+        try expect(eof.isSuccess());
+        try expectEqual(NodeType.EOF, eof.Success.getType());
+    }
+};
+
 fn parseDecl(
     psr: *Parser,
     comptime scoping: Decl.Scoping,
@@ -176,6 +196,190 @@ test "can parse var, let and const declarations" {
     }).run();
 }
 
+const BranchResult = union(Type) {
+    const Type = enum {
+        Branch,
+        ParseResult,
+    };
+
+    Branch: node.If.Branch,
+    ParseResult: ParseResult,
+
+    pub fn getType(self: BranchResult) Type {
+        return @as(Type, self);
+    }
+};
+
+fn parseIfBranch(psr: *Parser) Parser.Error!BranchResult {
+    if (psr.lexer.token.ty != .If)
+        return BranchResult{ .ParseResult = ParseResult.noMatch(null) };
+
+    _ = psr.lexer.next();
+
+    if (psr.lexer.token.ty != .LParen)
+        return BranchResult{ .ParseResult = ParseResult.expected(
+            "paren after 'if'",
+            psr.lexer.token,
+        ) };
+
+    _ = psr.lexer.next();
+
+    const cond = try psr.parseExpr();
+    if (!cond.isSuccess())
+        return BranchResult{ .ParseResult = cond };
+
+    if (psr.lexer.token.ty != .RParen)
+        return BranchResult{ .ParseResult = ParseResult.expected(
+            "paren after if condition",
+            psr.lexer.token,
+        ) };
+
+    _ = psr.lexer.next();
+
+    const body = try psr.parseStmt();
+    if (!body.isSuccess())
+        return BranchResult{ .ParseResult = body };
+
+    return BranchResult{ .Branch = node.If.Branch{
+        .cond = cond.Success,
+        .ifTrue = body.Success,
+    } };
+}
+
+fn parseIf(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .If);
+
+    const csr = psr.lexer.token.csr;
+
+    var data = node.If{
+        .branches = node.If.BranchList{},
+        .elseBranch = null,
+    };
+
+    while (true) {
+        var isElse: bool = undefined;
+        if (psr.lexer.token.ty == .Else) {
+            isElse = true;
+            _ = psr.lexer.next();
+        } else {
+            isElse = false;
+        }
+
+        const branch = try parseIfBranch(psr);
+        if (branch.getType() == .Branch) {
+            try data.branches.append(psr.getAllocator(), branch.Branch);
+        } else {
+            const res = branch.ParseResult;
+            std.debug.assert(!res.isSuccess());
+            if (res.getType() == .NoMatch) {
+                if (isElse) {
+                    const stmt = try psr.parseStmt();
+                    switch (stmt.getType()) {
+                        .Success => {
+                            data.elseBranch = stmt.Success;
+                            break;
+                        },
+                        .Error => return stmt,
+                        .NoMatch => return ParseResult.expected(
+                            "'if' after 'else'",
+                            psr.lexer.token,
+                        ),
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                return res;
+            }
+        }
+    }
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        csr,
+        .If,
+        data,
+    ));
+}
+
+test "can parse a simple if statement" {
+    try (StmtTestCase{
+        .code = "if (a) {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.If, value.getType());
+
+                const branches = value.data.If.branches.items;
+                try expectEqual(@intCast(usize, 1), branches.len);
+                try expectEqual(NodeType.Ident, branches[0].cond.getType());
+                try expectEqual(NodeType.Block, branches[0].ifTrue.getType());
+
+                try expect(value.data.If.elseBranch == null);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse an if statement with an 'else if' branch" {
+    try (StmtTestCase{
+        .code = "if (a) {} else if (b) {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.If, value.getType());
+
+                const branches = value.data.If.branches.items;
+                try expectEqual(@intCast(usize, 2), branches.len);
+                try expectEqual(NodeType.Ident, branches[0].cond.getType());
+                try expectEqual(NodeType.Block, branches[0].ifTrue.getType());
+                try expectEqual(NodeType.Ident, branches[1].cond.getType());
+                try expectEqual(NodeType.Block, branches[1].ifTrue.getType());
+
+                try expect(value.data.If.elseBranch == null);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse an if statement with an 'else' branch" {
+    try (StmtTestCase{
+        .code = "if (a) {} else {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.If, value.getType());
+
+                const branches = value.data.If.branches.items;
+                try expectEqual(@intCast(usize, 1), branches.len);
+                try expectEqual(NodeType.Ident, branches[0].cond.getType());
+                try expectEqual(NodeType.Block, branches[0].ifTrue.getType());
+
+                const elseBranch = value.data.If.elseBranch.?;
+                try expectEqual(NodeType.Block, elseBranch.getType());
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse an if statement with an 'else if' and an 'else' branch" {
+    try (StmtTestCase{
+        .code = "if (a) {} else if (b) {} else {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.If, value.getType());
+
+                const branches = value.data.If.branches.items;
+                try expectEqual(@intCast(usize, 2), branches.len);
+                try expectEqual(NodeType.Ident, branches[0].cond.getType());
+                try expectEqual(NodeType.Block, branches[0].ifTrue.getType());
+                try expectEqual(NodeType.Ident, branches[1].cond.getType());
+                try expectEqual(NodeType.Block, branches[1].ifTrue.getType());
+
+                const elseBranch = value.data.If.elseBranch.?;
+                try expectEqual(NodeType.Block, elseBranch.getType());
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
     if (psr.lexer.token.ty != .LBrace)
         return ParseResult.noMatch(
@@ -191,10 +395,14 @@ pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    // TODO
+    while (psr.lexer.token.ty != .RBrace) {
+        const stmt = try psr.parseStmt();
+        if (!stmt.isSuccess())
+            return stmt;
+        try nd.data.Block.append(psr.getAllocator(), stmt.Success);
+    }
 
-    if (psr.lexer.token.ty != .RBrace)
-        return ParseResult.expected("'}' after block", psr.lexer.token);
+    std.debug.assert(psr.lexer.token.ty == .RBrace);
 
     _ = psr.lexer.next();
 
@@ -215,6 +423,7 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .Var => parseDecl(psr, .Var),
         .Let => parseDecl(psr, .Let),
         .Const => parseDecl(psr, .Const),
+        .If => parseIf(psr),
         .LBrace => parseBlock(psr),
         .EOF => ParseResult.success(try makeNode(
             psr.getAllocator(),

@@ -242,7 +242,43 @@ pub const Function = struct {
     }
 };
 
-pub const NodeType = enum(u8) {
+pub const If = struct {
+    pub const Branch = struct {
+        cond: Node,
+        ifTrue: Node,
+
+        pub fn eql(a: Branch, b: Branch) bool {
+            return genericEql.eql(a, b);
+        }
+    };
+
+    pub const BranchList = std.ArrayListUnmanaged(Branch);
+
+    branches: BranchList,
+    elseBranch: ?Node,
+
+    pub fn dump(
+        self: If,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "If:\n", .{});
+
+        for (self.branches.items) |item| {
+            try putInd(writer, indent + 2, "Cond:\n", .{});
+            try item.cond.dumpIndented(writer, indent + 4);
+            try putInd(writer, indent + 2, "Branch:\n", .{});
+            try item.ifTrue.dumpIndented(writer, indent + 4);
+        }
+
+        if (self.elseBranch) |branch| {
+            try putInd(writer, indent + 2, "Else:\n", .{});
+            try branch.dumpIndented(writer, indent + 4);
+        }
+    }
+};
+
+pub const NodeType = enum {
     EOF,
     Decl,
     Int,
@@ -264,6 +300,7 @@ pub const NodeType = enum(u8) {
     TypeName,
     Function,
     Block,
+    If,
 };
 
 pub const NodeData = union(NodeType) {
@@ -288,6 +325,7 @@ pub const NodeData = union(NodeType) {
     TypeName: []const u8,
     Function: Function,
     Block: NodeList,
+    If: If,
 
     pub fn dump(
         self: NodeData,
@@ -325,6 +363,7 @@ pub const NodeData = union(NodeType) {
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
             .Ternary => |ternary| try ternary.dump(writer, indent),
             .Function => |func| try func.dump(writer, indent),
+            .If => |stmt| try stmt.dump(writer, indent),
         }
     }
 
