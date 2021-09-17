@@ -278,6 +278,20 @@ pub const If = struct {
     }
 };
 
+pub const Labelled = struct {
+    label: []const u8,
+    stmt: Node,
+
+    pub fn dump(
+        self: Labelled,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Labelled \"{s}\":\n", .{self.label});
+        try self.stmt.dumpIndented(writer, indent + 2);
+    }
+};
+
 pub const NodeType = enum {
     EOF,
     Decl,
@@ -305,6 +319,7 @@ pub const NodeType = enum {
     Break,
     Continue,
     Throw,
+    Labelled,
 };
 
 pub const NodeData = union(NodeType) {
@@ -334,6 +349,7 @@ pub const NodeData = union(NodeType) {
     Break: ?[]const u8,
     Continue: ?[]const u8,
     Throw: Node,
+    Labelled: Labelled,
 
     pub fn dump(
         self: NodeData,
@@ -389,6 +405,7 @@ pub const NodeData = union(NodeType) {
                 "{s} {s}\n",
                 .{ @tagName(self), nd },
             ),
+            .Labelled => |labelled| try labelled.dump(writer, indent),
         }
     }
 

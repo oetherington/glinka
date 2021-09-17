@@ -103,16 +103,6 @@ fn parseDecl(
     return ParseResult.success(result);
 }
 
-test "can parse end-of-file" {
-    var parser = Parser.new(std.testing.allocator, "");
-    defer parser.deinit();
-
-    const res = try parser.next();
-
-    try expect(res.isSuccess());
-    try expectEqual(NodeType.EOF, res.Success.getType());
-}
-
 test "can parse var, let and const declarations" {
     const Runner = struct {
         code: []const u8,
@@ -584,6 +574,76 @@ test "can parse 'throw' statement" {
     }).run();
 }
 
+pub fn parseExprStmt(psr: *Parser) Parser.Error!ParseResult {
+    const expr = try psr.parseExpr();
+    if (expr.isSuccess()) {
+        if (eatSemi(psr)) |err|
+            return err;
+        return expr;
+    } else {
+        return ParseResult.expected("a statement", psr.lexer.token);
+    }
+}
+
+test "can parse expression statements" {
+    try (StmtTestCase{
+        .code = "a = 3;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.BinaryOp, value.getType());
+                const op = value.data.BinaryOp;
+                try expectEqual(TokenType.Assign, op.op);
+                try expectEqual(NodeType.Ident, op.left.getType());
+                try expectEqualStrings("a", op.left.data.Ident);
+                try expectEqual(NodeType.Int, op.right.getType());
+                try expectEqualStrings("3", op.right.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
+pub fn parseLabelled(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Ident);
+
+    const ctx = psr.lexer.save();
+
+    if (psr.lexer.next().ty == .Colon) {
+        _ = psr.lexer.next();
+
+        const stmt = try psr.parseStmt();
+        if (!stmt.isSuccess())
+            return stmt;
+
+        return ParseResult.success(try makeNode(
+            psr.getAllocator(),
+            ctx.token.csr,
+            .Labelled,
+            node.Labelled{
+                .label = ctx.token.data,
+                .stmt = stmt.Success,
+            },
+        ));
+    }
+
+    psr.lexer.restore(ctx);
+
+    return parseExprStmt(psr);
+}
+
+test "can parse labelled statement" {
+    try (StmtTestCase{
+        .code = "aLabel: a = 3;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Labelled, value.getType());
+                const labelled = value.data.Labelled;
+                try expectEqualStrings("aLabel", labelled.label);
+                try expectEqual(NodeType.BinaryOp, labelled.stmt.getType());
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
     while (psr.lexer.token.ty == .Semi)
         _ = psr.lexer.next();
@@ -604,17 +664,19 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
             .EOF,
             {},
         )),
-        else => {
-            const expr = try psr.parseExpr();
-            if (expr.isSuccess()) {
-                if (eatSemi(psr)) |err|
-                    return err;
-                return expr;
-            } else {
-                return ParseResult.expected("a statement", psr.lexer.token);
-            }
-        },
+        .Ident => parseLabelled(psr),
+        else => parseExprStmt(psr),
     };
+}
+
+test "can parse end-of-file" {
+    var parser = Parser.new(std.testing.allocator, "");
+    defer parser.deinit();
+
+    const res = try parser.next();
+
+    try expect(res.isSuccess());
+    try expectEqual(NodeType.EOF, res.Success.getType());
 }
 
 test "can skip empty statements" {
@@ -623,23 +685,6 @@ test "can skip empty statements" {
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Break, value.getType());
-            }
-        }).check,
-    }).run();
-}
-
-test "can parse expression statements" {
-    try (StmtTestCase{
-        .code = "a = 3;",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.BinaryOp, value.getType());
-                const op = value.data.BinaryOp;
-                try expectEqual(TokenType.Assign, op.op);
-                try expectEqual(NodeType.Ident, op.left.getType());
-                try expectEqualStrings("a", op.left.data.Ident);
-                try expectEqual(NodeType.Int, op.right.getType());
-                try expectEqualStrings("3", op.right.data.Int);
             }
         }).check,
     }).run();

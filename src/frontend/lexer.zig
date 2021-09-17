@@ -92,6 +92,12 @@ fn isIdent(c: u8) bool {
 }
 
 pub const Lexer = struct {
+    const Context = struct {
+        index: u64,
+        csr: Cursor,
+        token: Token,
+    };
+
     code: []const u8,
     index: u64,
     csr: Cursor,
@@ -104,6 +110,20 @@ pub const Lexer = struct {
             .csr = Cursor.new(1, 1),
             .token = Token.newInvalid(),
         };
+    }
+
+    pub fn save(self: Lexer) Context {
+        return Context{
+            .index = self.index,
+            .csr = self.csr,
+            .token = self.token,
+        };
+    }
+
+    pub fn restore(self: *Lexer, ctx: Context) void {
+        self.index = ctx.index;
+        self.csr = ctx.csr;
+        self.token = ctx.token;
     }
 
     fn atom(self: *Lexer, ty: Token.Type) Token {
@@ -515,4 +535,25 @@ test "lexer can lex strings" {
         .code = "`hello world`",
         .expectedType = .Template,
     }).run();
+}
+
+test "lexer can be saved and restored" {
+    const code: []const u8 = ". ; &";
+    var lexer = Lexer.new(code);
+
+    var tkn = lexer.next();
+    try expectEqual(Token.Type.Dot, tkn.ty);
+
+    const ctx = lexer.save();
+
+    tkn = lexer.next();
+    try expectEqual(Token.Type.Semi, tkn.ty);
+
+    tkn = lexer.next();
+    try expectEqual(Token.Type.BitAnd, tkn.ty);
+
+    lexer.restore(ctx);
+
+    tkn = lexer.next();
+    try expectEqual(Token.Type.Semi, tkn.ty);
 }
