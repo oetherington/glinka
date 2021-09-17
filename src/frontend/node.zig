@@ -302,6 +302,8 @@ pub const NodeType = enum {
     Block,
     If,
     Return,
+    Break,
+    Continue,
 };
 
 pub const NodeData = union(NodeType) {
@@ -328,6 +330,8 @@ pub const NodeData = union(NodeType) {
     Block: NodeList,
     If: If,
     Return: ?Node,
+    Break: ?[]const u8,
+    Continue: ?[]const u8,
 
     pub fn dump(
         self: NodeData,
@@ -371,6 +375,12 @@ pub const NodeData = union(NodeType) {
                 if (ret) |expr|
                     try expr.dumpIndented(writer, indent + 2);
             },
+            .Break, .Continue => |nd| try putInd(
+                writer,
+                indent,
+                "{s} {s}\n",
+                .{ @tagName(self), if (nd) |label| label else "" },
+            ),
         }
     }
 

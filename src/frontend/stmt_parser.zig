@@ -474,6 +474,83 @@ test "can parse 'return' with expression" {
     }).run();
 }
 
+pub fn parseBreakOrContinue(
+    psr: *Parser,
+    comptime ty: NodeType,
+) Parser.Error!ParseResult {
+    std.debug.assert(std.mem.eql(
+        u8,
+        @tagName(psr.lexer.token.ty),
+        @tagName(ty),
+    ));
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    var label: ?[]const u8 = null;
+
+    if (psr.lexer.token.ty == .Ident) {
+        label = psr.lexer.token.data;
+        _ = psr.lexer.next();
+    }
+
+    if (eatSemi(psr)) |err|
+        return err;
+
+    return ParseResult.success(
+        try makeNode(psr.getAllocator(), csr, ty, label),
+    );
+}
+
+test "can parse 'break' without label" {
+    try (StmtTestCase{
+        .code = "break;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Break, value.getType());
+                try expect(value.data.Break == null);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse 'break' with label" {
+    try (StmtTestCase{
+        .code = "break abc;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Break, value.getType());
+                try expectEqualStrings("abc", value.data.Break.?);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse 'continue' without label" {
+    try (StmtTestCase{
+        .code = "continue;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Continue, value.getType());
+                try expect(value.data.Continue == null);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse 'continue' with label" {
+    try (StmtTestCase{
+        .code = "continue abc;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Continue, value.getType());
+                try expectEqualStrings("abc", value.data.Continue.?);
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
     return switch (psr.lexer.token.ty) {
         .Var => parseDecl(psr, .Var),
@@ -482,6 +559,8 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .Return => parseReturn(psr),
         .If => parseIf(psr),
         .LBrace => parseBlock(psr),
+        .Break => parseBreakOrContinue(psr, .Break),
+        .Continue => parseBreakOrContinue(psr, .Continue),
         .EOF => ParseResult.success(try makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,
