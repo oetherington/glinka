@@ -551,6 +551,39 @@ test "can parse 'continue' with label" {
     }).run();
 }
 
+pub fn parseThrow(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Throw);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    const expr = try psr.parseExpr();
+    if (!expr.isSuccess())
+        return expr;
+
+    if (eatSemi(psr)) |err|
+        return err;
+
+    return ParseResult.success(
+        try makeNode(psr.getAllocator(), csr, .Throw, expr.Success),
+    );
+}
+
+test "can parse 'throw' statement" {
+    try (StmtTestCase{
+        .code = "throw abc;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Throw, value.getType());
+                const expr = value.data.Throw;
+                try expectEqual(NodeType.Ident, expr.getType());
+                try expectEqualStrings("abc", expr.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
     return switch (psr.lexer.token.ty) {
         .Var => parseDecl(psr, .Var),
@@ -561,6 +594,7 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .LBrace => parseBlock(psr),
         .Break => parseBreakOrContinue(psr, .Break),
         .Continue => parseBreakOrContinue(psr, .Continue),
+        .Throw => parseThrow(psr),
         .EOF => ParseResult.success(try makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,

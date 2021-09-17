@@ -304,6 +304,7 @@ pub const NodeType = enum {
     Return,
     Break,
     Continue,
+    Throw,
 };
 
 pub const NodeData = union(NodeType) {
@@ -332,6 +333,7 @@ pub const NodeData = union(NodeType) {
     Return: ?Node,
     Break: ?[]const u8,
     Continue: ?[]const u8,
+    Throw: Node,
 
     pub fn dump(
         self: NodeData,
@@ -380,6 +382,12 @@ pub const NodeData = union(NodeType) {
                 indent,
                 "{s} {s}\n",
                 .{ @tagName(self), if (nd) |label| label else "" },
+            ),
+            .Throw => |nd| try putInd(
+                writer,
+                indent,
+                "{s} {s}\n",
+                .{ @tagName(self), nd },
             ),
         }
     }
