@@ -322,6 +322,42 @@ pub const Labelled = struct {
     }
 };
 
+pub const Try = struct {
+    pub const Catch = struct {
+        name: []const u8,
+        block: Node,
+
+        pub fn eql(a: Catch, b: Catch) bool {
+            return genericEql.eql(a, b);
+        }
+    };
+
+    pub const CatchList = std.ArrayListUnmanaged(Catch);
+
+    tryBlock: Node,
+    catchBlocks: CatchList,
+    finallyBlock: ?Node,
+
+    pub fn dump(
+        self: Try,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Try:\n", .{});
+        try self.tryBlock.dumpIndented(writer, indent + 2);
+
+        for (self.catchBlocks.items) |item| {
+            try putInd(writer, indent, "Catch \"{s}\":\n", .{item.name});
+            try item.block.dumpIndented(writer, indent + 2);
+        }
+
+        if (self.finallyBlock) |finally| {
+            try putInd(writer, indent, "Finally:\n", .{});
+            try finally.dumpIndented(writer, indent + 2);
+        }
+    }
+};
+
 pub const NodeType = enum {
     EOF,
     Decl,
@@ -352,6 +388,7 @@ pub const NodeType = enum {
     Continue,
     Throw,
     Labelled,
+    Try,
 };
 
 pub const NodeData = union(NodeType) {
@@ -384,6 +421,7 @@ pub const NodeData = union(NodeType) {
     Continue: ?[]const u8,
     Throw: Node,
     Labelled: Labelled,
+    Try: Try,
 
     pub fn dump(
         self: NodeData,
@@ -424,6 +462,7 @@ pub const NodeData = union(NodeType) {
             .If => |stmt| try stmt.dump(writer, indent),
             .While => |loop| try loop.dump(writer, indent),
             .Do => |loop| try loop.dump(writer, indent),
+            .Try => |t| try t.dump(writer, indent),
             .Return => |ret| {
                 try putInd(writer, indent, "Return\n", .{});
                 if (ret) |expr|

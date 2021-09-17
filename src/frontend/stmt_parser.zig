@@ -690,6 +690,92 @@ test "can parse 'throw' statement" {
     }).run();
 }
 
+pub fn parseTry(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Try);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    const tryBlock = try parseBlock(psr);
+    if (!tryBlock.isSuccess())
+        return tryBlock;
+
+    var nd = try makeNode(psr.getAllocator(), csr, .Try, node.Try{
+        .tryBlock = tryBlock.Success,
+        .catchBlocks = node.Try.CatchList{},
+        .finallyBlock = null,
+    });
+
+    while (psr.lexer.token.ty == .Catch) {
+        _ = psr.lexer.next();
+
+        if (psr.lexer.token.ty != .LParen)
+            return ParseResult.expected("'(' after 'catch'", psr.lexer.token);
+
+        _ = psr.lexer.next();
+
+        if (psr.lexer.token.ty != .Ident)
+            return ParseResult.expected(
+                "identifier for caught exception",
+                psr.lexer.token,
+            );
+
+        const name = psr.lexer.token.data;
+
+        _ = psr.lexer.next();
+
+        if (psr.lexer.token.ty != .RParen)
+            return ParseResult.expected("')' after 'catch'", psr.lexer.token);
+
+        _ = psr.lexer.next();
+
+        const block = try parseBlock(psr);
+        if (!block.isSuccess())
+            return block;
+
+        try nd.data.Try.catchBlocks.append(psr.getAllocator(), node.Try.Catch{
+            .name = name,
+            .block = block.Success,
+        });
+    }
+
+    if (psr.lexer.token.ty == .Finally) {
+        _ = psr.lexer.next();
+
+        const block = try parseBlock(psr);
+        if (!block.isSuccess())
+            return block;
+
+        nd.data.Try.finallyBlock = block.Success;
+    }
+
+    return ParseResult.success(nd);
+}
+
+test "can parse try-catch" {
+    try (StmtTestCase{
+        .code = "try {} catch (e) {} catch (f) {} finally {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Try, value.getType());
+
+                const t = value.data.Try;
+                try expectEqual(NodeType.Block, t.tryBlock.getType());
+
+                const catches = t.catchBlocks.items;
+                try expectEqual(@intCast(usize, 2), catches.len);
+                try expectEqualStrings("e", catches[0].name);
+                try expectEqual(NodeType.Block, catches[0].block.getType());
+                try expectEqualStrings("f", catches[1].name);
+                try expectEqual(NodeType.Block, catches[1].block.getType());
+
+                try expectEqual(NodeType.Block, t.finallyBlock.?.getType());
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseExprStmt(psr: *Parser) Parser.Error!ParseResult {
     const expr = try psr.parseExpr();
     if (expr.isSuccess()) {
@@ -776,6 +862,7 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .Break => parseBreakOrContinue(psr, .Break),
         .Continue => parseBreakOrContinue(psr, .Continue),
         .Throw => parseThrow(psr),
+        .Try => parseTry(psr),
         .EOF => ParseResult.success(try makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,
