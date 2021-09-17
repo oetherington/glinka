@@ -377,6 +377,54 @@ test "can parse an if statement with an 'else if' and an 'else' branch" {
     }).run();
 }
 
+pub fn parseWhile(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .While);
+
+    const csr = psr.lexer.token.csr;
+
+    if (psr.lexer.next().ty != .LParen)
+        return ParseResult.expected("'(' after while", psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    const cond = try psr.parseExpr();
+    if (!cond.isSuccess())
+        return cond;
+
+    if (psr.lexer.token.ty != .RParen)
+        return ParseResult.expected(
+            "')' after while condition",
+            psr.lexer.token,
+        );
+
+    _ = psr.lexer.next();
+
+    const body = try psr.parseStmt();
+    if (!body.isSuccess())
+        return body;
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        csr,
+        .While,
+        node.While{
+            .cond = cond.Success,
+            .body = body.Success,
+        },
+    ));
+}
+
+test "can parse while loop" {
+    var parser = Parser.new(std.testing.allocator, "while (true) {}");
+    defer parser.deinit();
+    const res = try parser.next();
+    try expect(res.isSuccess());
+    try expectEqual(NodeType.While, res.Success.getType());
+    const loop = res.Success.data.While;
+    try expectEqual(NodeType.True, loop.cond.getType());
+    try expectEqual(NodeType.Block, loop.body.getType());
+}
+
 pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
     if (psr.lexer.token.ty != .LBrace)
         return ParseResult.noMatch(
@@ -413,6 +461,18 @@ test "can parse empty block" {
     try expect(res.isSuccess());
     try expectEqual(NodeType.Block, res.Success.getType());
     try expectEqual(@intCast(usize, 0), res.Success.data.Block.items.len);
+}
+
+test "can parse populated block" {
+    var parser = Parser.new(std.testing.allocator, "{ break; return; }");
+    defer parser.deinit();
+    const res = try parser.next();
+    try expect(res.isSuccess());
+    try expectEqual(NodeType.Block, res.Success.getType());
+    const items = res.Success.data.Block.items;
+    try expectEqual(@intCast(usize, 2), items.len);
+    try expectEqual(NodeType.Break, items[0].getType());
+    try expectEqual(NodeType.Return, items[1].getType());
 }
 
 pub fn parseReturn(psr: *Parser) Parser.Error!ParseResult {
@@ -654,6 +714,7 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .Const => parseDecl(psr, .Const),
         .Return => parseReturn(psr),
         .If => parseIf(psr),
+        .While => parseWhile(psr),
         .LBrace => parseBlock(psr),
         .Break => parseBreakOrContinue(psr, .Break),
         .Continue => parseBreakOrContinue(psr, .Continue),
