@@ -425,6 +425,62 @@ test "can parse while loop" {
     try expectEqual(NodeType.Block, loop.body.getType());
 }
 
+pub fn parseDo(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Do);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    const body = try psr.parseStmt();
+    if (!body.isSuccess())
+        return body;
+
+    if (psr.lexer.token.ty != .While)
+        return ParseResult.expected("'while'", psr.lexer.token);
+
+    if (psr.lexer.next().ty != .LParen)
+        return ParseResult.expected("'(' after while", psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    const cond = try psr.parseExpr();
+    if (!cond.isSuccess())
+        return cond;
+
+    if (psr.lexer.token.ty != .RParen)
+        return ParseResult.expected(
+            "')' after do-while condition",
+            psr.lexer.token,
+        );
+
+    _ = psr.lexer.next();
+
+    if (eatSemi(psr)) |err|
+        return err;
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        csr,
+        .Do,
+        node.Do{
+            .body = body.Success,
+            .cond = cond.Success,
+        },
+    ));
+}
+
+test "can parse do loop" {
+    var parser = Parser.new(std.testing.allocator, "do {} while (true);");
+    defer parser.deinit();
+    const res = try parser.next();
+    try expect(res.isSuccess());
+    try expectEqual(NodeType.Do, res.Success.getType());
+    const loop = res.Success.data.Do;
+    try expectEqual(NodeType.Block, loop.body.getType());
+    try expectEqual(NodeType.True, loop.cond.getType());
+}
+
 pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
     if (psr.lexer.token.ty != .LBrace)
         return ParseResult.noMatch(
@@ -715,6 +771,7 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .Return => parseReturn(psr),
         .If => parseIf(psr),
         .While => parseWhile(psr),
+        .Do => parseDo(psr),
         .LBrace => parseBlock(psr),
         .Break => parseBreakOrContinue(psr, .Break),
         .Continue => parseBreakOrContinue(psr, .Continue),

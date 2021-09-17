@@ -293,6 +293,21 @@ pub const While = struct {
     }
 };
 
+pub const Do = struct {
+    body: Node,
+    cond: Node,
+
+    pub fn dump(
+        self: Do,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Do:\n", .{});
+        try self.body.dumpIndented(writer, indent + 2);
+        try self.cond.dumpIndented(writer, indent + 2);
+    }
+};
+
 pub const Labelled = struct {
     label: []const u8,
     stmt: Node,
@@ -331,6 +346,7 @@ pub const NodeType = enum {
     Block,
     If,
     While,
+    Do,
     Return,
     Break,
     Continue,
@@ -362,6 +378,7 @@ pub const NodeData = union(NodeType) {
     Block: NodeList,
     If: If,
     While: While,
+    Do: Do,
     Return: ?Node,
     Break: ?[]const u8,
     Continue: ?[]const u8,
@@ -406,6 +423,7 @@ pub const NodeData = union(NodeType) {
             .Function => |func| try func.dump(writer, indent),
             .If => |stmt| try stmt.dump(writer, indent),
             .While => |loop| try loop.dump(writer, indent),
+            .Do => |loop| try loop.dump(writer, indent),
             .Return => |ret| {
                 try putInd(writer, indent, "Return\n", .{});
                 if (ret) |expr|
