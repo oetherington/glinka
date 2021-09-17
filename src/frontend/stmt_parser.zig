@@ -567,6 +567,32 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
             .EOF,
             {},
         )),
-        else => ParseResult.expected("a statement", psr.lexer.token),
+        else => {
+            const expr = try psr.parseExpr();
+            if (expr.isSuccess()) {
+                if (eatSemi(psr)) |err|
+                    return err;
+                return expr;
+            } else {
+                return ParseResult.expected("a statement", psr.lexer.token);
+            }
+        },
     };
+}
+
+test "can parse expression statements" {
+    try (StmtTestCase{
+        .code = "a = 3;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.BinaryOp, value.getType());
+                const op = value.data.BinaryOp;
+                try expectEqual(TokenType.Assign, op.op);
+                try expectEqual(NodeType.Ident, op.left.getType());
+                try expectEqualStrings("a", op.left.data.Ident);
+                try expectEqual(NodeType.Int, op.right.getType());
+                try expectEqualStrings("3", op.right.data.Int);
+            }
+        }).check,
+    }).run();
 }
