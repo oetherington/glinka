@@ -1,0 +1,23 @@
+{
+	"name": "glinka",
+	"version": "0.0.1",
+	"description": "A fast Typescript compiler written in Zig",
+	"scripts": {
+		"postinstall": "zig build -Drelease-fast=true"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/oetherington/glinka.git"
+	},
+	"keywords": [
+		"typescript",
+		"compiler",
+		"zig"
+	],
+	"author": "Ollie Etherington",
+	"license": "AGPL-3.0-or-later",
+	"bugs": {
+		"url": "https://github.com/oetherington/glinka/issues"
+	},
+	"homepage": "https://github.com/oetherington/glinka#readme"
+}

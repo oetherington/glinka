@@ -1,5 +1,7 @@
 all:
 	@zig build
+release:
+	@zig build -Drelease-fast=true
 run:
 	@echo
 	@zig build run
