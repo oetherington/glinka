@@ -585,6 +585,9 @@ test "can parse 'throw' statement" {
 }
 
 pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
+    while (psr.lexer.token.ty == .Semi)
+        _ = psr.lexer.next();
+
     return switch (psr.lexer.token.ty) {
         .Var => parseDecl(psr, .Var),
         .Let => parseDecl(psr, .Let),
@@ -612,6 +615,17 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
             }
         },
     };
+}
+
+test "can skip empty statements" {
+    try (StmtTestCase{
+        .code = "; ;; break;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Break, value.getType());
+            }
+        }).check,
+    }).run();
 }
 
 test "can parse expression statements" {
