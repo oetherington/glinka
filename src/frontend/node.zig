@@ -301,6 +301,7 @@ pub const NodeType = enum {
     Function,
     Block,
     If,
+    Return,
 };
 
 pub const NodeData = union(NodeType) {
@@ -326,6 +327,7 @@ pub const NodeData = union(NodeType) {
     Function: Function,
     Block: NodeList,
     If: If,
+    Return: ?Node,
 
     pub fn dump(
         self: NodeData,
@@ -364,6 +366,11 @@ pub const NodeData = union(NodeType) {
             .Ternary => |ternary| try ternary.dump(writer, indent),
             .Function => |func| try func.dump(writer, indent),
             .If => |stmt| try stmt.dump(writer, indent),
+            .Return => |ret| {
+                try putInd(writer, indent, "Return\n", .{});
+                if (ret) |expr|
+                    try expr.dumpIndented(writer, indent + 2);
+            },
         }
     }
 

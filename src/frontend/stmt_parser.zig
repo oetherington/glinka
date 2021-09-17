@@ -52,6 +52,15 @@ const StmtTestCase = struct {
     }
 };
 
+fn eatSemi(psr: *Parser) ?ParseResult {
+    if (psr.lexer.token.ty != TokenType.Semi)
+        return ParseResult.expected(TokenType.Semi, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return null;
+}
+
 fn parseDecl(
     psr: *Parser,
     comptime scoping: Decl.Scoping,
@@ -85,10 +94,8 @@ fn parseDecl(
         tkn = psr.lexer.token;
     }
 
-    if (tkn.ty != TokenType.Semi)
-        return ParseResult.expected(TokenType.Semi, psr.lexer.token);
-
-    _ = psr.lexer.next();
+    if (eatSemi(psr)) |err|
+        return err;
 
     const decl = Decl.new(scoping, name.data, declTy, expr);
     const result = try makeNode(psr.getAllocator(), csr, .Decl, decl);
@@ -418,11 +425,61 @@ test "can parse empty block" {
     try expectEqual(@intCast(usize, 0), res.Success.data.Block.items.len);
 }
 
+pub fn parseReturn(psr: *Parser) Parser.Error!ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Return);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    const expr = try psr.parseExpr();
+    if (expr.getType() == .Error)
+        return expr;
+
+    if (eatSemi(psr)) |err|
+        return err;
+
+    return ParseResult.success(try makeNode(
+        psr.getAllocator(),
+        csr,
+        .Return,
+        if (expr.isSuccess()) expr.Success else null,
+    ));
+}
+
+test "can parse 'return' without expression" {
+    try (StmtTestCase{
+        .code = "return;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Return, value.getType());
+                try expect(value.data.Return == null);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse 'return' with expression" {
+    try (StmtTestCase{
+        .code = "return 4;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Return, value.getType());
+
+                const expr = value.data.Return.?;
+                try expectEqual(NodeType.Int, expr.getType());
+                try expectEqualStrings("4", expr.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
     return switch (psr.lexer.token.ty) {
         .Var => parseDecl(psr, .Var),
         .Let => parseDecl(psr, .Let),
         .Const => parseDecl(psr, .Const),
+        .Return => parseReturn(psr),
         .If => parseIf(psr),
         .LBrace => parseBlock(psr),
         .EOF => ParseResult.success(try makeNode(
