@@ -18,10 +18,11 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
-const genericEql = @import("../../common/generic_eql.zig");
 
 pub const Type = union(This.Type) {
     const This = @This();
+
+    pub const Ptr = *const This;
 
     pub const TupleType = @import("tuple_type.zig");
     pub const ArrayType = @import("array_type.zig");
@@ -29,7 +30,7 @@ pub const Type = union(This.Type) {
     pub const EnumType = @import("enum_type.zig");
     pub const FunctionType = @import("function_type.zig");
     pub const OptionalType = @import("optional_type.zig");
-    pub const UnionType = @import("union_type.zig");
+    pub const UnionType = @import("union_type.zig").UnionType;
     pub const AliasType = @import("alias_type.zig");
     pub const InterfaceType = @import("interface_type.zig");
 
@@ -77,10 +78,6 @@ pub const Type = union(This.Type) {
         return @as(This.Type, self);
     }
 
-    pub fn eql(self: This, other: This) bool {
-        return genericEql.eql(self, other);
-    }
-
     pub fn newUnknown() This {
         return This{ .Unknown = {} };
     }
@@ -117,11 +114,22 @@ pub const Type = union(This.Type) {
         return This{ .Boolean = {} };
     }
 
-    pub fn isAssignableTo(self: This, target: This) bool {
+    pub fn newUnion(un: UnionType) This {
+        return This{ .Union = un };
+    }
+
+    pub fn isAssignableTo(self: This.Ptr, target: This.Ptr) bool {
         if (target.getType() == .Any)
             return true;
-        if (self.eql(target))
+
+        if (self == target)
             return true;
+
+        switch (target.*) {
+            .Union => |un| return un.contains(self),
+            else => {},
+        }
+
         return false;
     }
 
@@ -197,11 +205,11 @@ test "can create a boolean type" {
 const AssignableTestCase = struct {
     const This = @This();
 
-    fromType: Type,
-    toType: Type,
+    fromType: Type.Ptr,
+    toType: Type.Ptr,
     isAssignable: bool,
 
-    pub fn new(fromType: Type, toType: Type) This {
+    pub fn new(fromType: Type.Ptr, toType: Type.Ptr) This {
         return This{
             .fromType = fromType,
             .toType = toType,
@@ -209,7 +217,7 @@ const AssignableTestCase = struct {
         };
     }
 
-    pub fn newF(fromType: Type, toType: Type) This {
+    pub fn newF(fromType: Type.Ptr, toType: Type.Ptr) This {
         return This{
             .fromType = fromType,
             .toType = toType,
@@ -226,27 +234,48 @@ const AssignableTestCase = struct {
 };
 
 test "all types are assignable to 'any'" {
-    try AssignableTestCase.new(Type.newNumber(), Type.newAny()).run();
-    try AssignableTestCase.new(Type.newBoolean(), Type.newAny()).run();
-    try AssignableTestCase.new(Type.newAny(), Type.newAny()).run();
-    try AssignableTestCase.new(Type.newUnknown(), Type.newAny()).run();
-    try AssignableTestCase.new(Type.newVoid(), Type.newAny()).run();
-    try AssignableTestCase.new(Type.newString(), Type.newAny()).run();
+    const n = Type.newNumber();
+    const a = Type.newAny();
+    const b = Type.newBoolean();
+    const u = Type.newUnknown();
+    const v = Type.newVoid();
+    const s = Type.newString();
+
+    try AssignableTestCase.new(&n, &a).run();
+    try AssignableTestCase.new(&b, &a).run();
+    try AssignableTestCase.new(&a, &a).run();
+    try AssignableTestCase.new(&u, &a).run();
+    try AssignableTestCase.new(&v, &a).run();
+    try AssignableTestCase.new(&s, &a).run();
 }
 
 test "types are assignable to themselves" {
-    try AssignableTestCase.new(Type.newNumber(), Type.newNumber()).run();
-    try AssignableTestCase.new(Type.newBoolean(), Type.newBoolean()).run();
-    try AssignableTestCase.new(Type.newAny(), Type.newAny()).run();
-    try AssignableTestCase.new(Type.newUnknown(), Type.newUnknown()).run();
-    try AssignableTestCase.new(Type.newVoid(), Type.newVoid()).run();
-    try AssignableTestCase.new(Type.newString(), Type.newString()).run();
+    const n = Type.newNumber();
+    const a = Type.newAny();
+    const b = Type.newBoolean();
+    const u = Type.newUnknown();
+    const v = Type.newVoid();
+    const s = Type.newString();
+
+    try AssignableTestCase.new(&n, &n).run();
+    try AssignableTestCase.new(&a, &a).run();
+    try AssignableTestCase.new(&b, &b).run();
+    try AssignableTestCase.new(&u, &u).run();
+    try AssignableTestCase.new(&v, &v).run();
+    try AssignableTestCase.new(&s, &s).run();
 }
 
 test "other type assignments are invalid" {
-    try AssignableTestCase.newF(Type.newNumber(), Type.newString()).run();
-    try AssignableTestCase.newF(Type.newBoolean(), Type.newVoid()).run();
-    try AssignableTestCase.newF(Type.newAny(), Type.newUnknown()).run();
-    try AssignableTestCase.newF(Type.newUnknown(), Type.newNumber()).run();
-    try AssignableTestCase.newF(Type.newVoid(), Type.newBoolean()).run();
+    const n = Type.newNumber();
+    const a = Type.newAny();
+    const b = Type.newBoolean();
+    const u = Type.newUnknown();
+    const v = Type.newVoid();
+    const s = Type.newString();
+
+    try AssignableTestCase.newF(&n, &s).run();
+    try AssignableTestCase.newF(&b, &v).run();
+    try AssignableTestCase.newF(&a, &u).run();
+    try AssignableTestCase.newF(&u, &n).run();
+    try AssignableTestCase.newF(&v, &b).run();
 }

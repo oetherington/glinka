@@ -22,10 +22,10 @@ const Type = @import("type.zig").Type;
 
 pub const TypeError = struct {
     csr: Cursor,
-    valueTy: Type,
-    targetTy: Type,
+    valueTy: Type.Ptr,
+    targetTy: Type.Ptr,
 
-    pub fn new(csr: Cursor, valueTy: Type, targetTy: Type) TypeError {
+    pub fn new(csr: Cursor, valueTy: Type.Ptr, targetTy: Type.Ptr) TypeError {
         return TypeError{
             .csr = csr,
             .valueTy = valueTy,
@@ -49,8 +49,8 @@ test "can initialize a TypeError" {
     const csr = Cursor.new(2, 5);
     const valueTy = Type.newNumber();
     const targetTy = Type.newString();
-    const typeError = TypeError.new(csr, valueTy, targetTy);
+    const typeError = TypeError.new(csr, &valueTy, &targetTy);
     try expectEqual(csr, typeError.csr);
-    try expectEqual(valueTy, typeError.valueTy);
-    try expectEqual(targetTy, typeError.targetTy);
+    try expectEqual(&valueTy, typeError.valueTy);
+    try expectEqual(&targetTy, typeError.targetTy);
 }

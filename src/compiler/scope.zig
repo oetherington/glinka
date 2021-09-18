@@ -20,15 +20,16 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 const Type = @import("types/type.zig").Type;
+const TypeBook = @import("types/typebook.zig").TypeBook;
 const Cursor = @import("../common/cursor.zig").Cursor;
 
 pub const Scope = struct {
     pub const Symbol = struct {
-        ty: Type,
+        ty: Type.Ptr,
         isConst: bool,
         csr: Cursor,
 
-        pub fn new(ty: Type, isConst: bool, csr: Cursor) Symbol {
+        pub fn new(ty: Type.Ptr, isConst: bool, csr: Cursor) Symbol {
             return Symbol{
                 .ty = ty,
                 .isConst = isConst,
@@ -58,7 +59,7 @@ pub const Scope = struct {
     pub fn put(
         self: *Scope,
         name: []const u8,
-        ty: Type,
+        ty: Type.Ptr,
         isConst: bool,
         csr: Cursor,
     ) !void {
@@ -87,8 +88,11 @@ test "can insert into and retrieve from scope" {
     var scope = try Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
+    var typebook = try TypeBook.new(std.testing.allocator);
+    defer typebook.deinit();
+
     const name = "aVariable";
-    const ty = Type.newBoolean();
+    const ty = typebook.getBoolean();
     const isConst = true;
     const csr = Cursor.new(2, 9);
     try scope.put(name, ty, isConst, csr);
@@ -106,8 +110,11 @@ test "can retrieve from scope recursively" {
     var scope = try Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
+    var typebook = try TypeBook.new(std.testing.allocator);
+    defer typebook.deinit();
+
     const name = "aVariable";
-    const ty = Type.newBoolean();
+    const ty = typebook.getBoolean();
     const isConst = true;
     const csr = Cursor.new(2, 9);
     try scope.put(name, ty, isConst, csr);

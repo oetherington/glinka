@@ -21,24 +21,34 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const Type = @import("types/type.zig").Type;
 const TypeError = @import("types/type_error.zig").TypeError;
 const ImplicitAnyError = @import("types/implicit_any_error.zig").ImplicitAnyError;
+const OpError = @import("op_error.zig").OpError;
 const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const Parser = @import("../frontend/parser.zig").Parser;
+const TokenType = @import("../frontend/token.zig").Token.Type;
 const Cursor = @import("../common/cursor.zig").Cursor;
 
 pub const CompileError = union(CompileError.Type) {
     pub const Type = enum(u8) {
         TypeError,
+        OpError,
         ImplicitAnyError,
         ParseError,
     };
 
     TypeError: TypeError,
+    OpError: OpError,
     ImplicitAnyError: ImplicitAnyError,
     ParseError: ParseError,
 
     pub fn typeError(err: TypeError) CompileError {
         return CompileError{
             .TypeError = err,
+        };
+    }
+
+    pub fn opError(err: OpError) CompileError {
+        return CompileError{
+            .OpError = err,
         };
     }
 
@@ -61,6 +71,7 @@ pub const CompileError = union(CompileError.Type) {
     pub fn report(self: CompileError, writer: anytype) !void {
         switch (self) {
             .TypeError => |err| try err.report(writer),
+            .OpError => |err| try err.report(writer),
             .ImplicitAnyError => |err| try err.report(writer),
             .ParseError => |err| try err.report(writer),
         }
@@ -71,12 +82,25 @@ test "can create a CompileError from a TypeError" {
     const cursor = Cursor.new(5, 7);
     const valueTy = Type.newString();
     const targetTy = Type.newBoolean();
-    const typeError = TypeError.new(cursor, valueTy, targetTy);
+    const typeError = TypeError.new(cursor, &valueTy, &targetTy);
     const compileError = CompileError.typeError(typeError);
     try expectEqual(CompileError.Type.TypeError, compileError.getType());
     try expectEqual(cursor, compileError.TypeError.csr);
-    try expectEqual(valueTy, compileError.TypeError.valueTy);
-    try expectEqual(targetTy, compileError.TypeError.targetTy);
+    try expectEqual(&valueTy, compileError.TypeError.valueTy);
+    try expectEqual(&targetTy, compileError.TypeError.targetTy);
+}
+
+test "can create a CompileError from an OpError" {
+    const cursor = Cursor.new(5, 7);
+    const op = TokenType.Sub;
+    const ty = Type.newString();
+    const opError = OpError.new(cursor, op, &ty);
+    const compileError = CompileError.opError(opError);
+    try expectEqual(CompileError.Type.OpError, compileError.getType());
+    // TODO
+    // try expectEqual(cursor, compileError.TypeError.csr);
+    // try expectEqual(&valueTy, compileError.TypeError.valueTy);
+    // try expectEqual(&targetTy, compileError.TypeError.targetTy);
 }
 
 test "can create a CompileError from an ImplicitAnyError" {

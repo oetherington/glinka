@@ -27,8 +27,10 @@ const NodeType = node.NodeType;
 const Backend = @import("../backends/backend.zig").Backend;
 const Scope = @import("scope.zig").Scope;
 const Type = @import("types/type.zig").Type;
+const TypeBook = @import("types/typebook.zig").TypeBook;
 const TypeError = @import("types/type_error.zig").TypeError;
-const ImplicitAnyError = @import("types/implicit_any_error.zig").ImplicitAnyError;
+const implicitAnyError = @import("types/implicit_any_error.zig");
+const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const ErrorContext = @import("error_context.zig").ErrorContext;
 const CompileError = @import("compile_error.zig").CompileError;
 const inferrer = @import("inferrer.zig");
@@ -39,6 +41,7 @@ pub const Compiler = struct {
     parser: *Parser,
     backend: *Backend,
     scope: *Scope,
+    typebook: *TypeBook,
     errors: ErrorContext,
 
     pub fn new(
@@ -53,12 +56,14 @@ pub const Compiler = struct {
             .parser = parser,
             .backend = backend,
             .scope = try Scope.new(alloc, null),
+            .typebook = try TypeBook.new(alloc),
             .errors = ErrorContext.new(alloc),
         };
     }
 
     pub fn deinit(self: *Compiler) void {
         self.scope.deinit();
+        self.typebook.deinit();
         self.errors.deinit();
     }
 
@@ -70,13 +75,28 @@ pub const Compiler = struct {
         try self.errors.report();
     }
 
-    fn implicitAny(self: *Compiler, csr: Cursor, symbol: []const u8) !Type {
+    fn implicitAny(
+        self: *Compiler,
+        csr: Cursor,
+        symbol: []const u8,
+    ) !Type.Ptr {
         if (self.config.errorOnImplicitAny)
             try self.errors.append(CompileError.implicitAnyError(
                 ImplicitAnyError.new(csr, symbol),
             ));
 
-        return Type.newAny();
+        return self.typebook.getAny();
+    }
+
+    fn inferExprType(self: *Compiler, nd: Node) !?Type.Ptr {
+        const valTy = inferrer.inferExprType(self.scope, self.typebook, nd);
+        switch (valTy) {
+            .Success => |ty| return ty,
+            .Error => |err| {
+                try self.errors.append(err);
+                return null;
+            },
+        }
     }
 
     fn processDecl(self: *Compiler, nd: Node) !void {
@@ -85,12 +105,12 @@ pub const Compiler = struct {
         const decl = nd.data.Decl;
 
         const tyHint = if (decl.ty) |ty|
-            try inferrer.findType(self.scope, ty)
+            try inferrer.findType(self.scope, self.typebook, ty)
         else
             try self.implicitAny(nd.csr, decl.name);
 
         if (decl.value) |value| {
-            const valTy = inferrer.inferExprType(self.scope, value);
+            const valTy = (try self.inferExprType(value)) orelse return;
 
             if (!valTy.isAssignableTo(tyHint)) {
                 try self.errors.append(CompileError.typeError(

@@ -17,11 +17,64 @@
 
 const std = @import("std");
 const expectEqualStrings = std.testing.expectEqualStrings;
+const TokenType = @import("../../frontend/token.zig").Token.Type;
 const node = @import("../../frontend/node.zig");
 const Node = node.Node;
 const Cursor = @import("../../common/cursor.zig").Cursor;
 const Backend = @import("../backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
+
+fn opToString(op: TokenType) error{InvalidOp}![]const u8 {
+    return switch (op) {
+        .OptionChain => ".?",
+        .Ellipsis => "...",
+        .Add => "+",
+        .AddAssign => "+=",
+        .Inc => "++",
+        .Sub => "-",
+        .SubAssign => "-=",
+        .Dec => "--",
+        .Mul => "*",
+        .MulAssign => "*=",
+        .Pow => "**",
+        .PowAssign => "**=",
+        .Div => "/",
+        .DivAssign => "/=",
+        .Mod => "%",
+        .ModAssign => "%=",
+        .Assign => "=",
+        .CmpEq => "==",
+        .CmpStrictEq => "===",
+        .LogicalNot => "!",
+        .CmpNotEq => "!=",
+        .CmpStrictNotEq => "!==",
+        .CmpGreater => ">",
+        .CmpGreaterEq => ">=",
+        .CmpLess => "<",
+        .CmpLessEq => "<=",
+        .Nullish => "??",
+        .NullishAssign => "??=",
+        .BitAnd => "&",
+        .BitAndAssign => "&=",
+        .LogicalAnd => "&&",
+        .LogicalAndAssign => "&&=",
+        .BitOr => "|",
+        .BitOrAssign => "|=",
+        .LogicalOr => "||",
+        .LogicalOrAssign => "||=",
+        .BitNot => "~",
+        .BitNotAssign => "~=",
+        .BitXor => "^",
+        .BitXorAssign => "^=",
+        .ShiftRight => ">>",
+        .ShiftRightAssign => ">>=",
+        .ShiftRightUnsigned => ">>>",
+        .ShiftRightUnsignedAssign => ">>>=",
+        .ShiftLeft => "<<",
+        .ShiftLeftAssign => "<<=",
+        else => error.InvalidOp,
+    };
+}
 
 pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
     try switch (value.data) {
@@ -33,6 +86,23 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
         .False => self.out.print("false", .{}),
         .Null => self.out.print("null", .{}),
         .Undefined => self.out.print("undefined", .{}),
+        .PrefixOp => |op| {
+            try self.out.print("({s}", .{try opToString(op.op)});
+            try self.emitExpr(op.expr);
+            try self.out.print(")", .{});
+        },
+        .PostfixOp => |op| {
+            try self.out.print("(", .{});
+            try self.emitExpr(op.expr);
+            try self.out.print("{s})", .{try opToString(op.op)});
+        },
+        .BinaryOp => |op| {
+            try self.out.print("(", .{});
+            try self.emitExpr(op.left);
+            try self.out.print("{s}", .{try opToString(op.op)});
+            try self.emitExpr(op.right);
+            try self.out.print(")", .{});
+        },
         else => std.debug.panic(
             "Invalid Node type in emitExpr: {?}",
             .{value},

@@ -18,35 +18,43 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const Cursor = @import("../../common/cursor.zig").Cursor;
+const Cursor = @import("../common/cursor.zig").Cursor;
+const TokenType = @import("../frontend/token.zig").Token.Type;
+const Type = @import("types/type.zig").Type;
 
-pub const ImplicitAnyError = struct {
+pub const OpError = struct {
     csr: Cursor,
-    symbol: []const u8,
+    op: TokenType,
+    ty: Type.Ptr,
 
-    pub fn new(csr: Cursor, symbol: []const u8) ImplicitAnyError {
-        return ImplicitAnyError{
+    pub fn new(csr: Cursor, op: TokenType, ty: Type.Ptr) OpError {
+        return OpError{
             .csr = csr,
-            .symbol = symbol,
+            .op = op,
+            .ty = ty,
         };
     }
 
-    pub fn report(self: ImplicitAnyError, writer: anytype) !void {
+    pub fn report(self: OpError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: Untyped symbol '{s}' implicitely has type 'any'\n",
+            "Error: {d}:{d}: Operator '{s}' is not defined for type '",
             .{
                 self.csr.ln,
                 self.csr.ch,
-                self.symbol,
+                @tagName(self.op),
             },
         );
+        try self.ty.write(writer);
+        try writer.print("'\n", .{});
     }
 };
 
-test "can initialize an ImplicitAnyError" {
+test "can initialize an OpError" {
     const csr = Cursor.new(2, 5);
-    const symbol = "anySymbol";
-    const err = ImplicitAnyError.new(csr, symbol);
+    const op = TokenType.Sub;
+    const ty = Type.newString();
+    const err = OpError.new(csr, op, &ty);
     try expectEqual(csr, err.csr);
-    try expectEqualStrings(symbol, err.symbol);
+    try expectEqual(op, err.op);
+    try expectEqual(&ty, err.ty);
 }
