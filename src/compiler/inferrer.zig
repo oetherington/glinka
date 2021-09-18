@@ -91,6 +91,7 @@ const builtinMap = std.ComptimeStringMap(Type, .{
     .{ "string", Type.newString() },
     .{ "boolean", Type.newBoolean() },
     .{ "void", Type.newVoid() },
+    .{ "any", Type.newAny() },
 });
 
 pub fn findType(scope: *Scope, nd: Node) !Type {

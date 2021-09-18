@@ -20,6 +20,7 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Type = @import("types/type.zig").Type;
 const TypeError = @import("types/type_error.zig").TypeError;
+const ImplicitAnyError = @import("types/implicit_any_error.zig").ImplicitAnyError;
 const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const Parser = @import("../frontend/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -27,15 +28,23 @@ const Cursor = @import("../common/cursor.zig").Cursor;
 pub const CompileError = union(CompileError.Type) {
     pub const Type = enum(u8) {
         TypeError,
+        ImplicitAnyError,
         ParseError,
     };
 
     TypeError: TypeError,
+    ImplicitAnyError: ImplicitAnyError,
     ParseError: ParseError,
 
     pub fn typeError(err: TypeError) CompileError {
         return CompileError{
             .TypeError = err,
+        };
+    }
+
+    pub fn implicitAnyError(err: ImplicitAnyError) CompileError {
+        return CompileError{
+            .ImplicitAnyError = err,
         };
     }
 
@@ -52,6 +61,7 @@ pub const CompileError = union(CompileError.Type) {
     pub fn report(self: CompileError, writer: anytype) !void {
         switch (self) {
             .TypeError => |err| try err.report(writer),
+            .ImplicitAnyError => |err| try err.report(writer),
             .ParseError => |err| try err.report(writer),
         }
     }
@@ -67,6 +77,16 @@ test "can create a CompileError from a TypeError" {
     try expectEqual(cursor, compileError.TypeError.csr);
     try expectEqual(valueTy, compileError.TypeError.valueTy);
     try expectEqual(targetTy, compileError.TypeError.targetTy);
+}
+
+test "can create a CompileError from an ImplicitAnyError" {
+    const cursor = Cursor.new(2, 5);
+    const symbol = "anySymbol";
+    const err = ImplicitAnyError.new(cursor, symbol);
+    const compileError = CompileError.implicitAnyError(err);
+    try expectEqual(CompileError.Type.ImplicitAnyError, compileError.getType());
+    try expectEqual(cursor, compileError.ImplicitAnyError.csr);
+    try expectEqualStrings(symbol, compileError.ImplicitAnyError.symbol);
 }
 
 test "can create a CompileError from a ParseError" {

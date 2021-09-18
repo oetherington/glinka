@@ -21,6 +21,7 @@ const Parser = @import("frontend/parser.zig").Parser;
 const Backend = @import("backends/backend.zig").Backend;
 const JsBackend = @import("backends/js/js_backend.zig").JsBackend;
 const Compiler = @import("compiler/compiler.zig").Compiler;
+const Config = @import("common/config.zig").Config;
 
 pub fn main() !void {
     try std.io.getStdOut().writer().print(
@@ -34,11 +35,13 @@ pub fn main() !void {
         },
     );
 
-    const code: []const u8 = "var test: number = (123 + 321) * 2;";
+    const code: []const u8 = "var test: number = 2;";
 
     var allocator = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = allocator.deinit();
     var alloc = &allocator.allocator;
+
+    const config = Config{};
 
     var parser = Parser.new(alloc, code);
     defer parser.deinit();
@@ -46,7 +49,7 @@ pub fn main() !void {
     var backend = try JsBackend.new(alloc);
     defer backend.deinit();
 
-    var compiler = try Compiler.new(alloc, &parser, &backend.backend);
+    var compiler = try Compiler.new(alloc, &config, &parser, &backend.backend);
     defer compiler.deinit();
 
     try compiler.run();
