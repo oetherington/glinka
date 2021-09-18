@@ -540,7 +540,48 @@ fn parseMemberExpr(psr: *Parser) Parser.Error!ParseResult {
                     },
                 );
             },
-            .LParen => {},
+            .LParen => {
+                nd = try makeNode(
+                    psr.getAllocator(),
+                    psr.lexer.token.csr,
+                    .Call,
+                    node.Call{
+                        .expr = nd,
+                        .args = node.NodeList{},
+                    },
+                );
+
+                _ = psr.lexer.next();
+
+                while (psr.lexer.token.ty != .RParen) {
+                    const expr = try parseBinaryExpr(psr);
+                    switch (expr) {
+                        .Success => |arg| try nd.data.Call.args.append(
+                            psr.getAllocator(),
+                            arg,
+                        ),
+                        .Error => return expr,
+                        .NoMatch => return ParseResult.expected(
+                            "an expression for function call",
+                            psr.lexer.token,
+                        ),
+                    }
+
+                    if (psr.lexer.token.ty == .Comma) {
+                        _ = psr.lexer.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                if (psr.lexer.token.ty != .RParen)
+                    return ParseResult.expected(
+                        "')' after function call arguments",
+                        psr.lexer.token,
+                    );
+
+                _ = psr.lexer.next();
+            },
             else => break,
         }
     }
@@ -588,6 +629,50 @@ test "can parse array access expression" {
                 try expectEqual(NodeType.Ident, first.expr.getType());
 
                 try expectEqualStrings("a", first.expr.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse function call without arguments" {
+    try (ExprTestCase{
+        .expr = "a()",
+        .startingCh = 1,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Call, value.getType());
+
+                const call = value.data.Call;
+                try expectEqual(NodeType.Ident, call.expr.getType());
+                try expectEqualStrings("a", call.expr.data.Ident);
+                try expectEqual(@intCast(usize, 0), call.args.items.len);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse function call with arguments" {
+    try (ExprTestCase{
+        .expr = "a(b, true, 4)",
+        .startingCh = 1,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Call, value.getType());
+
+                const call = value.data.Call;
+                try expectEqual(NodeType.Ident, call.expr.getType());
+                try expectEqualStrings("a", call.expr.data.Ident);
+
+                const args = call.args.items;
+                try expectEqual(@intCast(usize, 3), args.len);
+
+                try expectEqual(NodeType.Ident, args[0].getType());
+                try expectEqualStrings("b", args[0].data.Ident);
+
+                try expectEqual(NodeType.True, args[1].getType());
+
+                try expectEqual(NodeType.Int, args[2].getType());
+                try expectEqualStrings("4", args[2].data.Int);
             }
         }).check,
     }).run();
