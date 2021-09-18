@@ -483,11 +483,61 @@ test "can parse 'this' primary expression" {
 }
 
 fn parseMemberExpr(psr: *Parser) Parser.Error!ParseResult {
-    const left = parsePrimaryExpr(psr);
+    const left = try parsePrimaryExpr(psr);
+    if (!left.isSuccess())
+        return left;
 
-    // TODO: Parse array access here
+    var nd = left.Success;
 
-    return left;
+    while (true) {
+        switch (psr.lexer.token.ty) {
+            .Dot => {
+                const csr = psr.lexer.token.csr;
+
+                const ident = psr.lexer.next();
+                if (ident.ty != .Ident)
+                    return ParseResult.expected(
+                        "identifier after '.'",
+                        psr.lexer.token,
+                    );
+
+                _ = psr.lexer.next();
+
+                nd = try makeNode(psr.getAllocator(), csr, .Dot, node.Dot{
+                    .expr = nd,
+                    .ident = ident.data,
+                });
+            },
+            .LBrack => {},
+            .LParen => {},
+            else => break,
+        }
+    }
+
+    return ParseResult.success(nd);
+}
+
+test "can parse dot expression" {
+    try (ExprTestCase{
+        .expr = "a.b.c",
+        .startingCh = 3,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Dot, value.getType());
+
+                const second = value.data.Dot;
+                try expectEqualStrings("c", second.ident);
+
+                try expectEqual(NodeType.Dot, second.expr.getType());
+
+                const first = second.expr.data.Dot;
+                try expectEqualStrings("b", first.ident);
+
+                try expectEqual(NodeType.Ident, first.expr.getType());
+                try expectEqualStrings("a", first.expr.data.Ident);
+            }
+        }).check,
+    }).run();
 }
 
 fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {

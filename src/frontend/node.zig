@@ -358,6 +358,53 @@ pub const Try = struct {
     }
 };
 
+pub const Dot = struct {
+    expr: Node,
+    ident: []const u8,
+
+    pub fn dump(
+        self: Dot,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Dot \"{s}\":\n", .{self.ident});
+        try self.expr.dumpIndented(writer, indent + 2);
+    }
+};
+
+pub const ArrayAccess = struct {
+    array: Node,
+    index: Node,
+
+    pub fn dump(
+        self: ArrayAccess,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Array Access:\n", .{});
+        try self.array.dumpIndented(writer, indent + 2);
+        try self.index.dumpIndented(writer, indent + 2);
+    }
+};
+
+pub const Call = struct {
+    expr: Node,
+    args: NodeList,
+
+    pub fn dump(
+        self: Call,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Call:\n", .{});
+        try self.expr.dumpIndented(writer, indent + 2);
+
+        try putInd(writer, indent, "Args:\n", .{});
+        for (self.args.items) |arg|
+            try arg.dumpIndented(writer, indent + 4);
+    }
+};
+
 pub const NodeType = enum {
     EOF,
     Decl,
@@ -389,6 +436,9 @@ pub const NodeType = enum {
     Throw,
     Labelled,
     Try,
+    Dot,
+    ArrayAccess,
+    Call,
 };
 
 pub const NodeData = union(NodeType) {
@@ -422,6 +472,9 @@ pub const NodeData = union(NodeType) {
     Throw: Node,
     Labelled: Labelled,
     Try: Try,
+    Dot: Dot,
+    ArrayAccess: ArrayAccess,
+    Call: Call,
 
     pub fn dump(
         self: NodeData,
@@ -456,13 +509,6 @@ pub const NodeData = union(NodeType) {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 try unaryOp.dump(writer, indent);
             },
-            .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
-            .Ternary => |ternary| try ternary.dump(writer, indent),
-            .Function => |func| try func.dump(writer, indent),
-            .If => |stmt| try stmt.dump(writer, indent),
-            .While => |loop| try loop.dump(writer, indent),
-            .Do => |loop| try loop.dump(writer, indent),
-            .Try => |t| try t.dump(writer, indent),
             .Return => |ret| {
                 try putInd(writer, indent, "Return\n", .{});
                 if (ret) |expr|
@@ -480,6 +526,16 @@ pub const NodeData = union(NodeType) {
                 "{s} {s}\n",
                 .{ @tagName(self), nd },
             ),
+            .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
+            .Ternary => |ternary| try ternary.dump(writer, indent),
+            .Function => |func| try func.dump(writer, indent),
+            .If => |stmt| try stmt.dump(writer, indent),
+            .While => |loop| try loop.dump(writer, indent),
+            .Do => |loop| try loop.dump(writer, indent),
+            .Try => |t| try t.dump(writer, indent),
+            .ArrayAccess => |aa| try aa.dump(writer, indent),
+            .Dot => |dot| try dot.dump(writer, indent),
+            .Call => |call| try call.dump(writer, indent),
             .Labelled => |labelled| try labelled.dump(writer, indent),
         }
     }
