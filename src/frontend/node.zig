@@ -373,7 +373,7 @@ pub const Dot = struct {
 };
 
 pub const ArrayAccess = struct {
-    array: Node,
+    expr: Node,
     index: Node,
 
     pub fn dump(
@@ -382,7 +382,7 @@ pub const ArrayAccess = struct {
         indent: usize,
     ) std.os.WriteError!void {
         try putInd(writer, indent, "Array Access:\n", .{});
-        try self.array.dumpIndented(writer, indent + 2);
+        try self.expr.dumpIndented(writer, indent + 2);
         try self.index.dumpIndented(writer, indent + 2);
     }
 };

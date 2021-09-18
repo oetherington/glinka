@@ -503,12 +503,43 @@ fn parseMemberExpr(psr: *Parser) Parser.Error!ParseResult {
 
                 _ = psr.lexer.next();
 
-                nd = try makeNode(psr.getAllocator(), csr, .Dot, node.Dot{
-                    .expr = nd,
-                    .ident = ident.data,
-                });
+                nd = try makeNode(
+                    psr.getAllocator(),
+                    csr,
+                    .Dot,
+                    node.Dot{
+                        .expr = nd,
+                        .ident = ident.data,
+                    },
+                );
             },
-            .LBrack => {},
+            .LBrack => {
+                const csr = psr.lexer.token.csr;
+
+                _ = psr.lexer.next();
+
+                const expr = try psr.parseExpr();
+                if (!expr.isSuccess())
+                    return expr;
+
+                if (psr.lexer.token.ty != .RBrack)
+                    return ParseResult.expected(
+                        "']' after array access",
+                        psr.lexer.token,
+                    );
+
+                _ = psr.lexer.next();
+
+                nd = try makeNode(
+                    psr.getAllocator(),
+                    csr,
+                    .ArrayAccess,
+                    node.ArrayAccess{
+                        .expr = nd,
+                        .index = expr.Success,
+                    },
+                );
+            },
             .LParen => {},
             else => break,
         }
@@ -527,13 +558,35 @@ test "can parse dot expression" {
 
                 const second = value.data.Dot;
                 try expectEqualStrings("c", second.ident);
-
                 try expectEqual(NodeType.Dot, second.expr.getType());
 
                 const first = second.expr.data.Dot;
                 try expectEqualStrings("b", first.ident);
-
                 try expectEqual(NodeType.Ident, first.expr.getType());
+                try expectEqualStrings("a", first.expr.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse array access expression" {
+    try (ExprTestCase{
+        .expr = "a[b][c]",
+        .startingCh = 4,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.ArrayAccess, value.getType());
+
+                const second = value.data.ArrayAccess;
+                try expectEqual(NodeType.Ident, second.index.getType());
+                try expectEqualStrings("c", second.index.data.Ident);
+                try expectEqual(NodeType.ArrayAccess, second.expr.getType());
+
+                const first = second.expr.data.ArrayAccess;
+                try expectEqual(NodeType.Ident, first.index.getType());
+                try expectEqualStrings("b", first.index.data.Ident);
+                try expectEqual(NodeType.Ident, first.expr.getType());
+
                 try expectEqualStrings("a", first.expr.data.Ident);
             }
         }).check,
