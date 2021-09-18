@@ -35,13 +35,16 @@ pub fn main() !void {
         },
     );
 
-    const code: []const u8 = "var test: number = 2;";
-
     var allocator = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = allocator.deinit();
     var alloc = &allocator.allocator;
 
     const config = Config{};
+
+    const path = "examples/example_1.ts";
+    const cwd = std.fs.cwd();
+    const code = try cwd.readFileAlloc(alloc, path, std.math.maxInt(usize));
+    defer alloc.free(code);
 
     var parser = Parser.new(alloc, code);
     defer parser.deinit();
