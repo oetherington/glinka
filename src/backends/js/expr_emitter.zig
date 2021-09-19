@@ -16,6 +16,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const TokenType = @import("../../common/token.zig").Token.Type;
 const node = @import("../../common/node.zig");
@@ -113,6 +114,7 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
 const ExprTestCase = struct {
     inputNode: Node,
     expectedOutput: []const u8,
+    cleanup: ?fn (alloc: *Allocator, nd: Node) void = null,
 
     pub fn run(self: ExprTestCase) !void {
         var backend = try JsBackend.new(std.testing.allocator);
@@ -123,6 +125,9 @@ const ExprTestCase = struct {
         const str = try backend.toString();
         defer backend.freeString(str);
         try expectEqualStrings(self.expectedOutput, str);
+
+        if (self.cleanup) |cleanup|
+            cleanup(std.testing.allocator, self.inputNode);
 
         std.testing.allocator.destroy(self.inputNode);
     }
@@ -190,5 +195,61 @@ test "JsBackend can emit 'undefined' expression" {
     try (ExprTestCase{
         .inputNode = try ExprTestCase.makeNode(.Undefined, {}),
         .expectedOutput = "undefined",
+    }).run();
+}
+
+test "JsBackend can emit prefix op expression" {
+    try (ExprTestCase{
+        .inputNode = try ExprTestCase.makeNode(
+            .PrefixOp,
+            node.UnaryOp{
+                .op = .Inc,
+                .expr = try ExprTestCase.makeNode(.Ident, "a"),
+            },
+        ),
+        .expectedOutput = "(++a)",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.PrefixOp.expr);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit postfix op expression" {
+    try (ExprTestCase{
+        .inputNode = try ExprTestCase.makeNode(
+            .PostfixOp,
+            node.UnaryOp{
+                .op = .Dec,
+                .expr = try ExprTestCase.makeNode(.Ident, "a"),
+            },
+        ),
+        .expectedOutput = "(a--)",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.PostfixOp.expr);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit binary op expression" {
+    try (ExprTestCase{
+        .inputNode = try ExprTestCase.makeNode(
+            .BinaryOp,
+            node.BinaryOp{
+                .op = .Add,
+                .left = try ExprTestCase.makeNode(.Ident, "a"),
+                .right = try ExprTestCase.makeNode(.Int, "4"),
+            },
+        ),
+        .expectedOutput = "(a+4)",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.BinaryOp.left);
+                alloc.destroy(nd.data.BinaryOp.right);
+            }
+        }).cleanup,
     }).run();
 }
