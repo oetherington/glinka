@@ -19,7 +19,7 @@ const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Cursor = @import("../common/cursor.zig").Cursor;
-const TokenType = @import("../frontend/token.zig").Token.Type;
+const TokenType = @import("../common/token.zig").Token.Type;
 const Type = @import("types/type.zig").Type;
 
 pub const OpError = struct {

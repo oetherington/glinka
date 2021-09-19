@@ -18,7 +18,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
-const TokenType = @import("token.zig").Token.Type;
+const TokenType = @import("../common/token.zig").Token.Type;
 
 const Branch = struct {
     branch: u8,

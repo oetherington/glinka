@@ -16,7 +16,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const node = @import("../frontend/node.zig");
+const node = @import("../common/node.zig");
 const Node = node.Node;
 
 pub const Backend = struct {

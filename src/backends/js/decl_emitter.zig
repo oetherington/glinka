@@ -17,7 +17,7 @@
 
 const std = @import("std");
 const expectEqualStrings = std.testing.expectEqualStrings;
-const node = @import("../../frontend/node.zig");
+const node = @import("../../common/node.zig");
 const Node = node.Node;
 const Cursor = @import("../../common/cursor.zig").Cursor;
 const Backend = @import("../backend.zig").Backend;

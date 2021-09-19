@@ -20,11 +20,12 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Type = @import("types/type.zig").Type;
 const TypeError = @import("types/type_error.zig").TypeError;
-const ImplicitAnyError = @import("types/implicit_any_error.zig").ImplicitAnyError;
+const implicitAnyError = @import("types/implicit_any_error.zig");
+const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const OpError = @import("op_error.zig").OpError;
 const ParseError = @import("../frontend/parse_result.zig").ParseError;
 const Parser = @import("../frontend/parser.zig").Parser;
-const TokenType = @import("../frontend/token.zig").Token.Type;
+const TokenType = @import("../common/token.zig").Token.Type;
 const Cursor = @import("../common/cursor.zig").Cursor;
 
 pub const CompileError = union(CompileError.Type) {

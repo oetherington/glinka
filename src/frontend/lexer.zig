@@ -21,7 +21,7 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const assert = std.debug.assert;
 const Cursor = @import("../common/cursor.zig").Cursor;
-const Token = @import("token.zig").Token;
+const Token = @import("../common/token.zig").Token;
 const lexOperator = @import("operator_lexer.zig").lexOperator;
 
 const keywordMap = std.ComptimeStringMap(Token.Type, .{
