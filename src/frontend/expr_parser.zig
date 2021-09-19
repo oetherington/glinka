@@ -30,7 +30,7 @@ const Decl = node.Decl;
 const TokenType = @import("../common/token.zig").Token.Type;
 const parseresult = @import("parse_result.zig");
 const ParseResult = parseresult.ParseResult;
-const ParseError = parseresult.ParseError;
+const ParseError = @import("../common/parse_error.zig").ParseError;
 
 const ExprTestCase = struct {
     expr: []const u8,
