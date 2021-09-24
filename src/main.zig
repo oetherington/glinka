@@ -17,11 +17,13 @@
 
 const std = @import("std");
 const version = @import("version.zig").version;
-const Parser = @import("frontend/parser.zig").Parser;
+const TsParser = @import("frontend/ts_parser.zig").TsParser;
+const Parser = @import("common/parser.zig").Parser;
 const Backend = @import("backends/backend.zig").Backend;
 const JsBackend = @import("backends/js/js_backend.zig").JsBackend;
 const Compiler = @import("compiler/compiler.zig").Compiler;
 const Config = @import("common/config.zig").Config;
+const Driver = @import("common/driver.zig").Driver;
 
 pub fn main() !void {
     try std.io.getStdOut().writer().print(
@@ -41,21 +43,17 @@ pub fn main() !void {
 
     const config = Config{};
 
-    const path = "examples/example_1.ts";
-    const cwd = std.fs.cwd();
-    const code = try cwd.readFileAlloc(alloc, path, std.math.maxInt(usize));
-    defer alloc.free(code);
-
-    var parser = Parser.new(alloc, code);
-    defer parser.deinit();
+    const driver = Driver(TsParser){};
 
     var backend = try JsBackend.new(alloc);
     defer backend.deinit();
 
-    var compiler = try Compiler.new(alloc, &config, &parser, &backend.backend);
+    var compiler = try Compiler.new(alloc, &config, &backend.backend);
     defer compiler.deinit();
 
-    try compiler.run();
+    const path = "examples/example_1.ts";
+
+    try compiler.compile(driver, path);
 
     if (compiler.hasErrors()) {
         try compiler.reportErrors();

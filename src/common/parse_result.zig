@@ -19,14 +19,14 @@ const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const Cursor = @import("../common/cursor.zig").Cursor;
-const Token = @import("../common/token.zig").Token;
-const node = @import("../common/node.zig");
+const Cursor = @import("cursor.zig").Cursor;
+const Token = @import("token.zig").Token;
+const node = @import("node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
-const ParseError = @import("../common/parse_error.zig").ParseError;
+const ParseError = @import("parse_error.zig").ParseError;
 
 pub const ParseResultType = enum {
     Success,

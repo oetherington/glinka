@@ -20,7 +20,9 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
-const Parser = @import("parser.zig").Parser;
+const Arena = std.heap.ArenaAllocator;
+const TsParser = @import("ts_parser.zig").TsParser;
+const Parser = @import("../common/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
@@ -28,7 +30,7 @@ const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
 const TokenType = @import("../common/token.zig").Token.Type;
-const parseresult = @import("parse_result.zig");
+const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 
@@ -40,8 +42,12 @@ const ExprTestCase = struct {
     pub fn run(comptime self: @This()) !void {
         const code = "var a = " ++ self.expr ++ ";";
 
-        var parser = Parser.new(std.testing.allocator, code);
-        defer parser.deinit();
+        var arena = Arena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var tsParser = TsParser.new(&arena, code);
+
+        var parser = tsParser.getParser();
 
         const res = try parser.next();
         try res.reportIfError(std.io.getStdErr().writer());
@@ -57,7 +63,7 @@ const ExprTestCase = struct {
     }
 };
 
-fn parseParenExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parseParenExpr(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LParen);
 
     _ = psr.lexer.next();
@@ -87,7 +93,7 @@ test "can parse paren primary expression" {
     }).run();
 }
 
-fn parseArrayLiteral(psr: *Parser) Parser.Error!ParseResult {
+fn parseArrayLiteral(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrack);
 
     const nd = try makeNode(
@@ -138,7 +144,7 @@ test "can parse array literal primary expression" {
     }).run();
 }
 
-fn parsePropertyKey(psr: *Parser) Parser.Error!ParseResult {
+fn parsePropertyKey(psr: *TsParser) Parser.Error!ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
     const data = psr.lexer.token.data;
@@ -155,7 +161,7 @@ fn parsePropertyKey(psr: *Parser) Parser.Error!ParseResult {
     return ParseResult.success(nd);
 }
 
-fn parseObjectLiteral(psr: *Parser) Parser.Error!ParseResult {
+fn parseObjectLiteral(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrace);
 
     const nd = try makeNode(
@@ -230,7 +236,7 @@ test "can parse object literal primary expression" {
     }).run();
 }
 
-fn parseFunctionExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parseFunctionExpr(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Function);
 
     const csr = psr.lexer.token.csr;
@@ -350,7 +356,7 @@ test "can parse function definition" {
     }).run();
 }
 
-fn parsePrimaryExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parsePrimaryExpr(psr: *TsParser) Parser.Error!ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
 
@@ -482,7 +488,7 @@ test "can parse 'this' primary expression" {
     }).run();
 }
 
-fn parseMemberExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
     const left = try parsePrimaryExpr(psr);
     if (!left.isSuccess())
         return left;
@@ -678,7 +684,7 @@ test "can parse function call with arguments" {
     }).run();
 }
 
-fn parsePostfixExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parsePostfixExpr(psr: *TsParser) Parser.Error!ParseResult {
     const res = try parseMemberExpr(psr);
     if (!res.isSuccess())
         return res;
@@ -724,7 +730,7 @@ test "can parse postfix unary operator expressions" {
     }).run();
 }
 
-fn parsePrefixExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parsePrefixExpr(psr: *TsParser) Parser.Error!ParseResult {
     const op = switch (psr.lexer.token.ty) {
         .Delete,
         .Void,
@@ -769,11 +775,11 @@ test "can parse prefix unary operator expressions" {
 }
 
 fn BinaryOpParser(
-    next: fn (psr: *Parser) Parser.Error!ParseResult,
+    next: fn (psr: *TsParser) Parser.Error!ParseResult,
     tokens: []const TokenType,
 ) type {
     return struct {
-        pub fn parse(psr: *Parser) Parser.Error!ParseResult {
+        pub fn parse(psr: *TsParser) Parser.Error!ParseResult {
             const res = try next(psr);
             if (!res.isSuccess())
                 return res;
@@ -864,7 +870,7 @@ const logOrOpParser = BinaryOpParser(
     &[_]TokenType{.LogicalOr},
 );
 
-fn parseTernaryExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parseTernaryExpr(psr: *TsParser) Parser.Error!ParseResult {
     const left = try logOrOpParser.parse(psr);
     if (!left.isSuccess())
         return left;
@@ -915,7 +921,7 @@ const assignOpParser = BinaryOpParser(
     },
 );
 
-fn parseBinaryExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parseBinaryExpr(psr: *TsParser) Parser.Error!ParseResult {
     return assignOpParser.parse(psr);
 }
 
@@ -1019,7 +1025,7 @@ test "can parse ternary expressions" {
     }).run();
 }
 
-fn parseCommaExpr(psr: *Parser) Parser.Error!ParseResult {
+fn parseCommaExpr(psr: *TsParser) Parser.Error!ParseResult {
     const res = try parseBinaryExpr(psr);
     if (!res.isSuccess() or psr.lexer.token.ty != .Comma)
         return res;
@@ -1069,5 +1075,5 @@ test "can parse comma expressions" {
 }
 
 pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {
-    return parseCommaExpr(psr);
+    return parseCommaExpr(@fieldParentPtr(TsParser, "parser", psr));
 }

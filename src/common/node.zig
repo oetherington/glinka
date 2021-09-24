@@ -407,6 +407,7 @@ pub const Call = struct {
 
 pub const NodeType = enum {
     EOF,
+    Program,
     Decl,
     Int,
     Ident,
@@ -443,6 +444,7 @@ pub const NodeType = enum {
 
 pub const NodeData = union(NodeType) {
     EOF: void,
+    Program: NodeList,
     Decl: Decl,
     Int: []const u8,
     Ident: []const u8,
@@ -489,7 +491,7 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
-            .Comma, .Array, .Block => |list| {
+            .Program, .Comma, .Array, .Block => |list| {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 for (list.items) |item|
                     try item.dumpIndented(writer, indent + 2);

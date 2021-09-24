@@ -20,7 +20,9 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
-const Parser = @import("parser.zig").Parser;
+const Arena = std.heap.ArenaAllocator;
+const TsParser = @import("ts_parser.zig").TsParser;
+const Parser = @import("../common/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
@@ -28,11 +30,11 @@ const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
 const TokenType = @import("../common/token.zig").TokenType;
-const parseresult = @import("parse_result.zig");
+const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 
-pub fn parseType(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseTypeName(psr: *TsParser) Parser.Error!ParseResult {
     switch (psr.lexer.token.ty) {
         .Ident => {
             const nd = try makeNode(
@@ -53,12 +55,20 @@ pub fn parseType(psr: *Parser) Parser.Error!ParseResult {
 test "can parse type names" {
     const code = " SomeTypeName ";
 
-    var parser = Parser.new(std.testing.allocator, code);
-    defer parser.deinit();
+    var arena = Arena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var tsParser = TsParser.new(&arena, code);
+
+    var parser = tsParser.getParser();
 
     const res = try parser.parseType();
     try expect(res.isSuccess());
     try expectEqual(Cursor.new(1, 2), res.Success.csr);
     try expectEqual(NodeType.TypeName, res.Success.data.getType());
     try expectEqualStrings("SomeTypeName", res.Success.data.TypeName);
+}
+
+pub fn parseType(psr: *Parser) Parser.Error!ParseResult {
+    return parseTypeName(@fieldParentPtr(TsParser, "parser", psr));
 }

@@ -24,7 +24,6 @@ const implicitAnyError = @import("types/implicit_any_error.zig");
 const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const OpError = @import("op_error.zig").OpError;
 const ParseError = @import("../common/parse_error.zig").ParseError;
-const Parser = @import("../frontend/parser.zig").Parser;
 const TokenType = @import("../common/token.zig").Token.Type;
 const Cursor = @import("../common/cursor.zig").Cursor;
 

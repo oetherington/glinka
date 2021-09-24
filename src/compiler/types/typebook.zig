@@ -57,7 +57,7 @@ const OpEntry = union(Variant) {
     }
 };
 
-const OpMap = [100]?OpEntry;
+const OpMap = [std.meta.fields(TokenType).len]?OpEntry;
 
 fn createOpMap(b: *TypeBook) !void {
     std.mem.set(?OpEntry, b.opMap[0..], null);

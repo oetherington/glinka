@@ -20,7 +20,9 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
-const Parser = @import("parser.zig").Parser;
+const Arena = std.heap.ArenaAllocator;
+const TsParser = @import("ts_parser.zig").TsParser;
+const Parser = @import("../common/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
@@ -28,7 +30,7 @@ const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
 const TokenType = @import("../common/token.zig").Token.Type;
-const parseresult = @import("parse_result.zig");
+const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 
@@ -37,8 +39,12 @@ const StmtTestCase = struct {
     check: fn (value: Node) anyerror!void,
 
     pub fn run(comptime self: @This()) !void {
-        var parser = Parser.new(std.testing.allocator, self.code);
-        defer parser.deinit();
+        var arena = Arena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var tsParser = TsParser.new(&arena, self.code);
+
+        var parser = tsParser.getParser();
 
         const res = try parser.next();
         try res.reportIfError(std.io.getStdErr().writer());
@@ -52,7 +58,7 @@ const StmtTestCase = struct {
     }
 };
 
-fn eatSemi(psr: *Parser) ?ParseResult {
+fn eatSemi(psr: *TsParser) ?ParseResult {
     if (psr.lexer.token.ty != TokenType.Semi)
         return ParseResult.expected(TokenType.Semi, psr.lexer.token);
 
@@ -62,7 +68,7 @@ fn eatSemi(psr: *Parser) ?ParseResult {
 }
 
 fn parseDecl(
-    psr: *Parser,
+    psr: *TsParser,
     comptime scoping: Decl.Scoping,
 ) Parser.Error!ParseResult {
     const csr = psr.lexer.token.csr;
@@ -111,8 +117,12 @@ test "can parse var, let and const declarations" {
         expectedValueIdent: ?[]const u8,
 
         fn run(self: @This()) !void {
-            var parser = Parser.new(std.testing.allocator, self.code);
-            defer parser.deinit();
+            var arena = Arena.init(std.testing.allocator);
+            defer arena.deinit();
+
+            var tsParser = TsParser.new(&arena, self.code);
+
+            var parser = tsParser.getParser();
 
             const res = try parser.next();
 
@@ -207,7 +217,7 @@ const BranchResult = union(Type) {
     }
 };
 
-fn parseIfBranch(psr: *Parser) Parser.Error!BranchResult {
+fn parseIfBranch(psr: *TsParser) Parser.Error!BranchResult {
     if (psr.lexer.token.ty != .If)
         return BranchResult{ .ParseResult = ParseResult.noMatch(null) };
 
@@ -243,7 +253,7 @@ fn parseIfBranch(psr: *Parser) Parser.Error!BranchResult {
     } };
 }
 
-fn parseIf(psr: *Parser) Parser.Error!ParseResult {
+fn parseIf(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .If);
 
     const csr = psr.lexer.token.csr;
@@ -377,7 +387,7 @@ test "can parse an if statement with an 'else if' and an 'else' branch" {
     }).run();
 }
 
-pub fn parseWhile(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseWhile(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .While);
 
     const csr = psr.lexer.token.csr;
@@ -415,17 +425,21 @@ pub fn parseWhile(psr: *Parser) Parser.Error!ParseResult {
 }
 
 test "can parse while loop" {
-    var parser = Parser.new(std.testing.allocator, "while (true) {}");
-    defer parser.deinit();
-    const res = try parser.next();
-    try expect(res.isSuccess());
-    try expectEqual(NodeType.While, res.Success.getType());
-    const loop = res.Success.data.While;
-    try expectEqual(NodeType.True, loop.cond.getType());
-    try expectEqual(NodeType.Block, loop.body.getType());
+    try (StmtTestCase{
+        .code = "while (true) {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.While, value.getType());
+
+                const loop = value.data.While;
+                try expectEqual(NodeType.True, loop.cond.getType());
+                try expectEqual(NodeType.Block, loop.body.getType());
+            }
+        }).check,
+    }).run();
 }
 
-pub fn parseDo(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseDo(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Do);
 
     const csr = psr.lexer.token.csr;
@@ -471,17 +485,21 @@ pub fn parseDo(psr: *Parser) Parser.Error!ParseResult {
 }
 
 test "can parse do loop" {
-    var parser = Parser.new(std.testing.allocator, "do {} while (true);");
-    defer parser.deinit();
-    const res = try parser.next();
-    try expect(res.isSuccess());
-    try expectEqual(NodeType.Do, res.Success.getType());
-    const loop = res.Success.data.Do;
-    try expectEqual(NodeType.Block, loop.body.getType());
-    try expectEqual(NodeType.True, loop.cond.getType());
+    try (StmtTestCase{
+        .code = "do {} while (true);",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Do, value.getType());
+
+                const loop = value.data.Do;
+                try expectEqual(NodeType.Block, loop.body.getType());
+                try expectEqual(NodeType.True, loop.cond.getType());
+            }
+        }).check,
+    }).run();
 }
 
-pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
+fn parseBlockStmt(psr: *TsParser) Parser.Error!ParseResult {
     if (psr.lexer.token.ty != .LBrace)
         return ParseResult.noMatch(
             ParseError.expected("a block", psr.lexer.token),
@@ -510,28 +528,39 @@ pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
     return ParseResult.success(nd);
 }
 
+pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
+    return parseBlockStmt(@fieldParentPtr(TsParser, "parser", psr));
+}
+
 test "can parse empty block" {
-    var parser = Parser.new(std.testing.allocator, "{}");
-    defer parser.deinit();
-    const res = try parser.next();
-    try expect(res.isSuccess());
-    try expectEqual(NodeType.Block, res.Success.getType());
-    try expectEqual(@intCast(usize, 0), res.Success.data.Block.items.len);
+    try (StmtTestCase{
+        .code = "{}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Block, value.getType());
+                try expectEqual(@intCast(usize, 0), value.data.Block.items.len);
+            }
+        }).check,
+    }).run();
 }
 
 test "can parse populated block" {
-    var parser = Parser.new(std.testing.allocator, "{ break; return; }");
-    defer parser.deinit();
-    const res = try parser.next();
-    try expect(res.isSuccess());
-    try expectEqual(NodeType.Block, res.Success.getType());
-    const items = res.Success.data.Block.items;
-    try expectEqual(@intCast(usize, 2), items.len);
-    try expectEqual(NodeType.Break, items[0].getType());
-    try expectEqual(NodeType.Return, items[1].getType());
+    try (StmtTestCase{
+        .code = "{ break; return; }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Block, value.getType());
+
+                const items = value.data.Block.items;
+                try expectEqual(@intCast(usize, 2), items.len);
+                try expectEqual(NodeType.Break, items[0].getType());
+                try expectEqual(NodeType.Return, items[1].getType());
+            }
+        }).check,
+    }).run();
 }
 
-pub fn parseReturn(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseReturn(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Return);
 
     const csr = psr.lexer.token.csr;
@@ -581,7 +610,7 @@ test "can parse 'return' with expression" {
 }
 
 pub fn parseBreakOrContinue(
-    psr: *Parser,
+    psr: *TsParser,
     comptime ty: NodeType,
 ) Parser.Error!ParseResult {
     std.debug.assert(std.mem.eql(
@@ -657,7 +686,7 @@ test "can parse 'continue' with label" {
     }).run();
 }
 
-pub fn parseThrow(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseThrow(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Throw);
 
     const csr = psr.lexer.token.csr;
@@ -690,14 +719,14 @@ test "can parse 'throw' statement" {
     }).run();
 }
 
-pub fn parseTry(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseTry(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Try);
 
     const csr = psr.lexer.token.csr;
 
     _ = psr.lexer.next();
 
-    const tryBlock = try parseBlock(psr);
+    const tryBlock = try parseBlockStmt(psr);
     if (!tryBlock.isSuccess())
         return tryBlock;
 
@@ -730,7 +759,7 @@ pub fn parseTry(psr: *Parser) Parser.Error!ParseResult {
 
         _ = psr.lexer.next();
 
-        const block = try parseBlock(psr);
+        const block = try parseBlockStmt(psr);
         if (!block.isSuccess())
             return block;
 
@@ -743,7 +772,7 @@ pub fn parseTry(psr: *Parser) Parser.Error!ParseResult {
     if (psr.lexer.token.ty == .Finally) {
         _ = psr.lexer.next();
 
-        const block = try parseBlock(psr);
+        const block = try parseBlockStmt(psr);
         if (!block.isSuccess())
             return block;
 
@@ -776,7 +805,7 @@ test "can parse try-catch" {
     }).run();
 }
 
-pub fn parseExprStmt(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseExprStmt(psr: *TsParser) Parser.Error!ParseResult {
     const expr = try psr.parseExpr();
     if (expr.isSuccess()) {
         if (eatSemi(psr)) |err|
@@ -804,7 +833,7 @@ test "can parse expression statements" {
     }).run();
 }
 
-pub fn parseLabelled(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseLabelled(psr: *TsParser) Parser.Error!ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Ident);
 
     const ctx = psr.lexer.save();
@@ -846,7 +875,7 @@ test "can parse labelled statement" {
     }).run();
 }
 
-pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseStmtInternal(psr: *TsParser) Parser.Error!ParseResult {
     while (psr.lexer.token.ty == .Semi)
         _ = psr.lexer.next();
 
@@ -858,7 +887,7 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
         .If => parseIf(psr),
         .While => parseWhile(psr),
         .Do => parseDo(psr),
-        .LBrace => parseBlock(psr),
+        .LBrace => parseBlockStmt(psr),
         .Break => parseBreakOrContinue(psr, .Break),
         .Continue => parseBreakOrContinue(psr, .Continue),
         .Throw => parseThrow(psr),
@@ -874,14 +903,19 @@ pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
     };
 }
 
+pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
+    return parseStmtInternal(@fieldParentPtr(TsParser, "parser", psr));
+}
+
 test "can parse end-of-file" {
-    var parser = Parser.new(std.testing.allocator, "");
-    defer parser.deinit();
-
-    const res = try parser.next();
-
-    try expect(res.isSuccess());
-    try expectEqual(NodeType.EOF, res.Success.getType());
+    try (StmtTestCase{
+        .code = "",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.EOF, value.getType());
+            }
+        }).check,
+    }).run();
 }
 
 test "can skip empty statements" {

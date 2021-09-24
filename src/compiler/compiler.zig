@@ -17,14 +17,14 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Arena = std.heap.ArenaAllocator;
 const Config = @import("../common/config.zig").Config;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const ParseError = @import("../common/parse_error.zig").ParseError;
-const Parser = @import("../frontend/parser.zig").Parser;
 const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
-const Backend = @import("../backends/backend.zig").Backend;
+const Backend = @import("../backends/backend.zig").Backend; // TODO
 const Scope = @import("scope.zig").Scope;
 const Type = @import("types/type.zig").Type;
 const TypeBook = @import("types/typebook.zig").TypeBook;
@@ -38,7 +38,6 @@ const inferrer = @import("inferrer.zig");
 pub const Compiler = struct {
     alloc: *Allocator,
     config: *const Config,
-    parser: *Parser,
     backend: *Backend,
     scope: *Scope,
     typebook: *TypeBook,
@@ -47,13 +46,11 @@ pub const Compiler = struct {
     pub fn new(
         alloc: *Allocator,
         config: *const Config,
-        parser: *Parser,
         backend: *Backend,
     ) !Compiler {
         return Compiler{
             .alloc = alloc,
             .config = config,
-            .parser = parser,
             .backend = backend,
             .scope = try Scope.new(alloc, null),
             .typebook = try TypeBook.new(alloc),
@@ -135,37 +132,30 @@ pub const Compiler = struct {
         }
     }
 
-    pub fn run(self: *Compiler) !void {
+    pub fn compile(self: *Compiler, driver: anytype, path: []const u8) !void {
+        var arena = Arena.init(self.alloc);
+        defer arena.deinit();
+
+        const file = try driver.parseFile(&arena, path);
+
+        const nd = switch (file.res) {
+            .Success => |node| node,
+            .Error => |err| {
+                try self.errors.append(CompileError.parseError(err));
+                return;
+            },
+            .NoMatch => std.debug.panic(
+                "parseFile should never return NoMatch",
+                .{},
+            ),
+        };
+
+        std.debug.assert(nd.getType() == .Program);
+
         try self.backend.prolog();
 
-        while (true) {
-            const res = try self.parser.next();
-
-            const nd = switch (res) {
-                .Success => |node| node,
-                .Error => |err| {
-                    try self.errors.append(CompileError.parseError(err));
-                    return;
-                },
-                .NoMatch => |err| {
-                    const theError = if (err) |perr|
-                        perr
-                    else
-                        ParseError.message(
-                            self.parser.lexer.csr,
-                            "Expected a top-level statement",
-                        );
-
-                    try self.errors.append(CompileError.parseError(theError));
-                    return;
-                },
-            };
-
-            switch (nd.getType()) {
-                .EOF => break,
-                else => try self.processNode(nd),
-            }
-        }
+        for (nd.data.Program.items) |child|
+            try self.processNode(child);
 
         try self.backend.epilog();
     }

@@ -21,7 +21,7 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
-const Lexer = @import("lexer.zig").Lexer;
+const Parser = @import("../common/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
@@ -29,61 +29,78 @@ const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
 const TokenType = @import("../common/token.zig").TokenType;
-const parseresult = @import("parse_result.zig");
+const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 const exprParser = @import("expr_parser.zig");
 const typeParser = @import("type_parser.zig");
 const stmtParser = @import("stmt_parser.zig");
+const Lexer = @import("lexer.zig").Lexer;
 
-pub const Parser = struct {
+pub const TsParser = struct {
     pub const Error = Allocator.Error;
 
-    arena: Arena,
+    arena: *Arena,
     lexer: Lexer,
+    parser: Parser,
 
-    pub fn new(alloc: *Allocator, code: []const u8) Parser {
+    pub fn new(arena: *Arena, code: []const u8) TsParser {
         var lexer = Lexer.new(code);
         _ = lexer.next();
 
-        return Parser{
-            .arena = Arena.init(alloc),
+        return TsParser{
+            .arena = arena,
             .lexer = lexer,
+            .parser = Parser{
+                .callbacks = .{
+                    .currentCursor = TsParser.currentCursor,
+                    .parseExpr = exprParser.parseExpr,
+                    .parseType = typeParser.parseType,
+                    .parseBlock = stmtParser.parseBlock,
+                    .parseStmt = stmtParser.parseStmt,
+                },
+            },
         };
     }
 
-    pub fn deinit(self: Parser) void {
-        self.arena.deinit();
-    }
-
-    pub fn getAllocator(self: *Parser) *Allocator {
+    pub fn getAllocator(self: *TsParser) *Allocator {
         return &self.arena.allocator;
     }
 
-    pub fn parseExpr(self: *Parser) Parser.Error!ParseResult {
-        return exprParser.parseExpr(self);
+    pub fn getParser(self: *TsParser) *Parser {
+        return &self.parser;
     }
 
-    pub fn parseType(self: *Parser) Parser.Error!ParseResult {
-        return typeParser.parseType(self);
+    pub fn currentCursor(psr: *Parser) Cursor {
+        const self = @fieldParentPtr(TsParser, "parser", psr);
+        return self.lexer.token.csr;
     }
 
-    pub fn parseBlock(self: *Parser) Parser.Error!ParseResult {
-        return stmtParser.parseBlock(self);
+    pub fn parseExpr(self: *TsParser) Parser.Error!ParseResult {
+        return exprParser.parseExpr(self.getParser());
     }
 
-    pub fn parseStmt(self: *Parser) Parser.Error!ParseResult {
-        return stmtParser.parseStmt(self);
+    pub fn parseType(self: *TsParser) Parser.Error!ParseResult {
+        return typeParser.parseType(self.getParser());
     }
 
-    pub fn next(self: *Parser) Parser.Error!ParseResult {
+    pub fn parseBlock(self: *TsParser) Parser.Error!ParseResult {
+        return stmtParser.parseBlock(self.getParser());
+    }
+
+    pub fn parseStmt(self: *TsParser) Parser.Error!ParseResult {
+        return stmtParser.parseStmt(self.getParser());
+    }
+
+    pub fn next(self: *TsParser) Parser.Error!ParseResult {
         return self.parseStmt();
     }
 };
 
-test "parser can be initialized" {
+test "TsParser can be initialized" {
     const code: []const u8 = "some sample code";
-    var parser = Parser.new(std.testing.allocator, code);
-    defer parser.deinit();
+    var arena = Arena.init(std.testing.allocator);
+    defer arena.deinit();
+    var parser = TsParser.new(&arena, code);
     try expectEqualStrings(code, parser.lexer.code);
 }
