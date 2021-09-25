@@ -22,7 +22,7 @@ const TokenType = @import("../../common/token.zig").Token.Type;
 const node = @import("../../common/node.zig");
 const Node = node.Node;
 const Cursor = @import("../../common/cursor.zig").Cursor;
-const Backend = @import("../backend.zig").Backend;
+const Backend = @import("../../common/backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
 
 fn opToString(op: TokenType) error{InvalidOp}![]const u8 {

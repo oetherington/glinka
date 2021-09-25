@@ -20,7 +20,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const node = @import("../../common/node.zig");
 const Node = node.Node;
 const Cursor = @import("../../common/cursor.zig").Cursor;
-const Backend = @import("../backend.zig").Backend;
+const Backend = @import("../../common/backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
 
 pub fn emitDecl(self: *JsBackend, decl: node.Decl) Backend.Error!void {
