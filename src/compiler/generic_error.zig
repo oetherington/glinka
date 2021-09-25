@@ -17,43 +17,38 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const TokenType = @import("../common/token.zig").Token.Type;
 const Type = @import("types/type.zig").Type;
 
-pub const OpError = struct {
+pub const GenericError = struct {
     csr: Cursor,
-    op: TokenType,
-    ty: Type.Ptr,
+    msg: []const u8,
 
-    pub fn new(csr: Cursor, op: TokenType, ty: Type.Ptr) OpError {
-        return OpError{
+    pub fn new(csr: Cursor, msg: []const u8) GenericError {
+        return GenericError{
             .csr = csr,
-            .op = op,
-            .ty = ty,
+            .msg = msg,
         };
     }
 
-    pub fn report(self: OpError, writer: anytype) !void {
+    pub fn report(self: GenericError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: Operator '{s}' is not defined for type '",
+            "Error: {d}:{d}: {s}\n",
             .{
                 self.csr.ln,
                 self.csr.ch,
-                @tagName(self.op),
+                self.msg,
             },
         );
-        try self.ty.write(writer);
-        try writer.print("'\n", .{});
     }
 };
 
-test "can initialize an OpError" {
+test "can initialize a GenericError" {
     const csr = Cursor.new(2, 5);
-    const op = TokenType.Sub;
-    const ty = Type.newString();
-    const err = OpError.new(csr, op, &ty);
+    const msg = "Some error message";
+    const err = GenericError.new(csr, msg);
     try expectEqual(csr, err.csr);
-    try expectEqual(op, err.op);
-    try expectEqual(&ty, err.ty);
+    try expectEqualStrings(msg, err.msg);
 }

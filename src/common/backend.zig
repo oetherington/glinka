@@ -25,11 +25,13 @@ pub const Backend = struct {
     pub const Callback = fn (be: *Backend) Error!void;
     pub const NodeCallback = fn (be: *Backend, nd: Node) Error!void;
 
-    callbacks: struct {
+    pub const Callbacks = struct {
         prolog: Callback,
         epilog: Callback,
         declaration: NodeCallback,
-    },
+    };
+
+    callbacks: Callbacks,
 
     pub fn prolog(self: *Backend) Error!void {
         try self.callbacks.prolog(self);

@@ -23,6 +23,8 @@ const TypeError = @import("types/type_error.zig").TypeError;
 const implicitAnyError = @import("types/implicit_any_error.zig");
 const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const OpError = @import("op_error.zig").OpError;
+const RedefinitionError = @import("redefinition_error.zig").RedefinitionError;
+const GenericError = @import("generic_error.zig").GenericError;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 const TokenType = @import("../common/token.zig").Token.Type;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -31,12 +33,16 @@ pub const CompileError = union(CompileError.Type) {
     pub const Type = enum(u8) {
         TypeError,
         OpError,
+        RedefinitionError,
+        GenericError,
         ImplicitAnyError,
         ParseError,
     };
 
     TypeError: TypeError,
     OpError: OpError,
+    RedefinitionError: RedefinitionError,
+    GenericError: GenericError,
     ImplicitAnyError: ImplicitAnyError,
     ParseError: ParseError,
 
@@ -49,6 +55,18 @@ pub const CompileError = union(CompileError.Type) {
     pub fn opError(err: OpError) CompileError {
         return CompileError{
             .OpError = err,
+        };
+    }
+
+    pub fn redefinitionError(err: RedefinitionError) CompileError {
+        return CompileError{
+            .RedefinitionError = err,
+        };
+    }
+
+    pub fn genericError(err: GenericError) CompileError {
+        return CompileError{
+            .GenericError = err,
         };
     }
 
@@ -72,6 +90,8 @@ pub const CompileError = union(CompileError.Type) {
         switch (self) {
             .TypeError => |err| try err.report(writer),
             .OpError => |err| try err.report(writer),
+            .RedefinitionError => |err| try err.report(writer),
+            .GenericError => |err| try err.report(writer),
             .ImplicitAnyError => |err| try err.report(writer),
             .ParseError => |err| try err.report(writer),
         }
@@ -97,10 +117,31 @@ test "can create a CompileError from an OpError" {
     const opError = OpError.new(cursor, op, &ty);
     const compileError = CompileError.opError(opError);
     try expectEqual(CompileError.Type.OpError, compileError.getType());
-    // TODO
-    // try expectEqual(cursor, compileError.TypeError.csr);
-    // try expectEqual(&valueTy, compileError.TypeError.valueTy);
-    // try expectEqual(&targetTy, compileError.TypeError.targetTy);
+    try expectEqual(cursor, compileError.OpError.csr);
+    try expectEqual(op, compileError.OpError.op);
+    try expectEqual(ty.getType(), compileError.OpError.ty.getType());
+}
+
+test "can create a CompileError from a RedefinitionError" {
+    const name = "aSymbol";
+    const firstDefined = Cursor.new(1, 1);
+    const secondDefined = Cursor.new(3, 3);
+    const redefError = RedefinitionError.new(name, firstDefined, secondDefined);
+    const compileError = CompileError.redefinitionError(redefError);
+    try expectEqual(CompileError.Type.RedefinitionError, compileError.getType());
+    try expectEqualStrings(name, compileError.RedefinitionError.name);
+    try expectEqual(firstDefined, compileError.RedefinitionError.firstDefined);
+    try expectEqual(secondDefined, compileError.RedefinitionError.secondDefined);
+}
+
+test "can create a CompileError from a GenericError" {
+    const csr = Cursor.new(3, 3);
+    const msg = "Some error message";
+    const genError = GenericError.new(csr, msg);
+    const compileError = CompileError.genericError(genError);
+    try expectEqual(CompileError.Type.GenericError, compileError.getType());
+    try expectEqual(csr, compileError.GenericError.csr);
+    try expectEqualStrings(msg, compileError.GenericError.msg);
 }
 
 test "can create a CompileError from an ImplicitAnyError" {

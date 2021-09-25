@@ -202,7 +202,7 @@ const builtinMap = std.ComptimeStringMap(
     },
 );
 
-pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) !Type.Ptr {
+pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) !?Type.Ptr {
     _ = scope;
 
     switch (nd.data) {
@@ -211,10 +211,10 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) !Type.Ptr {
                 return func(typebook);
             } else {
                 // TODO: Lookup in scope if not builtin
-                return error.InvalidType;
+                return null;
             }
         },
-        else => return error.InvalidType,
+        else => return null,
     }
 }
 
@@ -234,5 +234,5 @@ test "can lookup builtin types" {
     defer std.testing.allocator.destroy(nd);
 
     const ty = try findType(scope, typebook, nd);
-    try expectEqual(Type.Type.Number, ty.getType());
+    try expectEqual(Type.Type.Number, ty.?.getType());
 }

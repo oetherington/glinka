@@ -20,10 +20,7 @@ const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
 const Config = @import("../common/config.zig").Config;
 const Cursor = @import("../common/cursor.zig").Cursor;
-const ParseError = @import("../common/parse_error.zig").ParseError;
-const node = @import("../common/node.zig");
-const Node = node.Node;
-const NodeType = node.NodeType;
+const Node = @import("../common/node.zig").Node;
 const Backend = @import("../common/backend.zig").Backend;
 const Scope = @import("scope.zig").Scope;
 const Type = @import("types/type.zig").Type;
@@ -34,14 +31,18 @@ const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const ErrorContext = @import("error_context.zig").ErrorContext;
 const CompileError = @import("compile_error.zig").CompileError;
 const inferrer = @import("inferrer.zig");
+const declaration = @import("declaration.zig");
 
 pub const Compiler = struct {
+    const StringList = std.ArrayList([]u8);
+
     alloc: *Allocator,
     config: *const Config,
     backend: *Backend,
     scope: *Scope,
     typebook: *TypeBook,
     errors: ErrorContext,
+    strings: StringList,
 
     pub fn new(
         alloc: *Allocator,
@@ -55,6 +56,7 @@ pub const Compiler = struct {
             .scope = try Scope.new(alloc, null),
             .typebook = try TypeBook.new(alloc),
             .errors = ErrorContext.new(alloc),
+            .strings = StringList.init(alloc),
         };
     }
 
@@ -62,6 +64,11 @@ pub const Compiler = struct {
         self.scope.deinit();
         self.typebook.deinit();
         self.errors.deinit();
+
+        for (self.strings.items) |string|
+            self.alloc.free(string);
+
+        self.strings.deinit();
     }
 
     pub fn hasErrors(self: Compiler) bool {
@@ -72,7 +79,21 @@ pub const Compiler = struct {
         try self.errors.report();
     }
 
-    fn implicitAny(
+    pub fn getError(self: Compiler, index: usize) CompileError {
+        return self.errors.list.items[index];
+    }
+
+    pub fn fmt(
+        self: *Compiler,
+        comptime format: []const u8,
+        args: anytype,
+    ) ![]u8 {
+        const string = try std.fmt.allocPrint(self.alloc, format, args);
+        try self.strings.append(string);
+        return string;
+    }
+
+    pub fn implicitAny(
         self: *Compiler,
         csr: Cursor,
         symbol: []const u8,
@@ -85,7 +106,7 @@ pub const Compiler = struct {
         return self.typebook.getAny();
     }
 
-    fn inferExprType(self: *Compiler, nd: Node) !?Type.Ptr {
+    pub fn inferExprType(self: *Compiler, nd: Node) !?Type.Ptr {
         const valTy = inferrer.inferExprType(self.scope, self.typebook, nd);
         switch (valTy) {
             .Success => |ty| return ty,
@@ -96,40 +117,28 @@ pub const Compiler = struct {
         }
     }
 
-    fn processDecl(self: *Compiler, nd: Node) !void {
-        std.debug.assert(nd.getType() == NodeType.Decl);
-
-        const decl = nd.data.Decl;
-
-        const tyHint = if (decl.ty) |ty|
-            try inferrer.findType(self.scope, self.typebook, ty)
-        else
-            try self.implicitAny(nd.csr, decl.name);
-
-        if (decl.value) |value| {
-            const valTy = (try self.inferExprType(value)) orelse return;
-
-            if (!valTy.isAssignableTo(tyHint)) {
-                try self.errors.append(CompileError.typeError(
-                    TypeError.new(nd.csr, valTy, tyHint),
-                ));
-
-                return;
-            }
-        }
-
-        // TODO Insert into scope
-
-        try self.backend.declaration(nd);
+    pub fn findType(self: *Compiler, nd: Node) !?Type.Ptr {
+        return try inferrer.findType(self.scope, self.typebook, nd);
     }
 
     pub fn processNode(self: *Compiler, nd: Node) !void {
         nd.dump(); // TODO: TMP
 
         switch (nd.data) {
-            .Decl => try self.processDecl(nd),
+            .Decl => try declaration.processDecl(self, nd),
             else => {},
         }
+    }
+
+    pub fn compileProgramNode(self: *Compiler, nd: Node) !void {
+        std.debug.assert(nd.getType() == .Program);
+
+        try self.backend.prolog();
+
+        for (nd.data.Program.items) |child|
+            try self.processNode(child);
+
+        try self.backend.epilog();
     }
 
     pub fn compile(self: *Compiler, driver: anytype, path: []const u8) !void {
@@ -150,13 +159,6 @@ pub const Compiler = struct {
             ),
         };
 
-        std.debug.assert(nd.getType() == .Program);
-
-        try self.backend.prolog();
-
-        for (nd.data.Program.items) |child|
-            try self.processNode(child);
-
-        try self.backend.epilog();
+        try self.compileProgramNode(nd);
     }
 };
