@@ -21,6 +21,7 @@ const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 const Type = @import("type.zig").Type;
 const TokenType = @import("../../common/token.zig").Token.Type;
+const allocate = @import("../../common/allocate.zig");
 
 const OpEntry = union(Variant) {
     const Variant = enum {
@@ -140,8 +141,8 @@ pub const TypeBook = struct {
     booleanTy: Type = Type.newBoolean(),
     unionTys: Type.UnionType.Map,
 
-    pub fn new(alloc: *Allocator) !*TypeBook {
-        var self = try alloc.create(TypeBook);
+    pub fn new(alloc: *Allocator) *TypeBook {
+        var self = alloc.create(TypeBook) catch allocate.reportAndExit();
         self.* = TypeBook{
             .alloc = alloc,
             .opMap = undefined,
@@ -202,7 +203,7 @@ pub const TypeBook = struct {
 };
 
 test "type book can return builtin types" {
-    var book = try TypeBook.new(std.testing.allocator);
+    var book = TypeBook.new(std.testing.allocator);
     defer book.deinit();
 
     try expectEqual(Type.Type.Unknown, book.getUnknown().getType());
@@ -217,7 +218,7 @@ test "type book can return builtin types" {
 }
 
 test "type book can create and retrieve union types" {
-    var book = try TypeBook.new(std.testing.allocator);
+    var book = TypeBook.new(std.testing.allocator);
     defer book.deinit();
 
     const num = &book.numberTy;
@@ -241,7 +242,7 @@ test "type book can create and retrieve union types" {
 }
 
 test "type book can return an OpEntry" {
-    var book = try TypeBook.new(std.testing.allocator);
+    var book = TypeBook.new(std.testing.allocator);
     defer book.deinit();
 
     const ty = TokenType.Sub;
@@ -251,7 +252,7 @@ test "type book can return an OpEntry" {
 }
 
 test "invalid token types don't have an OpEntry" {
-    var book = try TypeBook.new(std.testing.allocator);
+    var book = TypeBook.new(std.testing.allocator);
     defer book.deinit();
 
     const ty = TokenType.LParen;

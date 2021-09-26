@@ -88,7 +88,7 @@ test "can insert into and retrieve from scope" {
     var scope = try Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
-    var typebook = try TypeBook.new(std.testing.allocator);
+    var typebook = TypeBook.new(std.testing.allocator);
     defer typebook.deinit();
 
     const name = "aVariable";
@@ -110,7 +110,7 @@ test "can retrieve from scope recursively" {
     var scope = try Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
-    var typebook = try TypeBook.new(std.testing.allocator);
+    var typebook = TypeBook.new(std.testing.allocator);
     defer typebook.deinit();
 
     const name = "aVariable";

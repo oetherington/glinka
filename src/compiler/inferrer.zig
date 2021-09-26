@@ -187,7 +187,7 @@ const InferTestCase = struct {
         const scope = try Scope.new(std.testing.allocator, null);
         defer scope.deinit();
 
-        var typebook = try TypeBook.new(std.testing.allocator);
+        var typebook = TypeBook.new(std.testing.allocator);
         defer typebook.deinit();
 
         if (self.setup) |setup|
@@ -361,7 +361,7 @@ test "can lookup builtin types" {
     const scope = try Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
-    var typebook = try TypeBook.new(std.testing.allocator);
+    var typebook = TypeBook.new(std.testing.allocator);
     defer typebook.deinit();
 
     const nd = makeNode(

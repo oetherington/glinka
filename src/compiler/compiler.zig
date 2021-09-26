@@ -55,7 +55,7 @@ pub const Compiler = struct {
             .config = config,
             .backend = backend,
             .scope = try Scope.new(alloc, null),
-            .typebook = try TypeBook.new(alloc),
+            .typebook = TypeBook.new(alloc),
             .errors = ErrorContext.new(alloc),
             .strings = StringList.init(alloc),
         };
