@@ -59,7 +59,7 @@ const OpEntry = union(Variant) {
 
 const OpMap = [std.meta.fields(TokenType).len]?OpEntry;
 
-fn createOpMap(b: *TypeBook) !void {
+fn createOpMap(b: *TypeBook) void {
     std.mem.set(?OpEntry, b.opMap[0..], null);
 
     const h = (struct {
@@ -83,7 +83,7 @@ fn createOpMap(b: *TypeBook) !void {
 
     h.put(
         .Add,
-        OpEntry.bin(try b.getUnion(&.{ &b.numberTy, &b.stringTy }), null),
+        OpEntry.bin(b.getUnion(&.{ &b.numberTy, &b.stringTy }), null),
     );
 
     h.put(.Sub, OpEntry.bin(&b.numberTy, null));
@@ -147,7 +147,7 @@ pub const TypeBook = struct {
             .opMap = undefined,
             .unionTys = Type.UnionType.Map.new(alloc),
         };
-        try createOpMap(self);
+        createOpMap(self);
         return self;
     }
 
@@ -196,7 +196,7 @@ pub const TypeBook = struct {
         return &self.booleanTy;
     }
 
-    pub fn getUnion(self: *TypeBook, tys: []Type.Ptr) !Type.Ptr {
+    pub fn getUnion(self: *TypeBook, tys: []Type.Ptr) Type.Ptr {
         return self.unionTys.get(tys);
     }
 };
@@ -222,21 +222,21 @@ test "type book can create and retrieve union types" {
 
     const num = &book.numberTy;
     const str = &book.stringTy;
-    const numStr = try book.getUnion(&.{ num, str });
+    const numStr = book.getUnion(&.{ num, str });
     try expectEqual(Type.Type.Union, numStr.getType());
 
     const tys = numStr.Union.tys;
     try expectEqual(@intCast(usize, 2), tys.len);
     try expect((tys[0] == num and tys[1] == str) or (tys[0] == str and tys[1] == num));
 
-    const numStr2 = try book.getUnion(&.{ num, str });
+    const numStr2 = book.getUnion(&.{ num, str });
     try expectEqual(numStr, numStr2);
 
-    const strNum = try book.getUnion(&.{ str, num });
+    const strNum = book.getUnion(&.{ str, num });
     try expectEqual(numStr, strNum);
 
     const boolean = &book.booleanTy;
-    const boolNum = try book.getUnion(&.{ boolean, num });
+    const boolNum = book.getUnion(&.{ boolean, num });
     try expect(numStr != boolNum);
 }
 

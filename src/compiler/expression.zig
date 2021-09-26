@@ -32,9 +32,9 @@ pub fn processExpression(cmp: *Compiler, nd: Node) !void {
     try cmp.backend.expression(nd);
 }
 
-test "can compile an assign expression" {
+test "can compile assign expressions" {
     try (CompilerTestCase{
-        .code = "var aVariable = false; aVariable = true;",
+        .code = "var aVariable = 3; aVariable = 4; aVariable += 3;",
     }).run();
 }
 
@@ -112,5 +112,11 @@ test "postfix expressions are type checked" {
                 );
             }
         }).check,
+    }).run();
+}
+
+test "can compile ternary expressions" {
+    try (CompilerTestCase{
+        .code = "true ? 1 : 0;",
     }).run();
 }

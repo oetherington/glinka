@@ -18,6 +18,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Type = @import("type.zig").Type;
+const allocate = @import("../../common/allocate.zig");
 
 const MapContext = struct {
     pub fn hash(self: @This(), tys: []Type.Ptr) u64 {
@@ -64,14 +65,14 @@ const UnionTypeMap = struct {
         self.map.deinit();
     }
 
-    pub fn get(self: *UnionTypeMap, tys_: []Type.Ptr) !Type.Ptr {
+    pub fn get(self: *UnionTypeMap, tys_: []Type.Ptr) Type.Ptr {
         const Context = struct {
             pub fn lessThan(_: @This(), lhs: Type.Ptr, rhs: Type.Ptr) bool {
                 return @ptrToInt(lhs) < @ptrToInt(rhs);
             }
         };
 
-        var tys = try self.map.allocator.alloc(Type.Ptr, tys_.len);
+        var tys = allocate.alloc(self.map.allocator, Type.Ptr, tys_.len);
         std.mem.copy(Type.Ptr, tys, tys_);
         std.sort.insertionSort(Type.Ptr, tys, Context{}, Context.lessThan);
 
@@ -81,9 +82,9 @@ const UnionTypeMap = struct {
             return ty;
         }
 
-        var ty = try self.map.allocator.create(Type);
+        var ty = allocate.create(self.map.allocator, Type);
         ty.* = Type{ .Union = Type.UnionType{ .tys = tys } };
-        try self.map.put(tys, ty);
+        self.map.put(tys, ty) catch allocate.reportAndExit();
         return ty;
     }
 };

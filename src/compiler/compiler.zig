@@ -129,6 +129,7 @@ pub const Compiler = struct {
             .PrefixOp,
             .PostfixOp,
             .BinaryOp,
+            .Ternary,
             => try expression.processExpression(self, nd),
             .Decl => try declaration.processDecl(self, nd),
             else => std.debug.panic(

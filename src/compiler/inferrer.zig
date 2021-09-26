@@ -138,60 +138,196 @@ pub fn inferExprType(scope: *Scope, typebook: *TypeBook, nd: Node) InferResult {
                 left,
             )));
         },
+        .Ternary => |trn| {
+            _ = switch (inferExprType(scope, typebook, trn.cond)) {
+                .Success => |res| res,
+                .Error => |err| return InferResult.err(err),
+            };
+
+            const ifT = switch (inferExprType(scope, typebook, trn.ifTrue)) {
+                .Success => |res| res,
+                .Error => |err| return InferResult.err(err),
+            };
+
+            const ifF = switch (inferExprType(scope, typebook, trn.ifFalse)) {
+                .Success => |res| res,
+                .Error => |err| return InferResult.err(err),
+            };
+
+            const ty = if (ifT == ifF)
+                ifT
+            else
+                typebook.getUnion(&.{ ifT, ifF });
+
+            return InferResult.success(ty);
+        },
         else => typebook.getUnknown(),
     };
 
     return InferResult.success(ty);
 }
 
-fn inferTestCase(
-    comptime nodeType: NodeType,
-    nodeData: anytype,
-    expectedType: Type.Type,
-) !void {
-    const scope = try Scope.new(std.testing.allocator, null);
-    defer scope.deinit();
+const InferTestCase = struct {
+    expectedTy: ?Type.Type = null,
+    check: ?fn (
+        scope: *Scope,
+        typebook: *TypeBook,
+        res: InferResult,
+    ) anyerror!void = null,
+    setup: ?fn (
+        scope: *Scope,
+        typebook: *TypeBook,
+    ) anyerror!void = null,
 
-    var typebook = try TypeBook.new(std.testing.allocator);
-    defer typebook.deinit();
+    pub fn run(
+        self: InferTestCase,
+        comptime nodeType: NodeType,
+        nodeData: anytype,
+    ) !void {
+        const scope = try Scope.new(std.testing.allocator, null);
+        defer scope.deinit();
 
-    const nd = try makeNode(
-        std.testing.allocator,
-        Cursor.new(6, 9),
-        nodeType,
-        nodeData,
-    );
-    defer std.testing.allocator.destroy(nd);
+        var typebook = try TypeBook.new(std.testing.allocator);
+        defer typebook.deinit();
 
-    const ty = inferExprType(scope, typebook, nd);
-    try expectEqual(InferResult.Success, ty.getType());
-    try expectEqual(expectedType, ty.Success.getType());
-}
+        if (self.setup) |setup|
+            try setup(scope, typebook);
+
+        const nd = try makeNode(
+            std.testing.allocator,
+            Cursor.new(6, 9),
+            nodeType,
+            nodeData,
+        );
+        defer std.testing.allocator.destroy(nd);
+
+        const res = inferExprType(scope, typebook, nd);
+
+        if (self.expectedTy) |expectedTy| {
+            try expectEqual(InferResult.Success, res.getType());
+            try expectEqual(expectedTy, res.Success.getType());
+        }
+
+        if (self.check) |check|
+            try check(scope, typebook, res);
+    }
+};
 
 test "can inter type of int literal" {
-    try inferTestCase(.Int, "1234", .Number);
+    try (InferTestCase{
+        .expectedTy = .Number,
+    }).run(.Int, "1234");
 }
 
 test "can inter type of string literals" {
-    try inferTestCase(.String, "1234", .String);
-    try inferTestCase(.Template, "1234", .String);
+    try (InferTestCase{
+        .expectedTy = .String,
+    }).run(.String, "'a string'");
 }
 
-test "can inter type of boolean" {
-    try inferTestCase(.True, {}, .Boolean);
-    try inferTestCase(.False, {}, .Boolean);
+test "can inter type of template literals" {
+    try (InferTestCase{
+        .expectedTy = .String,
+    }).run(.Template, "`a template`");
+}
+
+test "can inter type of booleans" {
+    try (InferTestCase{
+        .expectedTy = .Boolean,
+    }).run(.True, {});
+
+    try (InferTestCase{
+        .expectedTy = .Boolean,
+    }).run(.False, {});
 }
 
 test "can inter type of 'null'" {
-    try inferTestCase(.Null, {}, .Null);
+    try (InferTestCase{
+        .expectedTy = .Null,
+    }).run(.Null, {});
 }
 
 test "can inter type of 'undefined'" {
-    try inferTestCase(.Undefined, {}, .Undefined);
+    try (InferTestCase{
+        .expectedTy = .Undefined,
+    }).run(.Undefined, {});
 }
 
 test "can inter type of an identifier" {
-    // TODO
+    try (InferTestCase{
+        .expectedTy = .String,
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                try scope.put(
+                    "aVariable",
+                    typebook.getString(),
+                    false,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+    }).run(.Ident, "aVariable");
+}
+
+test "can infer type of a homogeneous ternary expression" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(0, 0);
+
+    const cond = try makeNode(alloc, csr, .True, {});
+    const ifTrue = try makeNode(alloc, csr, .Int, "1");
+    const ifFalse = try makeNode(alloc, csr, .Int, "2");
+
+    defer alloc.destroy(cond);
+    defer alloc.destroy(ifTrue);
+    defer alloc.destroy(ifFalse);
+
+    try (InferTestCase{
+        .expectedTy = .Number,
+    }).run(.Ternary, node.Ternary{
+        .cond = cond,
+        .ifTrue = ifTrue,
+        .ifFalse = ifFalse,
+    });
+}
+
+test "can infer type of a non-homogeneous ternary expression" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(0, 0);
+
+    const cond = try makeNode(alloc, csr, .True, {});
+    const ifTrue = try makeNode(alloc, csr, .Int, "1");
+    const ifFalse = try makeNode(alloc, csr, .String, "'hello world'");
+
+    defer alloc.destroy(cond);
+    defer alloc.destroy(ifTrue);
+    defer alloc.destroy(ifFalse);
+
+    try (InferTestCase{
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+
+                const expectedTy = typebook.getUnion(&.{
+                    typebook.getNumber(),
+                    typebook.getString(),
+                });
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+                try expectEqual(expectedTy, res.Success);
+            }
+        }).check,
+    }).run(.Ternary, node.Ternary{
+        .cond = cond,
+        .ifTrue = ifTrue,
+        .ifFalse = ifFalse,
+    });
 }
 
 const builtinMap = std.ComptimeStringMap(

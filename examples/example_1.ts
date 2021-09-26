@@ -9,7 +9,6 @@ const aBinOp: number = 2 - 4;
 const addNums: number = 2 + 4;
 const concatStrings: string = "abc" + "def";
 
-
 // Assignments
 aNumber = 4;
 aNumber += 1;
@@ -19,3 +18,4 @@ aNumber++;
 aNumber--;
 ++aNumber;
 --aNumber;
+aNumber ? aString : aBool;
