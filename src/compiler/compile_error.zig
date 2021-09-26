@@ -25,6 +25,7 @@ const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const OpError = @import("op_error.zig").OpError;
 const RedefinitionError = @import("redefinition_error.zig").RedefinitionError;
 const GenericError = @import("generic_error.zig").GenericError;
+const AssignError = @import("assign_error.zig").AssignError;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 const TokenType = @import("../common/token.zig").Token.Type;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -35,6 +36,7 @@ pub const CompileError = union(CompileError.Type) {
         OpError,
         RedefinitionError,
         GenericError,
+        AssignError,
         ImplicitAnyError,
         ParseError,
     };
@@ -43,6 +45,7 @@ pub const CompileError = union(CompileError.Type) {
     OpError: OpError,
     RedefinitionError: RedefinitionError,
     GenericError: GenericError,
+    AssignError: AssignError,
     ImplicitAnyError: ImplicitAnyError,
     ParseError: ParseError,
 
@@ -70,6 +73,12 @@ pub const CompileError = union(CompileError.Type) {
         };
     }
 
+    pub fn assignError(err: AssignError) CompileError {
+        return CompileError{
+            .AssignError = err,
+        };
+    }
+
     pub fn implicitAnyError(err: ImplicitAnyError) CompileError {
         return CompileError{
             .ImplicitAnyError = err,
@@ -92,6 +101,7 @@ pub const CompileError = union(CompileError.Type) {
             .OpError => |err| try err.report(writer),
             .RedefinitionError => |err| try err.report(writer),
             .GenericError => |err| try err.report(writer),
+            .AssignError => |err| try err.report(writer),
             .ImplicitAnyError => |err| try err.report(writer),
             .ParseError => |err| try err.report(writer),
         }
@@ -142,6 +152,18 @@ test "can create a CompileError from a GenericError" {
     try expectEqual(CompileError.Type.GenericError, compileError.getType());
     try expectEqual(csr, compileError.GenericError.csr);
     try expectEqualStrings(msg, compileError.GenericError.msg);
+}
+
+test "can create a CompileError from an AssignError" {
+    const csr = Cursor.new(2, 5);
+    const left = Type.newString();
+    const right = Type.newNumber();
+    const assignErr = AssignError.new(csr, &left, &right);
+    const compileError = CompileError.assignError(assignErr);
+    try expectEqual(CompileError.Type.AssignError, compileError.getType());
+    try expectEqual(csr, compileError.AssignError.csr);
+    try expectEqual(&left, compileError.AssignError.left);
+    try expectEqual(&right, compileError.AssignError.right);
 }
 
 test "can create a CompileError from an ImplicitAnyError" {

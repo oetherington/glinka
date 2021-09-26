@@ -42,6 +42,7 @@ pub const JsBackend = struct {
                     .prolog = JsBackend.prolog,
                     .epilog = JsBackend.epilog,
                     .declaration = JsBackend.declaration,
+                    .expression = JsBackend.expression,
                 },
             },
             .writeCtx = ctx,
@@ -84,6 +85,12 @@ pub const JsBackend = struct {
         const self = JsBackend.getSelf(be);
         const decl = nd.data.Decl;
         try declEmitter.emitDecl(self, decl);
+    }
+
+    fn expression(be: *Backend, nd: Node) Backend.Error!void {
+        const self = JsBackend.getSelf(be);
+        try self.emitExpr(nd);
+        try self.out.print(";\n", .{});
     }
 };
 

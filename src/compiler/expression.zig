@@ -1,0 +1,116 @@
+// glinka
+// Copyright (C) 2021 Ollie Etherington
+// <www.etherington.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+const std = @import("std");
+const Compiler = @import("compiler.zig").Compiler;
+const Cursor = @import("../common/cursor.zig").Cursor;
+const node = @import("../common/node.zig");
+const Node = node.Node;
+const NodeType = node.NodeType;
+const Type = @import("types/type.zig").Type;
+const TypeError = @import("types/type_error.zig").TypeError;
+const GenericError = @import("generic_error.zig").GenericError;
+const CompileError = @import("compile_error.zig").CompileError;
+const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
+
+pub fn processExpression(cmp: *Compiler, nd: Node) !void {
+    _ = try cmp.inferExprType(nd);
+    try cmp.backend.expression(nd);
+}
+
+test "can compile an assign expression" {
+    try (CompilerTestCase{
+        .code = "var aVariable = false; aVariable = true;",
+    }).run();
+}
+
+test "assign expressions are type checked" {
+    try (CompilerTestCase{
+        .code = "var aVariable = false; aVariable = 3;",
+        .check = (struct {
+            fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+
+                const err = cmp.getError(0);
+                try case.expectEqual(
+                    CompileError.Type.AssignError,
+                    err.getType(),
+                );
+                try case.expectEqual(
+                    cmp.typebook.getBoolean(),
+                    err.AssignError.left,
+                );
+                try case.expectEqual(
+                    cmp.typebook.getNumber(),
+                    err.AssignError.right,
+                );
+            }
+        }).check,
+    }).run();
+}
+
+test "can compile prefix expressions" {
+    try (CompilerTestCase{
+        .code = "let aVariable = 4; ++aVariable; --aVariable;",
+    }).run();
+}
+
+test "prefix expressions are type checked" {
+    try (CompilerTestCase{
+        .code = "let aVariable = 'a string'; ++aVariable; --aVariable;",
+        .check = (struct {
+            fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 2), cmp.errors.count());
+
+                try case.expectEqual(
+                    CompileError.Type.OpError,
+                    cmp.getError(0).getType(),
+                );
+                try case.expectEqual(
+                    CompileError.Type.OpError,
+                    cmp.getError(1).getType(),
+                );
+            }
+        }).check,
+    }).run();
+}
+
+test "can compile postfix expressions" {
+    try (CompilerTestCase{
+        .code = "let aVariable = 4; aVariable++; aVariable--;",
+    }).run();
+}
+
+test "postfix expressions are type checked" {
+    try (CompilerTestCase{
+        .code = "let aVariable = 'a string'; aVariable++; aVariable--;",
+        .check = (struct {
+            fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 2), cmp.errors.count());
+
+                try case.expectEqual(
+                    CompileError.Type.OpError,
+                    cmp.getError(0).getType(),
+                );
+                try case.expectEqual(
+                    CompileError.Type.OpError,
+                    cmp.getError(1).getType(),
+                );
+            }
+        }).check,
+    }).run();
+}

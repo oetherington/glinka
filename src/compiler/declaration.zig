@@ -106,7 +106,6 @@ test "constants must be initialized" {
         .code = "const aVariable;",
         .check = (struct {
             fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
-                try cmp.reportErrors();
                 try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
 
                 const err = cmp.getError(0);
@@ -128,7 +127,6 @@ test "uninitialized and untyped variable has implicit any type" {
         .code = "let aVariable;",
         .check = (struct {
             fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
-                try cmp.reportErrors();
                 try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
 
                 const err = cmp.getError(0);

@@ -31,6 +31,7 @@ const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const ErrorContext = @import("error_context.zig").ErrorContext;
 const CompileError = @import("compile_error.zig").CompileError;
 const inferrer = @import("inferrer.zig");
+const expression = @import("expression.zig");
 const declaration = @import("declaration.zig");
 
 pub const Compiler = struct {
@@ -122,11 +123,18 @@ pub const Compiler = struct {
     }
 
     pub fn processNode(self: *Compiler, nd: Node) !void {
-        nd.dump(); // TODO: TMP
+        // nd.dump(); // TODO: TMP
 
         switch (nd.data) {
+            .PrefixOp,
+            .PostfixOp,
+            .BinaryOp,
+            => try expression.processExpression(self, nd),
             .Decl => try declaration.processDecl(self, nd),
-            else => {},
+            else => std.debug.panic(
+                "Unhandled node type in Compiler.processNode: {?}\n",
+                .{nd.getType()},
+            ),
         }
     }
 

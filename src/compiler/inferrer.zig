@@ -28,6 +28,7 @@ const Type = @import("types/type.zig").Type;
 const TypeBook = @import("types/typebook.zig").TypeBook;
 const CompileError = @import("compile_error.zig").CompileError;
 const OpError = @import("op_error.zig").OpError;
+const AssignError = @import("assign_error.zig").AssignError;
 
 pub const InferResult = union(Variant) {
     pub const Variant = enum {
@@ -119,8 +120,10 @@ pub fn inferExprType(scope: *Scope, typebook: *TypeBook, nd: Node) InferResult {
                 .Error => |err| return InferResult.err(err),
             };
 
-            // TODO check left == right
-            std.debug.assert(left == right);
+            if (left != right)
+                return InferResult.err(CompileError.assignError(
+                    AssignError.new(nd.csr, left, right),
+                ));
 
             // We assume it's binary, otherwise the Node wouldn't have parsed
             if (typebook.getOpEntry(op.op)) |entry|
