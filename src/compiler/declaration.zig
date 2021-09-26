@@ -27,6 +27,7 @@ const RedefinitionError = @import("redefinition_error.zig").RedefinitionError;
 const GenericError = @import("generic_error.zig").GenericError;
 const CompileError = @import("compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
+const allocate = @import("../common/allocate.zig");
 
 fn declWithAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
     std.debug.assert(decl.value != null);
@@ -44,9 +45,9 @@ fn declWithAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
 
                 try cmp.scope.put(decl.name, annotation, isConst, csr);
             } else {
-                try cmp.errors.append(CompileError.genericError(
+                cmp.errors.append(CompileError.genericError(
                     GenericError.new(csr, "Invalid type annotation"),
-                ));
+                )) catch allocate.reportAndExit();
                 try cmp.scope.put(decl.name, valueTy, isConst, csr);
             }
         } else {
@@ -59,9 +60,9 @@ fn declWithoutAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
     std.debug.assert(decl.value == null);
 
     if (decl.scoping == .Const) {
-        try cmp.errors.append(CompileError.genericError(
+        cmp.errors.append(CompileError.genericError(
             GenericError.new(csr, "Constant value must be initialized"),
-        ));
+        )) catch allocate.reportAndExit();
         return;
     }
 
@@ -73,12 +74,12 @@ fn declWithoutAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
     if (annotation) |ty| {
         try cmp.scope.put(decl.name, ty, false, csr);
     } else {
-        try cmp.errors.append(CompileError.genericError(
+        cmp.errors.append(CompileError.genericError(
             GenericError.new(
                 csr,
-                try cmp.fmt("Invalid type for variable '{s}'", .{decl.name}),
+                cmp.fmt("Invalid type for variable '{s}'", .{decl.name}),
             ),
-        ));
+        )) catch allocate.reportAndExit();
     }
 }
 
@@ -88,9 +89,9 @@ pub fn processDecl(cmp: *Compiler, nd: Node) !void {
     const decl = nd.data.Decl;
 
     if (cmp.scope.getLocal(decl.name)) |previous| {
-        try cmp.errors.append(CompileError.redefinitionError(
+        cmp.errors.append(CompileError.redefinitionError(
             RedefinitionError.new(decl.name, previous.csr, nd.csr),
-        ));
+        )) catch allocate.reportAndExit();
     }
 
     try if (decl.value) |_|

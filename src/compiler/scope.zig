@@ -22,6 +22,7 @@ const Allocator = std.mem.Allocator;
 const Type = @import("types/type.zig").Type;
 const TypeBook = @import("types/typebook.zig").TypeBook;
 const Cursor = @import("../common/cursor.zig").Cursor;
+const allocate = @import("../common/allocate.zig");
 
 pub const Scope = struct {
     pub const Symbol = struct {
@@ -43,8 +44,8 @@ pub const Scope = struct {
     parent: ?*Scope,
     map: Map,
 
-    pub fn new(alloc: *Allocator, parent: ?*Scope) !*Scope {
-        var self = try alloc.create(Scope);
+    pub fn new(alloc: *Allocator, parent: ?*Scope) *Scope {
+        var self = alloc.create(Scope) catch allocate.reportAndExit();
         self.parent = parent;
         self.map = Map.init(alloc);
         return self;
@@ -62,12 +63,16 @@ pub const Scope = struct {
         ty: Type.Ptr,
         isConst: bool,
         csr: Cursor,
-    ) !void {
+    ) error{SymbolAlreadyExists}!void {
         if (self.getLocal(name)) |local| {
             _ = local;
             return error.SymbolAlreadyExists;
         }
-        try self.map.putNoClobber(name, Symbol.new(ty, isConst, csr));
+
+        self.map.putNoClobber(
+            name,
+            Symbol.new(ty, isConst, csr),
+        ) catch allocate.reportAndExit();
     }
 
     pub fn get(self: *Scope, name: []const u8) ?Symbol {
@@ -85,7 +90,7 @@ pub const Scope = struct {
 };
 
 test "can insert into and retrieve from scope" {
-    var scope = try Scope.new(std.testing.allocator, null);
+    var scope = Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
     var typebook = TypeBook.new(std.testing.allocator);
@@ -107,7 +112,7 @@ test "can insert into and retrieve from scope" {
 }
 
 test "can retrieve from scope recursively" {
-    var scope = try Scope.new(std.testing.allocator, null);
+    var scope = Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
     var typebook = TypeBook.new(std.testing.allocator);
@@ -119,7 +124,7 @@ test "can retrieve from scope recursively" {
     const csr = Cursor.new(2, 9);
     try scope.put(name, ty, isConst, csr);
 
-    var child = try Scope.new(std.testing.allocator, scope);
+    var child = Scope.new(std.testing.allocator, scope);
     defer child.deinit();
 
     const res = child.get(name);

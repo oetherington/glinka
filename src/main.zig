@@ -48,7 +48,7 @@ pub fn main() !void {
     var backend = try JsBackend.new(alloc);
     defer backend.deinit();
 
-    var compiler = try Compiler.new(alloc, &config, &backend.backend);
+    var compiler = Compiler.new(alloc, &config, &backend.backend);
     defer compiler.deinit();
 
     const path = "examples/example_1.ts";

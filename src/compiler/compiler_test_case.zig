@@ -82,7 +82,7 @@ pub const CompilerTestCase = struct {
 
         var backend = NopBackend.new();
 
-        var compiler = try Compiler.new(
+        var compiler = Compiler.new(
             std.testing.allocator,
             &config,
             &backend.backend,

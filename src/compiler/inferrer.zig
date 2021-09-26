@@ -184,7 +184,7 @@ const InferTestCase = struct {
         comptime nodeType: NodeType,
         nodeData: anytype,
     ) !void {
-        const scope = try Scope.new(std.testing.allocator, null);
+        const scope = Scope.new(std.testing.allocator, null);
         defer scope.deinit();
 
         var typebook = TypeBook.new(std.testing.allocator);
@@ -358,7 +358,7 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) !?Type.Ptr {
 }
 
 test "can lookup builtin types" {
-    const scope = try Scope.new(std.testing.allocator, null);
+    const scope = Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
     var typebook = TypeBook.new(std.testing.allocator);

@@ -33,6 +33,7 @@ const CompileError = @import("compile_error.zig").CompileError;
 const inferrer = @import("inferrer.zig");
 const expression = @import("expression.zig");
 const declaration = @import("declaration.zig");
+const allocate = @import("../common/allocate.zig");
 
 pub const Compiler = struct {
     const StringList = std.ArrayList([]u8);
@@ -49,12 +50,12 @@ pub const Compiler = struct {
         alloc: *Allocator,
         config: *const Config,
         backend: *Backend,
-    ) !Compiler {
+    ) Compiler {
         return Compiler{
             .alloc = alloc,
             .config = config,
             .backend = backend,
-            .scope = try Scope.new(alloc, null),
+            .scope = Scope.new(alloc, null),
             .typebook = TypeBook.new(alloc),
             .errors = ErrorContext.new(alloc),
             .strings = StringList.init(alloc),
@@ -88,9 +89,13 @@ pub const Compiler = struct {
         self: *Compiler,
         comptime format: []const u8,
         args: anytype,
-    ) ![]u8 {
-        const string = try std.fmt.allocPrint(self.alloc, format, args);
-        try self.strings.append(string);
+    ) []u8 {
+        const string = std.fmt.allocPrint(
+            self.alloc,
+            format,
+            args,
+        ) catch allocate.reportAndExit();
+        self.strings.append(string) catch allocate.reportAndExit();
         return string;
     }
 
