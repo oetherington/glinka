@@ -76,23 +76,23 @@ pub const TsParser = struct {
         return self.lexer.token.csr;
     }
 
-    pub fn parseExpr(self: *TsParser) Parser.Error!ParseResult {
+    pub fn parseExpr(self: *TsParser) ParseResult {
         return exprParser.parseExpr(self.getParser());
     }
 
-    pub fn parseType(self: *TsParser) Parser.Error!ParseResult {
+    pub fn parseType(self: *TsParser) ParseResult {
         return typeParser.parseType(self.getParser());
     }
 
-    pub fn parseBlock(self: *TsParser) Parser.Error!ParseResult {
+    pub fn parseBlock(self: *TsParser) ParseResult {
         return stmtParser.parseBlock(self.getParser());
     }
 
-    pub fn parseStmt(self: *TsParser) Parser.Error!ParseResult {
+    pub fn parseStmt(self: *TsParser) ParseResult {
         return stmtParser.parseStmt(self.getParser());
     }
 
-    pub fn next(self: *TsParser) Parser.Error!ParseResult {
+    pub fn next(self: *TsParser) ParseResult {
         return self.parseStmt();
     }
 };

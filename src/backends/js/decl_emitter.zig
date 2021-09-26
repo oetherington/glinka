@@ -60,7 +60,7 @@ const DeclTestCase = struct {
     }
 
     pub fn makeNode(comptime ty: node.NodeType, data: anytype) !Node {
-        return try node.makeNode(
+        return node.makeNode(
             std.testing.allocator,
             Cursor.new(0, 0),
             ty,

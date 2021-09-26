@@ -33,6 +33,7 @@ const TokenType = @import("../common/token.zig").Token.Type;
 const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
+const allocate = @import("../common/allocate.zig");
 
 const StmtTestCase = struct {
     code: []const u8,
@@ -46,13 +47,13 @@ const StmtTestCase = struct {
 
         var parser = tsParser.getParser();
 
-        const res = try parser.next();
+        const res = parser.next();
         try res.reportIfError(std.io.getStdErr().writer());
         try expect(res.isSuccess());
 
         try self.check(res.Success);
 
-        const eof = try parser.next();
+        const eof = parser.next();
         try expect(eof.isSuccess());
         try expectEqual(NodeType.EOF, eof.Success.getType());
     }
@@ -70,7 +71,7 @@ fn eatSemi(psr: *TsParser) ?ParseResult {
 fn parseDecl(
     psr: *TsParser,
     comptime scoping: Decl.Scoping,
-) Parser.Error!ParseResult {
+) ParseResult {
     const csr = psr.lexer.token.csr;
 
     const name = psr.lexer.next();
@@ -82,7 +83,7 @@ fn parseDecl(
     var tkn = psr.lexer.next();
     if (tkn.ty == .Colon) {
         _ = psr.lexer.next();
-        const tyRes = try psr.parseType();
+        const tyRes = psr.parseType();
         if (!tyRes.isSuccess())
             return tyRes;
         declTy = tyRes.Success;
@@ -93,7 +94,7 @@ fn parseDecl(
 
     if (tkn.ty == TokenType.Assign) {
         _ = psr.lexer.next();
-        const exprRes = try psr.parseExpr();
+        const exprRes = psr.parseExpr();
         if (!exprRes.isSuccess())
             return exprRes;
         expr = exprRes.Success;
@@ -104,7 +105,7 @@ fn parseDecl(
         return err;
 
     const decl = Decl.new(scoping, name.data, declTy, expr);
-    const result = try makeNode(psr.getAllocator(), csr, .Decl, decl);
+    const result = makeNode(psr.getAllocator(), csr, .Decl, decl);
 
     return ParseResult.success(result);
 }
@@ -124,7 +125,7 @@ test "can parse var, let and const declarations" {
 
             var parser = tsParser.getParser();
 
-            const res = try parser.next();
+            const res = parser.next();
 
             try expect(res.isSuccess());
             try expectEqual(NodeType.Decl, res.Success.getType());
@@ -152,7 +153,7 @@ test "can parse var, let and const declarations" {
         }
     };
 
-    const numberType = try makeNode(
+    const numberType = makeNode(
         std.testing.allocator,
         Cursor.new(1, 11),
         NodeType.TypeName,
@@ -217,7 +218,7 @@ const BranchResult = union(Type) {
     }
 };
 
-fn parseIfBranch(psr: *TsParser) Parser.Error!BranchResult {
+fn parseIfBranch(psr: *TsParser) BranchResult {
     if (psr.lexer.token.ty != .If)
         return BranchResult{ .ParseResult = ParseResult.noMatch(null) };
 
@@ -231,7 +232,7 @@ fn parseIfBranch(psr: *TsParser) Parser.Error!BranchResult {
 
     _ = psr.lexer.next();
 
-    const cond = try psr.parseExpr();
+    const cond = psr.parseExpr();
     if (!cond.isSuccess())
         return BranchResult{ .ParseResult = cond };
 
@@ -243,7 +244,7 @@ fn parseIfBranch(psr: *TsParser) Parser.Error!BranchResult {
 
     _ = psr.lexer.next();
 
-    const body = try psr.parseStmt();
+    const body = psr.parseStmt();
     if (!body.isSuccess())
         return BranchResult{ .ParseResult = body };
 
@@ -253,7 +254,7 @@ fn parseIfBranch(psr: *TsParser) Parser.Error!BranchResult {
     } };
 }
 
-fn parseIf(psr: *TsParser) Parser.Error!ParseResult {
+fn parseIf(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .If);
 
     const csr = psr.lexer.token.csr;
@@ -272,15 +273,18 @@ fn parseIf(psr: *TsParser) Parser.Error!ParseResult {
             isElse = false;
         }
 
-        const branch = try parseIfBranch(psr);
+        const branch = parseIfBranch(psr);
         if (branch.getType() == .Branch) {
-            try data.branches.append(psr.getAllocator(), branch.Branch);
+            data.branches.append(
+                psr.getAllocator(),
+                branch.Branch,
+            ) catch allocate.reportAndExit();
         } else {
             const res = branch.ParseResult;
             std.debug.assert(!res.isSuccess());
             if (res.getType() == .NoMatch) {
                 if (isElse) {
-                    const stmt = try psr.parseStmt();
+                    const stmt = psr.parseStmt();
                     switch (stmt.getType()) {
                         .Success => {
                             data.elseBranch = stmt.Success;
@@ -301,7 +305,7 @@ fn parseIf(psr: *TsParser) Parser.Error!ParseResult {
         }
     }
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         csr,
         .If,
@@ -387,7 +391,7 @@ test "can parse an if statement with an 'else if' and an 'else' branch" {
     }).run();
 }
 
-pub fn parseWhile(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseWhile(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .While);
 
     const csr = psr.lexer.token.csr;
@@ -397,7 +401,7 @@ pub fn parseWhile(psr: *TsParser) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    const cond = try psr.parseExpr();
+    const cond = psr.parseExpr();
     if (!cond.isSuccess())
         return cond;
 
@@ -409,11 +413,11 @@ pub fn parseWhile(psr: *TsParser) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    const body = try psr.parseStmt();
+    const body = psr.parseStmt();
     if (!body.isSuccess())
         return body;
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         csr,
         .While,
@@ -439,14 +443,14 @@ test "can parse while loop" {
     }).run();
 }
 
-pub fn parseDo(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseDo(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Do);
 
     const csr = psr.lexer.token.csr;
 
     _ = psr.lexer.next();
 
-    const body = try psr.parseStmt();
+    const body = psr.parseStmt();
     if (!body.isSuccess())
         return body;
 
@@ -458,7 +462,7 @@ pub fn parseDo(psr: *TsParser) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    const cond = try psr.parseExpr();
+    const cond = psr.parseExpr();
     if (!cond.isSuccess())
         return cond;
 
@@ -473,7 +477,7 @@ pub fn parseDo(psr: *TsParser) Parser.Error!ParseResult {
     if (eatSemi(psr)) |err|
         return err;
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         csr,
         .Do,
@@ -499,13 +503,13 @@ test "can parse do loop" {
     }).run();
 }
 
-fn parseBlockStmt(psr: *TsParser) Parser.Error!ParseResult {
+fn parseBlockStmt(psr: *TsParser) ParseResult {
     if (psr.lexer.token.ty != .LBrace)
         return ParseResult.noMatch(
             ParseError.expected("a block", psr.lexer.token),
         );
 
-    var nd = try makeNode(
+    var nd = makeNode(
         psr.getAllocator(),
         psr.lexer.token.csr,
         .Block,
@@ -515,10 +519,13 @@ fn parseBlockStmt(psr: *TsParser) Parser.Error!ParseResult {
     _ = psr.lexer.next();
 
     while (psr.lexer.token.ty != .RBrace) {
-        const stmt = try psr.parseStmt();
+        const stmt = psr.parseStmt();
         if (!stmt.isSuccess())
             return stmt;
-        try nd.data.Block.append(psr.getAllocator(), stmt.Success);
+        nd.data.Block.append(
+            psr.getAllocator(),
+            stmt.Success,
+        ) catch allocate.reportAndExit();
     }
 
     std.debug.assert(psr.lexer.token.ty == .RBrace);
@@ -528,7 +535,7 @@ fn parseBlockStmt(psr: *TsParser) Parser.Error!ParseResult {
     return ParseResult.success(nd);
 }
 
-pub fn parseBlock(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseBlock(psr: *Parser) ParseResult {
     return parseBlockStmt(@fieldParentPtr(TsParser, "parser", psr));
 }
 
@@ -560,21 +567,21 @@ test "can parse populated block" {
     }).run();
 }
 
-pub fn parseReturn(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseReturn(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Return);
 
     const csr = psr.lexer.token.csr;
 
     _ = psr.lexer.next();
 
-    const expr = try psr.parseExpr();
+    const expr = psr.parseExpr();
     if (expr.getType() == .Error)
         return expr;
 
     if (eatSemi(psr)) |err|
         return err;
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         csr,
         .Return,
@@ -612,7 +619,7 @@ test "can parse 'return' with expression" {
 pub fn parseBreakOrContinue(
     psr: *TsParser,
     comptime ty: NodeType,
-) Parser.Error!ParseResult {
+) ParseResult {
     std.debug.assert(std.mem.eql(
         u8,
         @tagName(psr.lexer.token.ty),
@@ -633,9 +640,7 @@ pub fn parseBreakOrContinue(
     if (eatSemi(psr)) |err|
         return err;
 
-    return ParseResult.success(
-        try makeNode(psr.getAllocator(), csr, ty, label),
-    );
+    return ParseResult.success(makeNode(psr.getAllocator(), csr, ty, label));
 }
 
 test "can parse 'break' without label" {
@@ -686,14 +691,14 @@ test "can parse 'continue' with label" {
     }).run();
 }
 
-pub fn parseThrow(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseThrow(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Throw);
 
     const csr = psr.lexer.token.csr;
 
     _ = psr.lexer.next();
 
-    const expr = try psr.parseExpr();
+    const expr = psr.parseExpr();
     if (!expr.isSuccess())
         return expr;
 
@@ -701,7 +706,7 @@ pub fn parseThrow(psr: *TsParser) Parser.Error!ParseResult {
         return err;
 
     return ParseResult.success(
-        try makeNode(psr.getAllocator(), csr, .Throw, expr.Success),
+        makeNode(psr.getAllocator(), csr, .Throw, expr.Success),
     );
 }
 
@@ -719,18 +724,18 @@ test "can parse 'throw' statement" {
     }).run();
 }
 
-pub fn parseTry(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseTry(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Try);
 
     const csr = psr.lexer.token.csr;
 
     _ = psr.lexer.next();
 
-    const tryBlock = try parseBlockStmt(psr);
+    const tryBlock = parseBlockStmt(psr);
     if (!tryBlock.isSuccess())
         return tryBlock;
 
-    var nd = try makeNode(psr.getAllocator(), csr, .Try, node.Try{
+    var nd = makeNode(psr.getAllocator(), csr, .Try, node.Try{
         .tryBlock = tryBlock.Success,
         .catchBlocks = node.Try.CatchList{},
         .finallyBlock = null,
@@ -759,20 +764,20 @@ pub fn parseTry(psr: *TsParser) Parser.Error!ParseResult {
 
         _ = psr.lexer.next();
 
-        const block = try parseBlockStmt(psr);
+        const block = parseBlockStmt(psr);
         if (!block.isSuccess())
             return block;
 
-        try nd.data.Try.catchBlocks.append(psr.getAllocator(), node.Try.Catch{
+        nd.data.Try.catchBlocks.append(psr.getAllocator(), node.Try.Catch{
             .name = name,
             .block = block.Success,
-        });
+        }) catch allocate.reportAndExit();
     }
 
     if (psr.lexer.token.ty == .Finally) {
         _ = psr.lexer.next();
 
-        const block = try parseBlockStmt(psr);
+        const block = parseBlockStmt(psr);
         if (!block.isSuccess())
             return block;
 
@@ -805,8 +810,8 @@ test "can parse try-catch" {
     }).run();
 }
 
-pub fn parseExprStmt(psr: *TsParser) Parser.Error!ParseResult {
-    const expr = try psr.parseExpr();
+pub fn parseExprStmt(psr: *TsParser) ParseResult {
+    const expr = psr.parseExpr();
     if (expr.isSuccess()) {
         if (eatSemi(psr)) |err|
             return err;
@@ -833,7 +838,7 @@ test "can parse expression statements" {
     }).run();
 }
 
-pub fn parseLabelled(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseLabelled(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Ident);
 
     const ctx = psr.lexer.save();
@@ -841,11 +846,11 @@ pub fn parseLabelled(psr: *TsParser) Parser.Error!ParseResult {
     if (psr.lexer.next().ty == .Colon) {
         _ = psr.lexer.next();
 
-        const stmt = try psr.parseStmt();
+        const stmt = psr.parseStmt();
         if (!stmt.isSuccess())
             return stmt;
 
-        return ParseResult.success(try makeNode(
+        return ParseResult.success(makeNode(
             psr.getAllocator(),
             ctx.token.csr,
             .Labelled,
@@ -875,7 +880,7 @@ test "can parse labelled statement" {
     }).run();
 }
 
-pub fn parseStmtInternal(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseStmtInternal(psr: *TsParser) ParseResult {
     while (psr.lexer.token.ty == .Semi)
         _ = psr.lexer.next();
 
@@ -892,7 +897,7 @@ pub fn parseStmtInternal(psr: *TsParser) Parser.Error!ParseResult {
         .Continue => parseBreakOrContinue(psr, .Continue),
         .Throw => parseThrow(psr),
         .Try => parseTry(psr),
-        .EOF => ParseResult.success(try makeNode(
+        .EOF => ParseResult.success(makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,
             .EOF,
@@ -903,7 +908,7 @@ pub fn parseStmtInternal(psr: *TsParser) Parser.Error!ParseResult {
     };
 }
 
-pub fn parseStmt(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseStmt(psr: *Parser) ParseResult {
     return parseStmtInternal(@fieldParentPtr(TsParser, "parser", psr));
 }
 

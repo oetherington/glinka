@@ -132,8 +132,8 @@ const ExprTestCase = struct {
         std.testing.allocator.destroy(self.inputNode);
     }
 
-    pub fn makeNode(comptime ty: node.NodeType, data: anytype) !Node {
-        return try node.makeNode(
+    pub fn makeNode(comptime ty: node.NodeType, data: anytype) Node {
+        return node.makeNode(
             std.testing.allocator,
             Cursor.new(0, 0),
             ty,
@@ -144,67 +144,67 @@ const ExprTestCase = struct {
 
 test "JsBackend can emit ident expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.Ident, "anIdentifier"),
+        .inputNode = ExprTestCase.makeNode(.Ident, "anIdentifier"),
         .expectedOutput = "anIdentifier",
     }).run();
 }
 
 test "JsBackend can emit int expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.Int, "123"),
+        .inputNode = ExprTestCase.makeNode(.Int, "123"),
         .expectedOutput = "123",
     }).run();
 }
 
 test "JsBackend can emit string expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.String, "'a test string'"),
+        .inputNode = ExprTestCase.makeNode(.String, "'a test string'"),
         .expectedOutput = "'a test string'",
     }).run();
 }
 
 test "JsBackend can emit template expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.Template, "`a test template`"),
+        .inputNode = ExprTestCase.makeNode(.Template, "`a test template`"),
         .expectedOutput = "`a test template`",
     }).run();
 }
 
 test "JsBackend can emit 'true' expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.True, {}),
+        .inputNode = ExprTestCase.makeNode(.True, {}),
         .expectedOutput = "true",
     }).run();
 }
 
 test "JsBackend can emit 'false' expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.False, {}),
+        .inputNode = ExprTestCase.makeNode(.False, {}),
         .expectedOutput = "false",
     }).run();
 }
 
 test "JsBackend can emit 'null' expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.Null, {}),
+        .inputNode = ExprTestCase.makeNode(.Null, {}),
         .expectedOutput = "null",
     }).run();
 }
 
 test "JsBackend can emit 'undefined' expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(.Undefined, {}),
+        .inputNode = ExprTestCase.makeNode(.Undefined, {}),
         .expectedOutput = "undefined",
     }).run();
 }
 
 test "JsBackend can emit prefix op expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(
+        .inputNode = ExprTestCase.makeNode(
             .PrefixOp,
             node.UnaryOp{
                 .op = .Inc,
-                .expr = try ExprTestCase.makeNode(.Ident, "a"),
+                .expr = ExprTestCase.makeNode(.Ident, "a"),
             },
         ),
         .expectedOutput = "(++a)",
@@ -218,11 +218,11 @@ test "JsBackend can emit prefix op expression" {
 
 test "JsBackend can emit postfix op expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(
+        .inputNode = ExprTestCase.makeNode(
             .PostfixOp,
             node.UnaryOp{
                 .op = .Dec,
-                .expr = try ExprTestCase.makeNode(.Ident, "a"),
+                .expr = ExprTestCase.makeNode(.Ident, "a"),
             },
         ),
         .expectedOutput = "(a--)",
@@ -236,12 +236,12 @@ test "JsBackend can emit postfix op expression" {
 
 test "JsBackend can emit binary op expression" {
     try (ExprTestCase{
-        .inputNode = try ExprTestCase.makeNode(
+        .inputNode = ExprTestCase.makeNode(
             .BinaryOp,
             node.BinaryOp{
                 .op = .Add,
-                .left = try ExprTestCase.makeNode(.Ident, "a"),
-                .right = try ExprTestCase.makeNode(.Int, "4"),
+                .left = ExprTestCase.makeNode(.Ident, "a"),
+                .right = ExprTestCase.makeNode(.Int, "4"),
             },
         ),
         .expectedOutput = "(a+4)",

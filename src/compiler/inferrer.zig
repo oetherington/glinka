@@ -193,7 +193,7 @@ const InferTestCase = struct {
         if (self.setup) |setup|
             try setup(scope, typebook);
 
-        const nd = try makeNode(
+        const nd = makeNode(
             std.testing.allocator,
             Cursor.new(6, 9),
             nodeType,
@@ -276,9 +276,9 @@ test "can infer type of a homogeneous ternary expression" {
     const alloc = std.testing.allocator;
     const csr = Cursor.new(0, 0);
 
-    const cond = try makeNode(alloc, csr, .True, {});
-    const ifTrue = try makeNode(alloc, csr, .Int, "1");
-    const ifFalse = try makeNode(alloc, csr, .Int, "2");
+    const cond = makeNode(alloc, csr, .True, {});
+    const ifTrue = makeNode(alloc, csr, .Int, "1");
+    const ifFalse = makeNode(alloc, csr, .Int, "2");
 
     defer alloc.destroy(cond);
     defer alloc.destroy(ifTrue);
@@ -297,9 +297,9 @@ test "can infer type of a non-homogeneous ternary expression" {
     const alloc = std.testing.allocator;
     const csr = Cursor.new(0, 0);
 
-    const cond = try makeNode(alloc, csr, .True, {});
-    const ifTrue = try makeNode(alloc, csr, .Int, "1");
-    const ifFalse = try makeNode(alloc, csr, .String, "'hello world'");
+    const cond = makeNode(alloc, csr, .True, {});
+    const ifTrue = makeNode(alloc, csr, .Int, "1");
+    const ifFalse = makeNode(alloc, csr, .String, "'hello world'");
 
     defer alloc.destroy(cond);
     defer alloc.destroy(ifTrue);
@@ -364,7 +364,7 @@ test "can lookup builtin types" {
     var typebook = try TypeBook.new(std.testing.allocator);
     defer typebook.deinit();
 
-    const nd = try makeNode(
+    const nd = makeNode(
         std.testing.allocator,
         Cursor.new(11, 4),
         .TypeName,

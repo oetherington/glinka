@@ -73,7 +73,7 @@ pub const CompilerTestCase = struct {
 
         var parser = tsParser.getParser();
 
-        const res = try parser.getAst(&arena);
+        const res = parser.getAst(&arena);
         try res.reportIfError(std.io.getStdErr().writer());
         try self.expect(res.isSuccess());
         try self.expectEqual(NodeType.Program, res.Success.getType());

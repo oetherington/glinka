@@ -93,7 +93,7 @@ pub const ParseResult = union(ParseResultType) {
 };
 
 test "can initialize 'Success' parse result" {
-    const n = try makeNode(
+    const n = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,
@@ -108,7 +108,7 @@ test "can initialize 'Success' parse result" {
 
 test "can initialize 'Error' parse result" {
     const expected = Token.Type.Dot;
-    const found = try makeNode(
+    const found = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,
@@ -131,7 +131,7 @@ test "can initialize 'NoMatch' parse result without a payload" {
 
 test "can initialize 'NoMatch' parse result with a payload" {
     const expected = Token.Type.Dot;
-    const found = try makeNode(
+    const found = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,

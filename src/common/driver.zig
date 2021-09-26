@@ -48,7 +48,7 @@ pub fn Driver(comptime ParserImpl: type) type {
             var parserImpl = ParserImpl.new(arena, code);
             var parser = parserImpl.getParser();
 
-            var res = try parser.getAst(arena);
+            var res = parser.getAst(arena);
 
             return ParsedFile{
                 .code = code,

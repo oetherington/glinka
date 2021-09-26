@@ -33,6 +33,7 @@ const TokenType = @import("../common/token.zig").Token.Type;
 const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
+const allocate = @import("../common/allocate.zig");
 
 const ExprTestCase = struct {
     expr: []const u8,
@@ -49,7 +50,7 @@ const ExprTestCase = struct {
 
         var parser = tsParser.getParser();
 
-        const res = try parser.next();
+        const res = parser.next();
         try res.reportIfError(std.io.getStdErr().writer());
         try expect(res.isSuccess());
 
@@ -57,18 +58,18 @@ const ExprTestCase = struct {
         try expectEqual(Cursor.new(1, 9 + self.startingCh), value.csr);
         try self.check(value);
 
-        const eof = try parser.next();
+        const eof = parser.next();
         try expect(eof.isSuccess());
         try expectEqual(NodeType.EOF, eof.Success.getType());
     }
 };
 
-fn parseParenExpr(psr: *TsParser) Parser.Error!ParseResult {
+fn parseParenExpr(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LParen);
 
     _ = psr.lexer.next();
 
-    const expr = try psr.parseExpr();
+    const expr = psr.parseExpr();
     if (!expr.isSuccess())
         return expr;
 
@@ -93,10 +94,10 @@ test "can parse paren primary expression" {
     }).run();
 }
 
-fn parseArrayLiteral(psr: *TsParser) Parser.Error!ParseResult {
+fn parseArrayLiteral(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrack);
 
-    const nd = try makeNode(
+    const nd = makeNode(
         psr.getAllocator(),
         psr.lexer.token.csr,
         .Array,
@@ -106,11 +107,14 @@ fn parseArrayLiteral(psr: *TsParser) Parser.Error!ParseResult {
     _ = psr.lexer.next();
 
     while (psr.lexer.token.ty != .RBrack) {
-        const item = try parseBinaryExpr(psr);
+        const item = parseBinaryExpr(psr);
         if (!item.isSuccess())
             return item;
 
-        try nd.data.Array.append(psr.getAllocator(), item.Success);
+        nd.data.Array.append(
+            psr.getAllocator(),
+            item.Success,
+        ) catch allocate.reportAndExit();
 
         if (psr.lexer.token.ty != .Comma)
             break;
@@ -144,15 +148,15 @@ test "can parse array literal primary expression" {
     }).run();
 }
 
-fn parsePropertyKey(psr: *TsParser) Parser.Error!ParseResult {
+fn parsePropertyKey(psr: *TsParser) ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
     const data = psr.lexer.token.data;
 
     const nd = switch (psr.lexer.token.ty) {
-        .Ident => try makeNode(alloc, csr, .Ident, data),
-        .String => try makeNode(alloc, csr, .String, data),
-        .Int => try makeNode(alloc, csr, .Int, data),
+        .Ident => makeNode(alloc, csr, .Ident, data),
+        .String => makeNode(alloc, csr, .String, data),
+        .Int => makeNode(alloc, csr, .Int, data),
         else => return ParseResult.expected("property key", psr.lexer.token),
     };
 
@@ -161,10 +165,10 @@ fn parsePropertyKey(psr: *TsParser) Parser.Error!ParseResult {
     return ParseResult.success(nd);
 }
 
-fn parseObjectLiteral(psr: *TsParser) Parser.Error!ParseResult {
+fn parseObjectLiteral(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrace);
 
-    const nd = try makeNode(
+    const nd = makeNode(
         psr.getAllocator(),
         psr.lexer.token.csr,
         .Object,
@@ -174,26 +178,26 @@ fn parseObjectLiteral(psr: *TsParser) Parser.Error!ParseResult {
     _ = psr.lexer.next();
 
     while (psr.lexer.token.ty != .RBrace) {
-        const key = try parsePropertyKey(psr);
+        const key = parsePropertyKey(psr);
         if (!key.isSuccess())
             return key;
 
         if (psr.lexer.token.ty == .Colon) {
             _ = psr.lexer.next();
 
-            const value = try parseBinaryExpr(psr);
+            const value = parseBinaryExpr(psr);
             if (!value.isSuccess())
                 return value;
 
-            try nd.data.Object.append(
+            nd.data.Object.append(
                 psr.getAllocator(),
                 node.ObjectProperty.new(key.Success, value.Success),
-            );
+            ) catch allocate.reportAndExit();
         } else if (key.Success.getType() == .Ident) {
-            try nd.data.Object.append(
+            nd.data.Object.append(
                 psr.getAllocator(),
                 node.ObjectProperty.new(key.Success, key.Success),
-            );
+            ) catch allocate.reportAndExit();
         } else {
             return ParseResult.expected("property value", psr.lexer.token);
         }
@@ -236,7 +240,7 @@ test "can parse object literal primary expression" {
     }).run();
 }
 
-fn parseFunctionExpr(psr: *TsParser) Parser.Error!ParseResult {
+fn parseFunctionExpr(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Function);
 
     const csr = psr.lexer.token.csr;
@@ -272,18 +276,18 @@ fn parseFunctionExpr(psr: *TsParser) Parser.Error!ParseResult {
         if (psr.lexer.token.ty == .Colon) {
             _ = psr.lexer.next();
 
-            const tyRes = try psr.parseType();
+            const tyRes = psr.parseType();
             if (!tyRes.isSuccess())
                 return tyRes;
 
             ty = tyRes.Success;
         }
 
-        try func.args.append(psr.getAllocator(), node.Function.Arg{
+        func.args.append(psr.getAllocator(), node.Function.Arg{
             .csr = arg.csr,
             .name = arg.data,
             .ty = ty,
-        });
+        }) catch allocate.reportAndExit();
 
         if (psr.lexer.token.ty != .Comma)
             break;
@@ -299,7 +303,7 @@ fn parseFunctionExpr(psr: *TsParser) Parser.Error!ParseResult {
     if (psr.lexer.token.ty == .Colon) {
         _ = psr.lexer.next();
 
-        const retTy = try psr.parseType();
+        const retTy = psr.parseType();
         if (!retTy.isSuccess())
             return retTy;
 
@@ -308,13 +312,13 @@ fn parseFunctionExpr(psr: *TsParser) Parser.Error!ParseResult {
         func.retTy = null;
     }
 
-    const body = try psr.parseBlock();
+    const body = psr.parseBlock();
     if (!body.isSuccess())
         return body;
 
     func.body = body.Success;
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         csr,
         .Function,
@@ -356,11 +360,11 @@ test "can parse function definition" {
     }).run();
 }
 
-fn parsePrimaryExpr(psr: *TsParser) Parser.Error!ParseResult {
+fn parsePrimaryExpr(psr: *TsParser) ParseResult {
     const alloc = psr.getAllocator();
     const csr = psr.lexer.token.csr;
 
-    const nd = try switch (psr.lexer.token.ty) {
+    const nd = switch (psr.lexer.token.ty) {
         .Ident => makeNode(alloc, csr, .Ident, psr.lexer.token.data),
         .Int => makeNode(alloc, csr, .Int, psr.lexer.token.data),
         .String => makeNode(alloc, csr, .String, psr.lexer.token.data),
@@ -488,8 +492,8 @@ test "can parse 'this' primary expression" {
     }).run();
 }
 
-fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
-    const left = try parsePrimaryExpr(psr);
+fn parseMemberExpr(psr: *TsParser) ParseResult {
+    const left = parsePrimaryExpr(psr);
     if (!left.isSuccess())
         return left;
 
@@ -509,7 +513,7 @@ fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
 
                 _ = psr.lexer.next();
 
-                nd = try makeNode(
+                nd = makeNode(
                     psr.getAllocator(),
                     csr,
                     .Dot,
@@ -524,7 +528,7 @@ fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
 
                 _ = psr.lexer.next();
 
-                const expr = try psr.parseExpr();
+                const expr = psr.parseExpr();
                 if (!expr.isSuccess())
                     return expr;
 
@@ -536,7 +540,7 @@ fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
 
                 _ = psr.lexer.next();
 
-                nd = try makeNode(
+                nd = makeNode(
                     psr.getAllocator(),
                     csr,
                     .ArrayAccess,
@@ -547,7 +551,7 @@ fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
                 );
             },
             .LParen => {
-                nd = try makeNode(
+                nd = makeNode(
                     psr.getAllocator(),
                     psr.lexer.token.csr,
                     .Call,
@@ -560,12 +564,12 @@ fn parseMemberExpr(psr: *TsParser) Parser.Error!ParseResult {
                 _ = psr.lexer.next();
 
                 while (psr.lexer.token.ty != .RParen) {
-                    const expr = try parseBinaryExpr(psr);
+                    const expr = parseBinaryExpr(psr);
                     switch (expr) {
-                        .Success => |arg| try nd.data.Call.args.append(
+                        .Success => |arg| nd.data.Call.args.append(
                             psr.getAllocator(),
                             arg,
-                        ),
+                        ) catch allocate.reportAndExit(),
                         .Error => return expr,
                         .NoMatch => return ParseResult.expected(
                             "an expression for function call",
@@ -684,8 +688,8 @@ test "can parse function call with arguments" {
     }).run();
 }
 
-fn parsePostfixExpr(psr: *TsParser) Parser.Error!ParseResult {
-    const res = try parseMemberExpr(psr);
+fn parsePostfixExpr(psr: *TsParser) ParseResult {
+    const res = parseMemberExpr(psr);
     if (!res.isSuccess())
         return res;
 
@@ -693,7 +697,7 @@ fn parsePostfixExpr(psr: *TsParser) Parser.Error!ParseResult {
 
     while (true) {
         if (psr.lexer.token.ty == .Inc) {
-            left = try makeNode(
+            left = makeNode(
                 psr.getAllocator(),
                 psr.lexer.token.csr,
                 .PostfixOp,
@@ -701,7 +705,7 @@ fn parsePostfixExpr(psr: *TsParser) Parser.Error!ParseResult {
             );
             _ = psr.lexer.next();
         } else if (psr.lexer.token.ty == .Dec) {
-            left = try makeNode(
+            left = makeNode(
                 psr.getAllocator(),
                 psr.lexer.token.csr,
                 .PostfixOp,
@@ -730,7 +734,7 @@ test "can parse postfix unary operator expressions" {
     }).run();
 }
 
-fn parsePrefixExpr(psr: *TsParser) Parser.Error!ParseResult {
+fn parsePrefixExpr(psr: *TsParser) ParseResult {
     const op = switch (psr.lexer.token.ty) {
         .Delete,
         .Void,
@@ -742,16 +746,16 @@ fn parsePrefixExpr(psr: *TsParser) Parser.Error!ParseResult {
         .BitNot,
         .LogicalNot,
         => psr.lexer.token,
-        else => return try parsePostfixExpr(psr),
+        else => return parsePostfixExpr(psr),
     };
 
     _ = psr.lexer.next();
 
-    const expr = try parsePrefixExpr(psr);
+    const expr = parsePrefixExpr(psr);
     if (!expr.isSuccess())
         return expr;
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         op.csr,
         .PrefixOp,
@@ -775,12 +779,12 @@ test "can parse prefix unary operator expressions" {
 }
 
 fn BinaryOpParser(
-    next: fn (psr: *TsParser) Parser.Error!ParseResult,
+    next: fn (psr: *TsParser) ParseResult,
     tokens: []const TokenType,
 ) type {
     return struct {
-        pub fn parse(psr: *TsParser) Parser.Error!ParseResult {
-            const res = try next(psr);
+        pub fn parse(psr: *TsParser) ParseResult {
+            const res = next(psr);
             if (!res.isSuccess())
                 return res;
 
@@ -792,11 +796,11 @@ fn BinaryOpParser(
                         const op = psr.lexer.token;
                         _ = psr.lexer.next();
 
-                        const right = try next(psr);
+                        const right = next(psr);
                         if (!right.isSuccess())
                             return right;
 
-                        left = try makeNode(
+                        left = makeNode(
                             psr.getAllocator(),
                             op.csr,
                             .BinaryOp,
@@ -870,8 +874,8 @@ const logOrOpParser = BinaryOpParser(
     &[_]TokenType{.LogicalOr},
 );
 
-fn parseTernaryExpr(psr: *TsParser) Parser.Error!ParseResult {
-    const left = try logOrOpParser.parse(psr);
+fn parseTernaryExpr(psr: *TsParser) ParseResult {
+    const left = logOrOpParser.parse(psr);
     if (!left.isSuccess())
         return left;
 
@@ -882,7 +886,7 @@ fn parseTernaryExpr(psr: *TsParser) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    const ifTrue = try assignOpParser.parse(psr);
+    const ifTrue = assignOpParser.parse(psr);
     if (!ifTrue.isSuccess())
         return ifTrue;
 
@@ -891,11 +895,11 @@ fn parseTernaryExpr(psr: *TsParser) Parser.Error!ParseResult {
 
     _ = psr.lexer.next();
 
-    const ifFalse = try assignOpParser.parse(psr);
+    const ifFalse = assignOpParser.parse(psr);
     if (!ifFalse.isSuccess())
         return ifFalse;
 
-    return ParseResult.success(try makeNode(
+    return ParseResult.success(makeNode(
         psr.getAllocator(),
         csr,
         .Ternary,
@@ -921,7 +925,7 @@ const assignOpParser = BinaryOpParser(
     },
 );
 
-fn parseBinaryExpr(psr: *TsParser) Parser.Error!ParseResult {
+fn parseBinaryExpr(psr: *TsParser) ParseResult {
     return assignOpParser.parse(psr);
 }
 
@@ -1025,30 +1029,36 @@ test "can parse ternary expressions" {
     }).run();
 }
 
-fn parseCommaExpr(psr: *TsParser) Parser.Error!ParseResult {
-    const res = try parseBinaryExpr(psr);
+fn parseCommaExpr(psr: *TsParser) ParseResult {
+    const res = parseBinaryExpr(psr);
     if (!res.isSuccess() or psr.lexer.token.ty != .Comma)
         return res;
 
     const alloc = psr.getAllocator();
 
-    var list = try makeNode(
+    var list = makeNode(
         alloc,
         psr.lexer.token.csr,
         .Comma,
         node.NodeList{},
     );
 
-    try list.data.Comma.append(alloc, res.Success);
+    list.data.Comma.append(
+        alloc,
+        res.Success,
+    ) catch allocate.reportAndExit();
 
     while (psr.lexer.token.ty == .Comma) {
         _ = psr.lexer.next();
 
-        const right = try parseBinaryExpr(psr);
+        const right = parseBinaryExpr(psr);
         if (!right.isSuccess())
             return right;
 
-        try list.data.Comma.append(alloc, right.Success);
+        list.data.Comma.append(
+            alloc,
+            right.Success,
+        ) catch allocate.reportAndExit();
     }
 
     return ParseResult.success(list);
@@ -1074,6 +1084,6 @@ test "can parse comma expressions" {
     }).run();
 }
 
-pub fn parseExpr(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseExpr(psr: *Parser) ParseResult {
     return parseCommaExpr(@fieldParentPtr(TsParser, "parser", psr));
 }

@@ -114,7 +114,7 @@ test "can initialize 'FoundData' with a Token" {
 }
 
 test "can initialize 'FoundData' with a Node" {
-    const found = try makeNode(
+    const found = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,

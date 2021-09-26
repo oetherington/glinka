@@ -33,11 +33,12 @@ const TokenType = @import("../common/token.zig").TokenType;
 const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
+const allocate = @import("../common/allocate.zig");
 
-pub fn parseTypeName(psr: *TsParser) Parser.Error!ParseResult {
+pub fn parseTypeName(psr: *TsParser) ParseResult {
     switch (psr.lexer.token.ty) {
         .Ident => {
-            const nd = try makeNode(
+            const nd = makeNode(
                 psr.getAllocator(),
                 psr.lexer.token.csr,
                 NodeType.TypeName,
@@ -62,13 +63,13 @@ test "can parse type names" {
 
     var parser = tsParser.getParser();
 
-    const res = try parser.parseType();
+    const res = parser.parseType();
     try expect(res.isSuccess());
     try expectEqual(Cursor.new(1, 2), res.Success.csr);
     try expectEqual(NodeType.TypeName, res.Success.data.getType());
     try expectEqualStrings("SomeTypeName", res.Success.data.TypeName);
 }
 
-pub fn parseType(psr: *Parser) Parser.Error!ParseResult {
+pub fn parseType(psr: *Parser) ParseResult {
     return parseTypeName(@fieldParentPtr(TsParser, "parser", psr));
 }

@@ -23,6 +23,7 @@ const Allocator = std.mem.Allocator;
 const Token = @import("token.zig").Token;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const genericEql = @import("../common/generic_eql.zig");
+const allocate = @import("allocate.zig");
 
 fn putInd(
     writer: anytype,
@@ -588,8 +589,8 @@ pub fn makeNode(
     csr: Cursor,
     comptime ty: NodeType,
     data: anytype,
-) Allocator.Error!Node {
-    var n = try alloc.create(NodeImpl);
+) Node {
+    var n = allocate.create(alloc, NodeImpl);
     n.csr = csr;
     n.data = @unionInit(NodeData, @tagName(ty), data);
     return n;
@@ -597,7 +598,7 @@ pub fn makeNode(
 
 test "can initialize a var node" {
     const name = "aVariableName";
-    const node = try makeNode(
+    const node = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,
@@ -612,21 +613,21 @@ test "can initialize a var node" {
 test "can compare Nodes for equality" {
     const name = "aVarName";
 
-    const a = try makeNode(
+    const a = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,
         Decl.new(.Var, name, null, null),
     );
 
-    const b = try makeNode(
+    const b = makeNode(
         std.testing.allocator,
         Cursor.new(0, 0),
         NodeType.Decl,
         Decl.new(.Var, name, null, null),
     );
 
-    const c = try makeNode(
+    const c = makeNode(
         std.testing.allocator,
         Cursor.new(1, 1),
         NodeType.Decl,
