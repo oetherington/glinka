@@ -33,6 +33,7 @@ const CompileError = @import("compile_error.zig").CompileError;
 const inferrer = @import("inferrer.zig");
 const expression = @import("expression.zig");
 const declaration = @import("declaration.zig");
+const conditional = @import("conditional.zig");
 const allocate = @import("../common/allocate.zig");
 
 pub const Compiler = struct {
@@ -71,6 +72,17 @@ pub const Compiler = struct {
             self.alloc.free(string);
 
         self.strings.deinit();
+    }
+
+    pub fn pushScope(self: *Compiler) void {
+        self.scope = Scope.new(self.alloc, self.scope);
+    }
+
+    pub fn popScope(self: *Compiler) void {
+        std.debug.assert(self.scope.parent != null);
+        var old = self.scope;
+        self.scope = old.parent;
+        old.deinit();
     }
 
     pub fn hasErrors(self: Compiler) bool {
@@ -137,6 +149,7 @@ pub const Compiler = struct {
             .Ternary,
             => try expression.processExpression(self, nd),
             .Decl => try declaration.processDecl(self, nd),
+            .If => try conditional.processConditional(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

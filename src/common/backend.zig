@@ -28,8 +28,9 @@ pub const Backend = struct {
     pub const Callbacks = struct {
         prolog: Callback,
         epilog: Callback,
-        declaration: NodeCallback,
         expression: NodeCallback,
+        declaration: NodeCallback,
+        conditional: NodeCallback,
     };
 
     callbacks: Callbacks,
@@ -42,11 +43,15 @@ pub const Backend = struct {
         try self.callbacks.epilog(self);
     }
 
+    pub fn expression(self: *Backend, nd: Node) Error!void {
+        try self.callbacks.expression(self, nd);
+    }
+
     pub fn declaration(self: *Backend, nd: Node) Error!void {
         try self.callbacks.declaration(self, nd);
     }
 
-    pub fn expression(self: *Backend, nd: Node) Error!void {
-        try self.callbacks.expression(self, nd);
+    pub fn conditional(self: *Backend, nd: Node) Error!void {
+        try self.callbacks.conditional(self, nd);
     }
 };

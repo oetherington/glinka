@@ -26,6 +26,7 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const exprEmitter = @import("expr_emitter.zig");
 const declEmitter = @import("decl_emitter.zig");
+const condEmitter = @import("cond_emitter.zig");
 
 pub const JsBackend = struct {
     const WriteCtx = WriteContext(.{});
@@ -41,8 +42,9 @@ pub const JsBackend = struct {
                 .callbacks = .{
                     .prolog = JsBackend.prolog,
                     .epilog = JsBackend.epilog,
-                    .declaration = JsBackend.declaration,
                     .expression = JsBackend.expression,
+                    .declaration = JsBackend.declaration,
+                    .conditional = JsBackend.conditional,
                 },
             },
             .writeCtx = ctx,
@@ -80,17 +82,20 @@ pub const JsBackend = struct {
         return try exprEmitter.emitExpr(self, value);
     }
 
-    fn declaration(be: *Backend, nd: Node) Backend.Error!void {
-        std.debug.assert(nd.getType() == NodeType.Decl);
-        const self = JsBackend.getSelf(be);
-        const decl = nd.data.Decl;
-        try declEmitter.emitDecl(self, decl);
-    }
-
     fn expression(be: *Backend, nd: Node) Backend.Error!void {
         const self = JsBackend.getSelf(be);
         try self.emitExpr(nd);
         try self.out.print(";\n", .{});
+    }
+
+    fn declaration(be: *Backend, nd: Node) Backend.Error!void {
+        std.debug.assert(nd.getType() == NodeType.Decl);
+        try declEmitter.emitDecl(JsBackend.getSelf(be), nd.data.Decl);
+    }
+
+    fn conditional(be: *Backend, nd: Node) Backend.Error!void {
+        std.debug.assert(nd.getType() == NodeType.If);
+        try condEmitter.emitCond(JsBackend.getSelf(be), nd.data.If);
     }
 };
 
