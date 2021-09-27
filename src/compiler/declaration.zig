@@ -98,8 +98,6 @@ pub fn processDecl(cmp: *Compiler, nd: Node) !void {
         declWithAssign(cmp, nd.csr, decl)
     else
         declWithoutAssign(cmp, nd.csr, decl);
-
-    try cmp.backend.declaration(nd);
 }
 
 test "constants must be initialized" {

@@ -29,7 +29,6 @@ const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 
 pub fn processExpression(cmp: *Compiler, nd: Node) !void {
     _ = try cmp.inferExprType(nd);
-    try cmp.backend.expression(nd);
 }
 
 test "can compile assign expressions" {

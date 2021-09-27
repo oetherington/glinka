@@ -29,5 +29,8 @@ const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 pub fn processConditional(cmp: *Compiler, nd: Node) !void {
     std.debug.assert(nd.getType() == .If);
 
-    try cmp.backend.conditional(nd);
+    _ = cmp;
+    _ = nd;
+
+    // TODO
 }

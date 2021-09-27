@@ -162,8 +162,10 @@ pub const Compiler = struct {
 
         try self.backend.prolog();
 
-        for (nd.data.Program.items) |child|
+        for (nd.data.Program.items) |child| {
             try self.processNode(child);
+            try self.backend.processNode(child);
+        }
 
         try self.backend.epilog();
     }
