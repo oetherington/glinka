@@ -29,34 +29,34 @@ const CompileError = @import("compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 const allocate = @import("../common/allocate.zig");
 
-fn declWithAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
+fn declWithAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) void {
     std.debug.assert(decl.value != null);
 
-    if (try cmp.inferExprType(decl.value.?)) |valueTy| {
+    if (cmp.inferExprType(decl.value.?)) |valueTy| {
         const isConst = decl.scoping == .Const;
 
         if (decl.ty) |annotationNode| {
-            if (try cmp.findType(annotationNode)) |annotation| {
+            if (cmp.findType(annotationNode)) |annotation| {
                 if (!valueTy.isAssignableTo(annotation)) {
-                    try cmp.errors.append(CompileError.typeError(
+                    cmp.errors.append(CompileError.typeError(
                         TypeError.new(csr, valueTy, annotation),
-                    ));
+                    )) catch allocate.reportAndExit();
                 }
 
-                try cmp.scope.put(decl.name, annotation, isConst, csr);
+                cmp.scope.put(decl.name, annotation, isConst, csr);
             } else {
                 cmp.errors.append(CompileError.genericError(
                     GenericError.new(csr, "Invalid type annotation"),
                 )) catch allocate.reportAndExit();
-                try cmp.scope.put(decl.name, valueTy, isConst, csr);
+                cmp.scope.put(decl.name, valueTy, isConst, csr);
             }
         } else {
-            try cmp.scope.put(decl.name, valueTy, isConst, csr);
+            cmp.scope.put(decl.name, valueTy, isConst, csr);
         }
     }
 }
 
-fn declWithoutAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
+fn declWithoutAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) void {
     std.debug.assert(decl.value == null);
 
     if (decl.scoping == .Const) {
@@ -67,12 +67,12 @@ fn declWithoutAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
     }
 
     const annotation = if (decl.ty) |ty|
-        try cmp.findType(ty)
+        cmp.findType(ty)
     else
-        try cmp.implicitAny(csr, decl.name);
+        cmp.implicitAny(csr, decl.name);
 
     if (annotation) |ty| {
-        try cmp.scope.put(decl.name, ty, false, csr);
+        cmp.scope.put(decl.name, ty, false, csr);
     } else {
         cmp.errors.append(CompileError.genericError(
             GenericError.new(
@@ -83,7 +83,7 @@ fn declWithoutAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) !void {
     }
 }
 
-pub fn processDecl(cmp: *Compiler, nd: Node) !void {
+pub fn processDecl(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == NodeType.Decl);
 
     const decl = nd.data.Decl;
@@ -94,7 +94,7 @@ pub fn processDecl(cmp: *Compiler, nd: Node) !void {
         )) catch allocate.reportAndExit();
     }
 
-    try if (decl.value) |_|
+    if (decl.value) |_|
         declWithAssign(cmp, nd.csr, decl)
     else
         declWithoutAssign(cmp, nd.csr, decl);

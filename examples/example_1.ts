@@ -19,3 +19,13 @@ aNumber--;
 ++aNumber;
 --aNumber;
 aNumber ? aString : aBool;
+
+// Conditionals
+if (aNumber)
+	aNumber = 4;
+else if (aBool)
+	aNumber = 5;
+else if (aString)
+	aNumber = 6;
+else
+	aNumber = 7;

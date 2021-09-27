@@ -24,6 +24,7 @@ const Node = node.Node;
 const Cursor = @import("../../common/cursor.zig").Cursor;
 const Backend = @import("../../common/backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
+const EmitTestCase = @import("emit_test_case.zig").EmitTestCase;
 
 fn opToString(op: TokenType) error{InvalidOp}![]const u8 {
     return switch (op) {
@@ -120,103 +121,72 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
     };
 }
 
-const ExprTestCase = struct {
-    inputNode: Node,
-    expectedOutput: []const u8,
-    cleanup: ?fn (alloc: *Allocator, nd: Node) void = null,
-
-    pub fn run(self: ExprTestCase) !void {
-        var backend = try JsBackend.new(std.testing.allocator);
-        defer backend.deinit();
-
-        try emitExpr(backend, self.inputNode);
-
-        const str = try backend.toString();
-        defer backend.freeString(str);
-        try expectEqualStrings(self.expectedOutput, str);
-
-        if (self.cleanup) |cleanup|
-            cleanup(std.testing.allocator, self.inputNode);
-
-        std.testing.allocator.destroy(self.inputNode);
-    }
-
-    pub fn makeNode(comptime ty: node.NodeType, data: anytype) Node {
-        return node.makeNode(
-            std.testing.allocator,
-            Cursor.new(0, 0),
-            ty,
-            data,
-        );
-    }
-};
-
 test "JsBackend can emit ident expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.Ident, "anIdentifier"),
-        .expectedOutput = "anIdentifier",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Ident, "anIdentifier"),
+        .expectedOutput = "anIdentifier;\n",
     }).run();
 }
 
 test "JsBackend can emit int expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.Int, "123"),
-        .expectedOutput = "123",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Int, "123"),
+        .expectedOutput = "123;\n",
     }).run();
 }
 
 test "JsBackend can emit string expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.String, "'a test string'"),
-        .expectedOutput = "'a test string'",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.String, "'a test string'"),
+        .expectedOutput = "'a test string';\n",
     }).run();
 }
 
 test "JsBackend can emit template expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.Template, "`a test template`"),
-        .expectedOutput = "`a test template`",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Template, "`a test template`"),
+        .expectedOutput = "`a test template`;\n",
     }).run();
 }
 
 test "JsBackend can emit 'true' expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.True, {}),
-        .expectedOutput = "true",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.True, {}),
+        .expectedOutput = "true;\n",
     }).run();
 }
 
 test "JsBackend can emit 'false' expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.False, {}),
-        .expectedOutput = "false",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.False, {}),
+        .expectedOutput = "false;\n",
     }).run();
 }
 
 test "JsBackend can emit 'null' expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.Null, {}),
-        .expectedOutput = "null",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Null, {}),
+        .expectedOutput = "null;\n",
     }).run();
 }
 
 test "JsBackend can emit 'undefined' expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(.Undefined, {}),
-        .expectedOutput = "undefined",
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Undefined, {}),
+        .expectedOutput = "undefined;\n",
     }).run();
 }
 
 test "JsBackend can emit prefix op expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
             .PrefixOp,
             node.UnaryOp{
                 .op = .Inc,
-                .expr = ExprTestCase.makeNode(.Ident, "a"),
+                .expr = EmitTestCase.makeNode(.Ident, "a"),
             },
         ),
-        .expectedOutput = "(++a)",
+        .expectedOutput = "(++a);\n",
         .cleanup = (struct {
             fn cleanup(alloc: *Allocator, nd: Node) void {
                 alloc.destroy(nd.data.PrefixOp.expr);
@@ -226,15 +196,15 @@ test "JsBackend can emit prefix op expression" {
 }
 
 test "JsBackend can emit postfix op expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
             .PostfixOp,
             node.UnaryOp{
                 .op = .Dec,
-                .expr = ExprTestCase.makeNode(.Ident, "a"),
+                .expr = EmitTestCase.makeNode(.Ident, "a"),
             },
         ),
-        .expectedOutput = "(a--)",
+        .expectedOutput = "(a--);\n",
         .cleanup = (struct {
             fn cleanup(alloc: *Allocator, nd: Node) void {
                 alloc.destroy(nd.data.PostfixOp.expr);
@@ -244,16 +214,16 @@ test "JsBackend can emit postfix op expression" {
 }
 
 test "JsBackend can emit binary op expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
             .BinaryOp,
             node.BinaryOp{
                 .op = .Add,
-                .left = ExprTestCase.makeNode(.Ident, "a"),
-                .right = ExprTestCase.makeNode(.Int, "4"),
+                .left = EmitTestCase.makeNode(.Ident, "a"),
+                .right = EmitTestCase.makeNode(.Int, "4"),
             },
         ),
-        .expectedOutput = "(a+4)",
+        .expectedOutput = "(a+4);\n",
         .cleanup = (struct {
             fn cleanup(alloc: *Allocator, nd: Node) void {
                 alloc.destroy(nd.data.BinaryOp.left);
@@ -264,16 +234,16 @@ test "JsBackend can emit binary op expression" {
 }
 
 test "JsBackend can emit ternary expression" {
-    try (ExprTestCase{
-        .inputNode = ExprTestCase.makeNode(
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
             .Ternary,
             node.Ternary{
-                .cond = ExprTestCase.makeNode(.Ident, "a"),
-                .ifTrue = ExprTestCase.makeNode(.Int, "3"),
-                .ifFalse = ExprTestCase.makeNode(.False, {}),
+                .cond = EmitTestCase.makeNode(.Ident, "a"),
+                .ifTrue = EmitTestCase.makeNode(.Int, "3"),
+                .ifFalse = EmitTestCase.makeNode(.False, {}),
             },
         ),
-        .expectedOutput = "(a?3:false)",
+        .expectedOutput = "(a?3:false);\n",
         .cleanup = (struct {
             fn cleanup(alloc: *Allocator, nd: Node) void {
                 alloc.destroy(nd.data.Ternary.cond);

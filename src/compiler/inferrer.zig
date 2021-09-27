@@ -261,7 +261,7 @@ test "can inter type of an identifier" {
                 scope: *Scope,
                 typebook: *TypeBook,
             ) anyerror!void {
-                try scope.put(
+                scope.put(
                     "aVariable",
                     typebook.getString(),
                     false,
@@ -341,7 +341,7 @@ const builtinMap = std.ComptimeStringMap(
     },
 );
 
-pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) !?Type.Ptr {
+pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
     _ = scope;
 
     switch (nd.data) {
@@ -372,6 +372,6 @@ test "can lookup builtin types" {
     );
     defer std.testing.allocator.destroy(nd);
 
-    const ty = try findType(scope, typebook, nd);
+    const ty = findType(scope, typebook, nd);
     try expectEqual(Type.Type.Number, ty.?.getType());
 }

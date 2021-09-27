@@ -115,31 +115,31 @@ pub const Compiler = struct {
         self: *Compiler,
         csr: Cursor,
         symbol: []const u8,
-    ) !Type.Ptr {
+    ) Type.Ptr {
         if (self.config.errorOnImplicitAny)
-            try self.errors.append(CompileError.implicitAnyError(
+            self.errors.append(CompileError.implicitAnyError(
                 ImplicitAnyError.new(csr, symbol),
-            ));
+            )) catch allocate.reportAndExit();
 
         return self.typebook.getAny();
     }
 
-    pub fn inferExprType(self: *Compiler, nd: Node) !?Type.Ptr {
+    pub fn inferExprType(self: *Compiler, nd: Node) ?Type.Ptr {
         const valTy = inferrer.inferExprType(self.scope, self.typebook, nd);
         switch (valTy) {
             .Success => |ty| return ty,
             .Error => |err| {
-                try self.errors.append(err);
+                self.errors.append(err) catch allocate.reportAndExit();
                 return null;
             },
         }
     }
 
-    pub fn findType(self: *Compiler, nd: Node) !?Type.Ptr {
-        return try inferrer.findType(self.scope, self.typebook, nd);
+    pub fn findType(self: *Compiler, nd: Node) ?Type.Ptr {
+        return inferrer.findType(self.scope, self.typebook, nd);
     }
 
-    pub fn processNode(self: *Compiler, nd: Node) !void {
+    pub fn processNode(self: *Compiler, nd: Node) void {
         // nd.dump(); // TODO: TMP
 
         switch (nd.data) {
@@ -147,9 +147,9 @@ pub const Compiler = struct {
             .PostfixOp,
             .BinaryOp,
             .Ternary,
-            => try expression.processExpression(self, nd),
-            .Decl => try declaration.processDecl(self, nd),
-            .If => try conditional.processConditional(self, nd),
+            => expression.processExpression(self, nd),
+            .Decl => declaration.processDecl(self, nd),
+            .If => conditional.processConditional(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},
@@ -163,7 +163,7 @@ pub const Compiler = struct {
         try self.backend.prolog();
 
         for (nd.data.Program.items) |child| {
-            try self.processNode(child);
+            self.processNode(child);
             try self.backend.processNode(child);
         }
 

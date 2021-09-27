@@ -27,8 +27,8 @@ const GenericError = @import("generic_error.zig").GenericError;
 const CompileError = @import("compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 
-pub fn processExpression(cmp: *Compiler, nd: Node) !void {
-    _ = try cmp.inferExprType(nd);
+pub fn processExpression(cmp: *Compiler, nd: Node) void {
+    _ = cmp.inferExprType(nd);
 }
 
 test "can compile assign expressions" {

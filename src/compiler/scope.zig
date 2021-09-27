@@ -63,11 +63,8 @@ pub const Scope = struct {
         ty: Type.Ptr,
         isConst: bool,
         csr: Cursor,
-    ) error{SymbolAlreadyExists}!void {
-        if (self.getLocal(name)) |local| {
-            _ = local;
-            return error.SymbolAlreadyExists;
-        }
+    ) void {
+        std.debug.assert(self.getLocal(name) == null);
 
         self.map.putNoClobber(
             name,
@@ -100,7 +97,7 @@ test "can insert into and retrieve from scope" {
     const ty = typebook.getBoolean();
     const isConst = true;
     const csr = Cursor.new(2, 9);
-    try scope.put(name, ty, isConst, csr);
+    scope.put(name, ty, isConst, csr);
 
     const res = scope.get(name);
     try expect(res != null);
@@ -122,7 +119,7 @@ test "can retrieve from scope recursively" {
     const ty = typebook.getBoolean();
     const isConst = true;
     const csr = Cursor.new(2, 9);
-    try scope.put(name, ty, isConst, csr);
+    scope.put(name, ty, isConst, csr);
 
     var child = Scope.new(std.testing.allocator, scope);
     defer child.deinit();

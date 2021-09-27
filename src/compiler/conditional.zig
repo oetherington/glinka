@@ -26,11 +26,58 @@ const GenericError = @import("generic_error.zig").GenericError;
 const CompileError = @import("compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 
-pub fn processConditional(cmp: *Compiler, nd: Node) !void {
+pub fn processConditional(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == .If);
 
-    _ = cmp;
-    _ = nd;
+    const cond = nd.data.If;
 
-    // TODO
+    for (cond.branches.items) |branch| {
+        _ = cmp.inferExprType(branch.cond);
+        cmp.processNode(branch.ifTrue);
+    }
+
+    if (cond.elseBranch) |branch| {
+        cmp.processNode(branch);
+    }
+}
+
+test "can compile simple 'if' statement" {
+    try (CompilerTestCase{
+        .code = "if (true) var a = 6;",
+    }).run();
+}
+
+test "can compile simple 'if' statement with 'else'" {
+    try (CompilerTestCase{
+        .code = "if (true) var a = 6; else var b = 7;",
+    }).run();
+}
+
+test "can compile simple 'if' statement with 'else if'" {
+    try (CompilerTestCase{
+        .code = "if (true) var a = 6; else if (false) var b = 7;",
+    }).run();
+}
+
+test "can compile simple 'if' statement with multiple 'else if'" {
+    try (CompilerTestCase{
+        .code = 
+        \\if (true) var a = 6;
+        \\else if (false) var b = 7;
+        \\else if (3) var c = 8;
+        \\else if (4) var d = 9;
+        ,
+    }).run();
+}
+
+test "can compile simple 'if' statement with multiple 'else if' and 'else'" {
+    try (CompilerTestCase{
+        .code = 
+        \\if (true) var a = 6;
+        \\else if (false) var b = 7;
+        \\else if (3) var c = 8;
+        \\else if (4) var d = 9;
+        \\else var e = 10;
+        ,
+    }).run();
 }
