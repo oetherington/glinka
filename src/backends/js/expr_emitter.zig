@@ -104,6 +104,15 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
             try self.emitExpr(op.right);
             try self.out.print(")", .{});
         },
+        .Ternary => |trn| {
+            try self.out.print("(", .{});
+            try self.emitExpr(trn.cond);
+            try self.out.print("?", .{});
+            try self.emitExpr(trn.ifTrue);
+            try self.out.print(":", .{});
+            try self.emitExpr(trn.ifFalse);
+            try self.out.print(")", .{});
+        },
         else => std.debug.panic(
             "Invalid Node type in emitExpr: {?}",
             .{value},
@@ -249,6 +258,27 @@ test "JsBackend can emit binary op expression" {
             fn cleanup(alloc: *Allocator, nd: Node) void {
                 alloc.destroy(nd.data.BinaryOp.left);
                 alloc.destroy(nd.data.BinaryOp.right);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit ternary expression" {
+    try (ExprTestCase{
+        .inputNode = ExprTestCase.makeNode(
+            .Ternary,
+            node.Ternary{
+                .cond = ExprTestCase.makeNode(.Ident, "a"),
+                .ifTrue = ExprTestCase.makeNode(.Int, "3"),
+                .ifFalse = ExprTestCase.makeNode(.False, {}),
+            },
+        ),
+        .expectedOutput = "(a?3:false)",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.Ternary.cond);
+                alloc.destroy(nd.data.Ternary.ifTrue);
+                alloc.destroy(nd.data.Ternary.ifFalse);
             }
         }).cleanup,
     }).run();
