@@ -126,7 +126,11 @@ pub const Type = union(This.Type) {
             return true;
 
         switch (target.*) {
-            .Union => |un| return un.contains(self),
+            .Union => |un| {
+                for (un.tys) |ty|
+                    if (self.isAssignableTo(ty))
+                        return true;
+            },
             else => {},
         }
 
