@@ -227,7 +227,7 @@ pub const Lexer = struct {
         return self.token;
     }
 
-    fn operator(self: *Lexer) Token {
+    pub fn operator(self: *Lexer) Token {
         if (lexOperator(self.code[self.index..])) |res| {
             self.token = Token.new(res.ty, self.csr);
             self.index += res.len;
@@ -239,8 +239,6 @@ pub const Lexer = struct {
     }
 
     pub fn next(self: *Lexer) Token {
-        _ = lexOperator("");
-
         nextLoop: while (self.index < self.code.len) {
             switch (self.code[self.index]) {
                 0 => break :nextLoop,
@@ -388,6 +386,11 @@ test "lexer can detect EOF" {
     var lexer = Lexer.new(code[0..]);
     const tkn = lexer.next();
     try expectEqual(Token.Type.EOF, tkn.ty);
+
+    const nullTerminated = "\x00 this is never lexed";
+    lexer = Lexer.new(nullTerminated);
+    const tkn2 = lexer.next();
+    try expectEqual(Token.Type.EOF, tkn2.ty);
 }
 
 test "lexer can lex simple atoms" {
@@ -412,6 +415,11 @@ test "lexer can lex operators" {
     try expectEqual(@intCast(u64, 1), lexer.csr.ln);
     try expectEqual(@intCast(u64, 3), lexer.csr.ch);
     try expectEqual(@intCast(u64, 2), lexer.index);
+
+    lexer.code = "c";
+    lexer.index = 0;
+    const inv = lexer.operator();
+    try expectEqual(Token.Type.Invalid, inv.ty);
 }
 
 test "lexer can lex divide" {
@@ -509,6 +517,7 @@ test "lexer can lex strings" {
     const StringTestCase = struct {
         code: []const u8,
         expectedType: Token.Type = .String,
+        dotCursor: ?Cursor = null,
 
         pub fn run(comptime self: @This()) anyerror!void {
             const input = " " ++ self.code ++ " . ";
@@ -520,8 +529,12 @@ test "lexer can lex strings" {
 
             const dot = lexer.next();
             try expectEqual(Token.Type.Dot, dot.ty);
-            try expectEqual(@intCast(u32, 1), dot.csr.ln);
-            try expectEqual(@intCast(u32, self.code.len + 3), dot.csr.ch);
+            if (self.dotCursor) |csr| {
+                try expectEqual(csr, dot.csr);
+            } else {
+                try expectEqual(@intCast(u32, 1), dot.csr.ln);
+                try expectEqual(@intCast(u32, self.code.len + 3), dot.csr.ch);
+            }
         }
     };
 
@@ -532,9 +545,14 @@ test "lexer can lex strings" {
     try (StringTestCase{ .code = "\"hello\\\\\"" }).run();
     try (StringTestCase{ .code = "\"hello\\\\\\\"world\"" }).run();
     try (StringTestCase{
-        .code = "`hello world`",
+        .code = "`hello\nworld`",
         .expectedType = .Template,
+        .dotCursor = comptime Cursor.new(2, 8),
     }).run();
+
+    var lexer = Lexer.new("'an unterminated string");
+    const str = lexer.next();
+    try expectEqual(Token.Type.Invalid, str.ty);
 }
 
 test "lexer can be saved and restored" {

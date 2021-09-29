@@ -35,6 +35,23 @@ const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 const allocate = @import("../common/allocate.zig");
 
+const ParseTypeTestCase = struct {
+    code: []const u8,
+    check: fn (res: ParseResult) anyerror!void,
+
+    pub fn run(self: ParseTypeTestCase) !void {
+        var arena = Arena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var tsParser = TsParser.new(&arena, self.code);
+
+        var parser = tsParser.getParser();
+
+        const res = parser.parseType();
+        try self.check(res);
+    }
+};
+
 pub fn parseTypeName(psr: *TsParser) ParseResult {
     switch (psr.lexer.token.ty) {
         .Ident => {
@@ -54,22 +71,30 @@ pub fn parseTypeName(psr: *TsParser) ParseResult {
 }
 
 test "can parse type names" {
-    const code = " SomeTypeName ";
-
-    var arena = Arena.init(std.testing.allocator);
-    defer arena.deinit();
-
-    var tsParser = TsParser.new(&arena, code);
-
-    var parser = tsParser.getParser();
-
-    const res = parser.parseType();
-    try expect(res.isSuccess());
-    try expectEqual(Cursor.new(1, 2), res.Success.csr);
-    try expectEqual(NodeType.TypeName, res.Success.data.getType());
-    try expectEqualStrings("SomeTypeName", res.Success.data.TypeName);
+    try (ParseTypeTestCase{
+        .code = " ATypeName ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.TypeName, res.Success.data.getType());
+                try expectEqualStrings("ATypeName", res.Success.data.TypeName);
+            }
+        }).check,
+    }).run();
 }
 
 pub fn parseType(psr: *Parser) ParseResult {
     return parseTypeName(@fieldParentPtr(TsParser, "parser", psr));
+}
+
+test "invalid types return NoMatch" {
+    try (ParseTypeTestCase{
+        .code = " 3 ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expectEqual(ParseResult.Type.NoMatch, res.getType());
+            }
+        }).check,
+    }).run();
 }

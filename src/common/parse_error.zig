@@ -180,7 +180,7 @@ pub const ParseErrorData = union(Type) {
 };
 
 pub const ParseError = struct {
-    const Type = ParseErrorData.Type;
+    pub const Type = ParseErrorData.Type;
 
     csr: Cursor,
     data: ParseErrorData,

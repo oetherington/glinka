@@ -28,13 +28,13 @@ const makeNode = node.makeNode;
 const Decl = node.Decl;
 const ParseError = @import("parse_error.zig").ParseError;
 
-pub const ParseResultType = enum {
-    Success,
-    Error,
-    NoMatch,
-};
+pub const ParseResult = union(Type) {
+    pub const Type = enum {
+        Success,
+        Error,
+        NoMatch,
+    };
 
-pub const ParseResult = union(ParseResultType) {
     Success: Node,
     Error: ParseError,
     NoMatch: ?ParseError,
@@ -75,12 +75,12 @@ pub const ParseResult = union(ParseResultType) {
         ));
     }
 
-    pub fn getType(self: ParseResult) ParseResultType {
-        return @as(ParseResultType, self);
+    pub fn getType(self: ParseResult) Type {
+        return @as(Type, self);
     }
 
     pub fn isSuccess(self: ParseResult) bool {
-        return @as(ParseResultType, self) == .Success;
+        return @as(Type, self) == .Success;
     }
 
     pub fn reportIfError(self: ParseResult, writer: anytype) !void {
@@ -101,7 +101,7 @@ test "can initialize 'Success' parse result" {
     );
     defer std.testing.allocator.destroy(n);
     const res = ParseResult.success(n);
-    try expectEqual(ParseResultType.Success, res.getType());
+    try expectEqual(ParseResult.Type.Success, res.getType());
     try expectEqual(n, res.Success);
     try expect(res.isSuccess());
 }
@@ -117,14 +117,31 @@ test "can initialize 'Error' parse result" {
     defer std.testing.allocator.destroy(found);
     const err = ParseError.expected(expected, found);
     const res = ParseResult.err(err);
-    try expectEqual(ParseResultType.Error, res.getType());
+    try expectEqual(ParseResult.Type.Error, res.getType());
     try expectEqual(err, res.Error);
+    try expect(!res.isSuccess());
+}
+
+test "can initialize 'expected' parse result" {
+    const expected = Token.Type.Dot;
+    const found = makeNode(
+        std.testing.allocator,
+        Cursor.new(0, 0),
+        NodeType.Decl,
+        Decl.new(.Var, "aName", null, null),
+    );
+    defer std.testing.allocator.destroy(found);
+    const res = ParseResult.expected(expected, found);
+    try expectEqual(ParseResult.Type.Error, res.getType());
+    try expectEqual(ParseError.Type.Expected, res.Error.data.getType());
+    try expectEqual(expected, res.Error.data.Expected.expected.Token);
+    try expectEqual(found, res.Error.data.Expected.found.Node);
     try expect(!res.isSuccess());
 }
 
 test "can initialize 'NoMatch' parse result without a payload" {
     const res = ParseResult.noMatch(null);
-    try expectEqual(ParseResultType.NoMatch, res.getType());
+    try expectEqual(ParseResult.Type.NoMatch, res.getType());
     try expect(res.NoMatch == null);
     try expect(!res.isSuccess());
 }
@@ -140,6 +157,6 @@ test "can initialize 'NoMatch' parse result with a payload" {
     defer std.testing.allocator.destroy(found);
     const err = ParseError.expected(expected, found);
     const res = ParseResult.noMatch(err);
-    try expectEqual(ParseResultType.NoMatch, res.getType());
+    try expectEqual(ParseResult.Type.NoMatch, res.getType());
     try expectEqual(err, res.NoMatch.?);
 }

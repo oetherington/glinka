@@ -108,6 +108,13 @@ test "can insert into and retrieve from scope" {
     }
 }
 
+test "scope returns null for undefined symbols" {
+    var scope = Scope.new(std.testing.allocator, null);
+    defer scope.deinit();
+    const res = scope.get("anUndefinedSymbol");
+    try expect(res == null);
+}
+
 test "can retrieve from scope recursively" {
     var scope = Scope.new(std.testing.allocator, null);
     defer scope.deinit();
