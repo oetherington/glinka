@@ -47,19 +47,19 @@ test "can compile simple 'if' statement" {
     }).run();
 }
 
-test "can compile simple 'if' statement with 'else'" {
+test "can compile 'if' statement with 'else'" {
     try (CompilerTestCase{
         .code = "if (true) var a = 6; else var b = 7;",
     }).run();
 }
 
-test "can compile simple 'if' statement with 'else if'" {
+test "can compile 'if' statement with 'else if'" {
     try (CompilerTestCase{
         .code = "if (true) var a = 6; else if (false) var b = 7;",
     }).run();
 }
 
-test "can compile simple 'if' statement with multiple 'else if'" {
+test "can compile 'if' statement with multiple 'else if'" {
     try (CompilerTestCase{
         .code = 
         \\if (true) var a = 6;
@@ -70,7 +70,7 @@ test "can compile simple 'if' statement with multiple 'else if'" {
     }).run();
 }
 
-test "can compile simple 'if' statement with multiple 'else if' and 'else'" {
+test "can compile 'if' statement with multiple 'else if' and 'else'" {
     try (CompilerTestCase{
         .code = 
         \\if (true) var a = 6;

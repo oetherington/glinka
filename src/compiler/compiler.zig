@@ -34,6 +34,7 @@ const inferrer = @import("inferrer.zig");
 const expression = @import("expression.zig");
 const declaration = @import("declaration.zig");
 const conditional = @import("conditional.zig");
+const loop = @import("loop.zig");
 const allocate = @import("../common/allocate.zig");
 
 pub const Compiler = struct {
@@ -150,6 +151,7 @@ pub const Compiler = struct {
             => expression.processExpression(self, nd),
             .Decl => declaration.processDecl(self, nd),
             .If => conditional.processConditional(self, nd),
+            .While => loop.processWhile(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

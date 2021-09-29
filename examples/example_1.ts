@@ -29,3 +29,7 @@ else if (aString)
 	aNumber = 6;
 else
 	aNumber = 7;
+
+// Loops
+while (true)
+	var aLoopVar = false;
