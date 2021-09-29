@@ -34,6 +34,10 @@ else
 while (true)
 	var aWhileLoopVar = false;
 
+while (true) {
+	var aWhileLoopVar = false;
+}
+
 do
 	var aDoLoopVar = false;
 while (true);

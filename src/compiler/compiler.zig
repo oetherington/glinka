@@ -34,6 +34,7 @@ const ErrorContext = @import("error_context.zig").ErrorContext;
 const CompileError = @import("compile_error.zig").CompileError;
 const inferrer = @import("inferrer.zig");
 const expression = @import("expression.zig");
+const block = @import("block.zig");
 const declaration = @import("declaration.zig");
 const conditional = @import("conditional.zig");
 const loop = @import("loop.zig");
@@ -155,6 +156,7 @@ pub const Compiler = struct {
             .BinaryOp,
             .Ternary,
             => expression.processExpression(self, nd),
+            .Block => block.processBlock(self, nd),
             .Decl => declaration.processDecl(self, nd),
             .If => conditional.processConditional(self, nd),
             .While => loop.processWhile(self, nd),

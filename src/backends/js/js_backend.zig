@@ -25,6 +25,7 @@ const node = @import("../../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
 const exprEmitter = @import("expr_emitter.zig");
+const blockEmitter = @import("block_emitter.zig");
 const declEmitter = @import("decl_emitter.zig");
 const condEmitter = @import("cond_emitter.zig");
 const loopEmitter = @import("loop_emitter.zig");
@@ -104,6 +105,7 @@ pub const JsBackend = struct {
                 try self.emitExpr(nd);
                 try self.out.print(";\n", .{});
             },
+            .Block => try blockEmitter.emitBlock(self, nd.data.Block.items),
             .Decl => try declEmitter.emitDecl(self, nd.data.Decl),
             .If => try condEmitter.emitCond(self, nd.data.If),
             .While => try loopEmitter.emitWhile(self, nd.data.While),
