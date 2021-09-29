@@ -17,7 +17,9 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
+const WriteContext = @import("../../common/writer.zig").WriteContext;
 
 pub const Type = union(This.Type) {
     const This = @This();
@@ -269,6 +271,20 @@ test "types are assignable to themselves" {
     try AssignableTestCase.new(&s, &s).run();
 }
 
+test "unions can be assigned from any of their subtypes" {
+    const n = Type.newNumber();
+    const b = Type.newBoolean();
+    const s = Type.newString();
+
+    const u = Type.newUnion(Type.UnionType{
+        .tys = &[_]Type.Ptr{ &n, &b },
+    });
+
+    try AssignableTestCase.new(&n, &u).run();
+    try AssignableTestCase.new(&b, &u).run();
+    try AssignableTestCase.newF(&s, &u).run();
+}
+
 test "other type assignments are invalid" {
     const n = Type.newNumber();
     const a = Type.newAny();
@@ -283,3 +299,94 @@ test "other type assignments are invalid" {
     try AssignableTestCase.newF(&u, &n).run();
     try AssignableTestCase.newF(&v, &b).run();
 }
+
+const WriteTypeTestCase = struct {
+    ty: Type,
+    expected: []const u8,
+
+    pub fn run(self: WriteTypeTestCase) !void {
+        const ctx = try WriteContext(.{}).new(std.testing.allocator);
+        defer ctx.deinit();
+
+        try self.ty.write(ctx.writer());
+
+        const str = try ctx.toString();
+        defer ctx.freeString(str);
+
+        try expectEqualStrings(self.expected, str);
+    }
+};
+
+test "can write an unknown type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newUnknown(),
+        .expected = "unknown",
+    }).run();
+}
+
+test "can write a void type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newVoid(),
+        .expected = "void",
+    }).run();
+}
+
+test "can write a null type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newNull(),
+        .expected = "null",
+    }).run();
+}
+
+test "can write an undefined type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newUndefined(),
+        .expected = "undefined",
+    }).run();
+}
+
+test "can write a never type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newNever(),
+        .expected = "never",
+    }).run();
+}
+
+test "can write a number type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newNumber(),
+        .expected = "number",
+    }).run();
+}
+
+test "can write a string type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newString(),
+        .expected = "string",
+    }).run();
+}
+
+test "can write a boolean type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newBoolean(),
+        .expected = "boolean",
+    }).run();
+}
+
+// TODO: Add test for writing a tuple type
+
+// TODO: Add test for writing an array type
+
+// TODO: Add test for writing an object type
+
+// TODO: Add test for writing an enum type
+
+// TODO: Add test for writing a function type
+
+// TODO: Add test for writing an optional type
+
+// TODO: Add test for writing a union type
+
+// TODO: Add test for writing an alias type
+
+// TODO: Add test for writing an interface type
