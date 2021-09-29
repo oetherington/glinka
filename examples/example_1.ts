@@ -32,4 +32,8 @@ else
 
 // Loops
 while (true)
-	var aLoopVar = false;
+	var aWhileLoopVar = false;
+
+do
+	var aDoLoopVar = false;
+while (true);

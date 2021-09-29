@@ -35,8 +35,23 @@ pub fn processWhile(cmp: *Compiler, nd: Node) void {
     cmp.processNode(loop.body);
 }
 
-test "can compile 'while' statement" {
+test "can compile 'while' statements" {
     try (CompilerTestCase{
         .code = "while (true) var a = 6;",
+    }).run();
+}
+
+pub fn processDo(cmp: *Compiler, nd: Node) void {
+    std.debug.assert(nd.getType() == .Do);
+
+    const loop = nd.data.Do;
+
+    cmp.processNode(loop.body);
+    _ = cmp.inferExprType(loop.cond);
+}
+
+test "can compile 'do' statements" {
+    try (CompilerTestCase{
+        .code = "do var x = 3; while (true);",
     }).run();
 }

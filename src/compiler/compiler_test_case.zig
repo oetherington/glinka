@@ -25,7 +25,7 @@ const NodeType = node.NodeType;
 const Config = @import("../common/config.zig").Config;
 const TsParser = @import("../frontend/ts_parser.zig").TsParser;
 
-const NopBackend = struct {
+pub const NopBackend = struct {
     backend: Backend,
 
     pub fn new() NopBackend {

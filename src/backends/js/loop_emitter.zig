@@ -46,3 +46,28 @@ test "JsBackend can emit 'while' statement" {
         .expectedOutput = "while (true) null;\n",
     }).run();
 }
+
+pub fn emitDo(self: *JsBackend, loop: node.Do) Backend.Error!void {
+    try self.out.print("do ", .{});
+    try self.emitNode(loop.body);
+    try self.out.print("while (", .{});
+    try self.emitExpr(loop.cond);
+    try self.out.print(");\n", .{});
+}
+
+test "JsBackend can emit 'do' statement" {
+    const alloc = std.testing.allocator;
+
+    const body = EmitTestCase.makeNode(.Null, {});
+    const cond = EmitTestCase.makeNode(.True, {});
+    defer alloc.destroy(body);
+    defer alloc.destroy(cond);
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Do, node.Do{
+            .body = body,
+            .cond = cond,
+        }),
+        .expectedOutput = "do null;\nwhile (true);\n",
+    }).run();
+}

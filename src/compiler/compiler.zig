@@ -16,6 +16,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const expect = std.testing.expect;
+const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
 const Config = @import("../common/config.zig").Config;
@@ -36,6 +38,7 @@ const declaration = @import("declaration.zig");
 const conditional = @import("conditional.zig");
 const loop = @import("loop.zig");
 const allocate = @import("../common/allocate.zig");
+const NopBackend = @import("compiler_test_case.zig").NopBackend;
 
 pub const Compiler = struct {
     const StringList = std.ArrayList([]u8);
@@ -65,8 +68,11 @@ pub const Compiler = struct {
     }
 
     pub fn deinit(self: *Compiler) void {
+        std.debug.assert(self.scope.parent == null);
         self.scope.deinit();
+
         self.typebook.deinit();
+
         self.errors.deinit();
 
         for (self.strings.items) |string|
@@ -82,7 +88,7 @@ pub const Compiler = struct {
     pub fn popScope(self: *Compiler) void {
         std.debug.assert(self.scope.parent != null);
         var old = self.scope;
-        self.scope = old.parent;
+        self.scope = old.parent.?;
         old.deinit();
     }
 
@@ -152,6 +158,7 @@ pub const Compiler = struct {
             .Decl => declaration.processDecl(self, nd),
             .If => conditional.processConditional(self, nd),
             .While => loop.processWhile(self, nd),
+            .Do => loop.processDo(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},
@@ -193,3 +200,30 @@ pub const Compiler = struct {
         try self.compileProgramNode(nd);
     }
 };
+
+test "can push and pop compiler scopes" {
+    const config = Config{};
+    var backend = NopBackend.new();
+
+    var compiler = Compiler.new(
+        std.testing.allocator,
+        &config,
+        &backend.backend,
+    );
+    defer compiler.deinit();
+
+    const first = compiler.scope;
+    try expect(first.parent == null);
+
+    compiler.pushScope();
+
+    const second = compiler.scope;
+    try expect(first != second);
+    try expectEqual(first, second.parent.?);
+
+    compiler.popScope();
+
+    const third = compiler.scope;
+    try expectEqual(first, third);
+    try expect(third.parent == null);
+}
