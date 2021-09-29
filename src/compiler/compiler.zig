@@ -161,6 +161,8 @@ pub const Compiler = struct {
             .If => conditional.processConditional(self, nd),
             .While => loop.processWhile(self, nd),
             .Do => loop.processDo(self, nd),
+            .Break => loop.processBreak(self, nd),
+            .Continue => loop.processContinue(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

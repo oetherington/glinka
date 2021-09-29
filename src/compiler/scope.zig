@@ -25,6 +25,10 @@ const Cursor = @import("../common/cursor.zig").Cursor;
 const allocate = @import("../common/allocate.zig");
 
 pub const Scope = struct {
+    pub const Context = enum {
+        Loop,
+    };
+
     pub const Symbol = struct {
         ty: Type.Ptr,
         isConst: bool,
@@ -43,6 +47,7 @@ pub const Scope = struct {
 
     parent: ?*Scope,
     map: Map,
+    ctx: ?Context = null,
 
     pub fn new(alloc: *Allocator, parent: ?*Scope) *Scope {
         var self = alloc.create(Scope) catch allocate.reportAndExit();
@@ -84,6 +89,15 @@ pub const Scope = struct {
     pub fn getLocal(self: *Scope, name: []const u8) ?Symbol {
         return self.map.get(name);
     }
+
+    pub fn isInContext(self: *Scope, ctx: Context) bool {
+        // TODO: self.ctx == ctx seems to crash the zig compiler
+        if (self.ctx != null and self.ctx.? == ctx)
+            return true;
+        if (self.parent) |parent|
+            return parent.isInContext(ctx);
+        return false;
+    }
 };
 
 test "can insert into and retrieve from scope" {
@@ -106,6 +120,26 @@ test "can insert into and retrieve from scope" {
         try expectEqual(isConst, symbol.isConst);
         try expectEqual(csr, symbol.csr);
     }
+}
+
+test "scope can retrieve context" {
+    var first = Scope.new(std.testing.allocator, null);
+    defer first.deinit();
+
+    var second = Scope.new(std.testing.allocator, first);
+    defer second.deinit();
+
+    try expect(!second.isInContext(.Loop));
+
+    first.ctx = .Loop;
+
+    try expect(second.isInContext(.Loop));
+
+    first.ctx = null;
+    second.ctx = .Loop;
+
+    try expect(second.isInContext(.Loop));
+    try expect(!first.isInContext(.Loop));
 }
 
 test "scope returns null for undefined symbols" {

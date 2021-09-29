@@ -71,3 +71,45 @@ test "JsBackend can emit 'do' statement" {
         .expectedOutput = "do null;\nwhile (true);\n",
     }).run();
 }
+
+pub fn emitBreak(self: *JsBackend, label: ?[]const u8) Backend.Error!void {
+    try if (label) |l|
+        self.out.print("break {s};\n", .{l})
+    else
+        self.out.print("break;\n", .{});
+}
+
+test "JsBackend can emit 'break' statement" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Break, null),
+        .expectedOutput = "break;\n",
+    }).run();
+}
+
+test "JsBackend can emit 'break' statement with a label" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Break, "aLabel"),
+        .expectedOutput = "break aLabel;\n",
+    }).run();
+}
+
+pub fn emitContinue(self: *JsBackend, label: ?[]const u8) Backend.Error!void {
+    try if (label) |l|
+        self.out.print("continue {s};\n", .{l})
+    else
+        self.out.print("continue;\n", .{});
+}
+
+test "JsBackend can emit 'continue' statement" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Continue, null),
+        .expectedOutput = "continue;\n",
+    }).run();
+}
+
+test "JsBackend can emit 'continue' statement with a label" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Continue, "aLabel"),
+        .expectedOutput = "continue aLabel;\n",
+    }).run();
+}

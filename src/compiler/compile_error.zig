@@ -23,6 +23,7 @@ const TypeError = @import("types/type_error.zig").TypeError;
 const implicitAnyError = @import("types/implicit_any_error.zig");
 const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const OpError = @import("op_error.zig").OpError;
+const ContextError = @import("context_error.zig").ContextError;
 const RedefinitionError = @import("redefinition_error.zig").RedefinitionError;
 const GenericError = @import("generic_error.zig").GenericError;
 const AssignError = @import("assign_error.zig").AssignError;
@@ -34,6 +35,7 @@ pub const CompileError = union(CompileError.Type) {
     pub const Type = enum(u8) {
         TypeError,
         OpError,
+        ContextError,
         RedefinitionError,
         GenericError,
         AssignError,
@@ -43,6 +45,7 @@ pub const CompileError = union(CompileError.Type) {
 
     TypeError: TypeError,
     OpError: OpError,
+    ContextError: ContextError,
     RedefinitionError: RedefinitionError,
     GenericError: GenericError,
     AssignError: AssignError,
@@ -58,6 +61,12 @@ pub const CompileError = union(CompileError.Type) {
     pub fn opError(err: OpError) CompileError {
         return CompileError{
             .OpError = err,
+        };
+    }
+
+    pub fn contextError(err: ContextError) CompileError {
+        return CompileError{
+            .ContextError = err,
         };
     }
 
@@ -99,6 +108,7 @@ pub const CompileError = union(CompileError.Type) {
         switch (self) {
             .TypeError => |err| try err.report(writer),
             .OpError => |err| try err.report(writer),
+            .ContextError => |err| try err.report(writer),
             .RedefinitionError => |err| try err.report(writer),
             .GenericError => |err| try err.report(writer),
             .AssignError => |err| try err.report(writer),
@@ -130,6 +140,21 @@ test "can create a CompileError from an OpError" {
     try expectEqual(cursor, compileError.OpError.csr);
     try expectEqual(op, compileError.OpError.op);
     try expectEqual(ty.getType(), compileError.OpError.ty.getType());
+}
+
+test "can create a CompileError from a ContextError" {
+    const cursor = Cursor.new(5, 7);
+    const found = "Something";
+    const expectedContext = "a context";
+    const ctxError = ContextError.new(cursor, found, expectedContext);
+    const compileError = CompileError.contextError(ctxError);
+    try expectEqual(CompileError.Type.ContextError, compileError.getType());
+    try expectEqual(cursor, compileError.ContextError.csr);
+    try expectEqualStrings(found, compileError.ContextError.found);
+    try expectEqualStrings(
+        expectedContext,
+        compileError.ContextError.expectedContext,
+    );
 }
 
 test "can create a CompileError from a RedefinitionError" {

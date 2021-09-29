@@ -8,8 +8,11 @@ const aBool: boolean = !false;
 const aBinOp: number = 2 - 4;
 const addNums: number = 2 + 4;
 const concatStrings: string = "abc" + "def";
+const inferredType = "foobar";
+let uninitialized: number;
 
 // Assignments
+uninitialized = 3;
 aNumber = 4;
 aNumber += 1;
 
@@ -32,12 +35,12 @@ else
 
 // Loops
 while (true)
-	var aWhileLoopVar = false;
+	break;
 
 while (true) {
 	var aWhileLoopVar = false;
 }
 
-do
-	var aDoLoopVar = false;
-while (true);
+do {
+	continue;
+} while (true);
