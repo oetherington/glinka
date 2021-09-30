@@ -29,6 +29,7 @@ const blockEmitter = @import("block_emitter.zig");
 const declEmitter = @import("decl_emitter.zig");
 const condEmitter = @import("cond_emitter.zig");
 const loopEmitter = @import("loop_emitter.zig");
+const throwEmitter = @import("throw_emitter.zig");
 
 pub const JsBackend = struct {
     const WriteCtx = WriteContext(.{});
@@ -112,6 +113,7 @@ pub const JsBackend = struct {
             .Do => try loopEmitter.emitDo(self, nd.data.Do),
             .Break => try loopEmitter.emitBreak(self, nd.data.Break),
             .Continue => try loopEmitter.emitContinue(self, nd.data.Continue),
+            .Throw => try throwEmitter.emitThrow(self, nd.data.Throw),
             else => std.debug.panic(
                 "Unhandled node type in JsBackend.processNode: {?}\n",
                 .{nd.getType()},

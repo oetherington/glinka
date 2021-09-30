@@ -38,6 +38,7 @@ const block = @import("block.zig");
 const declaration = @import("declaration.zig");
 const conditional = @import("conditional.zig");
 const loop = @import("loop.zig");
+const throw = @import("throw.zig");
 const allocate = @import("../common/allocate.zig");
 const NopBackend = @import("compiler_test_case.zig").NopBackend;
 
@@ -163,6 +164,7 @@ pub const Compiler = struct {
             .Do => loop.processDo(self, nd),
             .Break => loop.processBreak(self, nd),
             .Continue => loop.processContinue(self, nd),
+            .Throw => throw.processThrow(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

@@ -16,8 +16,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 const expectEqualStrings = std.testing.expectEqualStrings;
+const expectError = std.testing.expectError;
+const Allocator = std.mem.Allocator;
 const TokenType = @import("../../common/token.zig").Token.Type;
 const node = @import("../../common/node.zig");
 const Node = node.Node;
@@ -252,4 +253,66 @@ test "JsBackend can emit ternary expression" {
             }
         }).cleanup,
     }).run();
+}
+
+test "JSBackend can convert operators to strings" {
+    const TestCase = struct {
+        pub fn run(ty: TokenType, expected: []const u8) !void {
+            const str = try opToString(ty);
+            try expectEqualStrings(expected, str);
+        }
+    };
+
+    try TestCase.run(.OptionChain, ".?");
+    try TestCase.run(.Ellipsis, "...");
+    try TestCase.run(.Add, "+");
+    try TestCase.run(.AddAssign, "+=");
+    try TestCase.run(.Inc, "++");
+    try TestCase.run(.Sub, "-");
+    try TestCase.run(.SubAssign, "-=");
+    try TestCase.run(.Dec, "--");
+    try TestCase.run(.Mul, "*");
+    try TestCase.run(.MulAssign, "*=");
+    try TestCase.run(.Pow, "**");
+    try TestCase.run(.PowAssign, "**=");
+    try TestCase.run(.Div, "/");
+    try TestCase.run(.DivAssign, "/=");
+    try TestCase.run(.Mod, "%");
+    try TestCase.run(.ModAssign, "%=");
+    try TestCase.run(.Assign, "=");
+    try TestCase.run(.CmpEq, "==");
+    try TestCase.run(.CmpStrictEq, "===");
+    try TestCase.run(.LogicalNot, "!");
+    try TestCase.run(.CmpNotEq, "!=");
+    try TestCase.run(.CmpStrictNotEq, "!==");
+    try TestCase.run(.CmpGreater, ">");
+    try TestCase.run(.CmpGreaterEq, ">=");
+    try TestCase.run(.CmpLess, "<");
+    try TestCase.run(.CmpLessEq, "<=");
+    try TestCase.run(.Nullish, "??");
+    try TestCase.run(.NullishAssign, "??=");
+    try TestCase.run(.BitAnd, "&");
+    try TestCase.run(.BitAndAssign, "&=");
+    try TestCase.run(.LogicalAnd, "&&");
+    try TestCase.run(.LogicalAndAssign, "&&=");
+    try TestCase.run(.BitOr, "|");
+    try TestCase.run(.BitOrAssign, "|=");
+    try TestCase.run(.LogicalOr, "||");
+    try TestCase.run(.LogicalOrAssign, "||=");
+    try TestCase.run(.BitNot, "~");
+    try TestCase.run(.BitNotAssign, "~=");
+    try TestCase.run(.BitXor, "^");
+    try TestCase.run(.BitXorAssign, "^=");
+    try TestCase.run(.ShiftRight, ">>");
+    try TestCase.run(.ShiftRightAssign, ">>=");
+    try TestCase.run(.ShiftRightUnsigned, ">>>");
+    try TestCase.run(.ShiftRightUnsignedAssign, ">>>=");
+    try TestCase.run(.ShiftLeft, "<<");
+    try TestCase.run(.ShiftLeftAssign, "<<=");
+}
+
+test "JSBackend throws an error for invalid operators" {
+    const ty = TokenType.LBrace;
+    const result = opToString(ty);
+    try expectError(error.InvalidOp, result);
 }

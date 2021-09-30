@@ -44,3 +44,6 @@ while (true) {
 do {
 	continue;
 } while (true);
+
+// Exceptions
+throw true;
