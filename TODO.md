@@ -1,0 +1,43 @@
+# TODO
+
+ - [x] Comments
+ - [x] Int literals
+ - [ ] Float literals/infinity/NaN
+ - [x] String/Template literals
+ - [x] Boolean literals
+ - [x] Null/undefined literals
+ - [x] Prefix/postfix operators
+ - [x] Binary operators
+ - [x] Ternary expressions
+ - [x] Var/let/const
+ - [x] If/else if/else
+ - [ ] Switch
+ - [x] While loops
+ - [x] Do loops
+ - [ ] C-style for loops
+ - [ ] In/of for loops
+ - [x] Throw
+ - [x] Try/catch/finally
+ - [ ] Functions
+ - [ ] Arrow functions
+ - [x] Unions
+ - [ ] Tuples
+ - [ ] Arrays
+ - [ ] Optional
+ - [ ] Type aliases
+ - [ ] Interfaces
+ - [ ] Enums
+ - [ ] Object literals
+ - [ ] Delete
+ - [ ] Classes
+   -  [ ] New
+   -  [ ] Member variables
+   -  [ ] Member functions
+   -  [ ] Constructors
+   -  [ ] Destructors
+   -  [ ] Readonly
+ - [ ] Generics
+ - [ ] Modules/import/export
+ - [ ] Declare
+ - [ ] Namespace
+ - [ ] Async/await
