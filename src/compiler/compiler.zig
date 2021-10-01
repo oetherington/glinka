@@ -149,13 +149,12 @@ pub const Compiler = struct {
     }
 
     pub fn processNode(self: *Compiler, nd: Node) void {
-        // nd.dump(); // TODO: TMP
-
         switch (nd.data) {
             .PrefixOp,
             .PostfixOp,
             .BinaryOp,
             .Ternary,
+            .Ident,
             => expression.processExpression(self, nd),
             .Block => block.processBlock(self, nd),
             .Decl => declaration.processDecl(self, nd),
@@ -165,6 +164,7 @@ pub const Compiler = struct {
             .Break => loop.processBreak(self, nd),
             .Continue => loop.processContinue(self, nd),
             .Throw => throw.processThrow(self, nd),
+            .Try => throw.processTry(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

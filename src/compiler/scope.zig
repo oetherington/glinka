@@ -27,6 +27,9 @@ const allocate = @import("../common/allocate.zig");
 pub const Scope = struct {
     pub const Context = enum {
         Loop,
+        Try,
+        Catch,
+        Finally,
     };
 
     pub const Symbol = struct {

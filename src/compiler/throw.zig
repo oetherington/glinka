@@ -39,3 +39,36 @@ test "can compile a 'throw' statement" {
         .code = "throw false;",
     }).run();
 }
+
+pub fn processTry(cmp: *Compiler, nd: Node) void {
+    std.debug.assert(nd.getType() == NodeType.Try);
+
+    const data = nd.data.Try;
+
+    cmp.scope.ctx = .Try;
+    cmp.processNode(data.tryBlock);
+    cmp.scope.ctx = null;
+
+    cmp.scope.ctx = .Catch;
+    for (data.catchBlocks.items) |catchBlock| {
+        cmp.pushScope();
+        cmp.scope.ctx = .Catch;
+
+        cmp.scope.put(
+            catchBlock.name,
+            cmp.typebook.getAny(),
+            false,
+            nd.csr,
+        );
+
+        cmp.processNode(catchBlock.block);
+
+        cmp.popScope();
+    }
+
+    if (data.finallyBlock) |finallyBlock| {
+        cmp.scope.ctx = .Finally;
+        cmp.processNode(finallyBlock);
+        cmp.scope.ctx = null;
+    }
+}

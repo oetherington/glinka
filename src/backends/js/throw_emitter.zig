@@ -38,3 +38,57 @@ test "JsBackend can emit throw statements" {
         .expectedOutput = "throw true;\n",
     }).run();
 }
+
+pub fn emitTry(self: *JsBackend, data: node.Try) Backend.Error!void {
+    try self.out.print("try ", .{});
+    try self.emitNode(data.tryBlock);
+
+    for (data.catchBlocks.items) |catchBlock| {
+        try self.out.print("catch ({s}) ", .{catchBlock.name});
+        try self.emitNode(catchBlock.block);
+    }
+
+    if (data.finallyBlock) |finallyBlock| {
+        try self.out.print("finally ", .{});
+        try self.emitNode(finallyBlock);
+    }
+}
+
+test "JsBackend can emit try statements" {
+    const expr1 = EmitTestCase.makeNode(.True, {});
+    const expr2 = EmitTestCase.makeNode(.False, {});
+    const expr3 = EmitTestCase.makeNode(.Null, {});
+    const expr4 = EmitTestCase.makeNode(.Undefined, {});
+    defer std.testing.allocator.destroy(expr1);
+    defer std.testing.allocator.destroy(expr2);
+    defer std.testing.allocator.destroy(expr3);
+    defer std.testing.allocator.destroy(expr4);
+
+    var data = node.Try{
+        .tryBlock = expr1,
+        .catchBlocks = .{
+            .items = &[_]node.Try.Catch{
+                .{
+                    .name = "e",
+                    .block = expr2,
+                },
+                .{
+                    .name = "f",
+                    .block = expr3,
+                },
+            },
+        },
+        .finallyBlock = expr4,
+    };
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Try, data),
+        .expectedOutput = 
+        \\try true;
+        \\catch (e) false;
+        \\catch (f) null;
+        \\finally undefined;
+        \\
+        ,
+    }).run();
+}

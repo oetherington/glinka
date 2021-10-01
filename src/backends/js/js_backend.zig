@@ -114,6 +114,7 @@ pub const JsBackend = struct {
             .Break => try loopEmitter.emitBreak(self, nd.data.Break),
             .Continue => try loopEmitter.emitContinue(self, nd.data.Continue),
             .Throw => try throwEmitter.emitThrow(self, nd.data.Throw),
+            .Try => try throwEmitter.emitTry(self, nd.data.Try),
             else => std.debug.panic(
                 "Unhandled node type in JsBackend.processNode: {?}\n",
                 .{nd.getType()},

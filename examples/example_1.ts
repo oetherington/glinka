@@ -47,3 +47,11 @@ do {
 
 // Exceptions
 throw true;
+
+try {
+	const aNumber = 4;
+} catch (e) {
+	e;
+} finally {
+	3 + 4;
+}
