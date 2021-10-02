@@ -137,7 +137,10 @@ pub const Compiler = struct {
     pub fn inferExprType(self: *Compiler, nd: Node) ?Type.Ptr {
         const valTy = inferrer.inferExprType(self.scope, self.typebook, nd);
         switch (valTy) {
-            .Success => |ty| return ty,
+            .Success => |ty| {
+                nd.ty = ty;
+                return ty;
+            },
             .Error => |err| {
                 self.errors.append(err) catch allocate.reportAndExit();
                 return null;

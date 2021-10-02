@@ -21,8 +21,9 @@ const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Token = @import("token.zig").Token;
-const Cursor = @import("../common/cursor.zig").Cursor;
-const genericEql = @import("../common/generic_eql.zig");
+const Cursor = @import("cursor.zig").Cursor;
+const genericEql = @import("generic_eql.zig");
+const Type = @import("types/type.zig").Type;
 const allocate = @import("allocate.zig");
 
 fn putInd(
@@ -551,6 +552,7 @@ pub const NodeData = union(NodeType) {
 pub const NodeImpl = struct {
     csr: Cursor,
     data: NodeData,
+    ty: ?Type.Ptr = null,
 
     pub fn getType(self: Node) NodeType {
         return @as(NodeType, self.data);
