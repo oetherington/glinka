@@ -66,7 +66,7 @@ test "can compile 'do' statements" {
 pub fn processBreak(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == .Break);
 
-    if (!cmp.scope.isInContext(.Loop))
+    if (!cmp.scope.isInContext(.Loop) and !cmp.scope.isInContext(.Switch))
         cmp.errors.append(CompileError.contextError(ContextError.new(
             nd.csr,
             "Break",
@@ -74,12 +74,13 @@ pub fn processBreak(cmp: *Compiler, nd: Node) void {
         ))) catch allocate.reportAndExit();
 }
 
-test "can compile 'break' statements" {
+test "can compile 'break' statements in a loop" {
     try (CompilerTestCase{
         .code = "while (true) break;",
     }).run();
 }
 
+// TODO: Test case where break is inside a switch statement
 test "'break' must be inside a loop" {
     try (CompilerTestCase{
         .code = "break;",

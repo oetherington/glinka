@@ -55,6 +55,7 @@ const UnionTypeMap = struct {
 
     pub fn deinit(self: *UnionTypeMap) void {
         var it = self.map.valueIterator();
+
         while (it.next()) |val| {
             const unionTy = val.*.*;
             std.debug.assert(std.meta.activeTag(unionTy) == .Union);

@@ -59,13 +59,9 @@ const StmtTestCase = struct {
     }
 };
 
-fn eatSemi(psr: *TsParser) ?ParseResult {
-    if (psr.lexer.token.ty != TokenType.Semi)
-        return ParseResult.expected(TokenType.Semi, psr.lexer.token);
-
-    _ = psr.lexer.next();
-
-    return null;
+fn eatSemi(psr: *TsParser) void {
+    if (psr.lexer.token.ty == TokenType.Semi)
+        _ = psr.lexer.next();
 }
 
 fn parseDecl(
@@ -101,8 +97,7 @@ fn parseDecl(
         tkn = psr.lexer.token;
     }
 
-    if (eatSemi(psr)) |err|
-        return err;
+    eatSemi(psr);
 
     const decl = Decl.new(scoping, name.data, declTy, expr);
     const result = makeNode(psr.getAllocator(), csr, .Decl, decl);
@@ -474,8 +469,7 @@ pub fn parseDo(psr: *TsParser) ParseResult {
 
     _ = psr.lexer.next();
 
-    if (eatSemi(psr)) |err|
-        return err;
+    eatSemi(psr);
 
     return ParseResult.success(makeNode(
         psr.getAllocator(),
@@ -578,8 +572,7 @@ pub fn parseReturn(psr: *TsParser) ParseResult {
     if (expr.getType() == .Error)
         return expr;
 
-    if (eatSemi(psr)) |err|
-        return err;
+    eatSemi(psr);
 
     return ParseResult.success(makeNode(
         psr.getAllocator(),
@@ -637,8 +630,7 @@ pub fn parseBreakOrContinue(
         _ = psr.lexer.next();
     }
 
-    if (eatSemi(psr)) |err|
-        return err;
+    eatSemi(psr);
 
     return ParseResult.success(makeNode(psr.getAllocator(), csr, ty, label));
 }
@@ -702,8 +694,7 @@ pub fn parseThrow(psr: *TsParser) ParseResult {
     if (!expr.isSuccess())
         return expr;
 
-    if (eatSemi(psr)) |err|
-        return err;
+    eatSemi(psr);
 
     return ParseResult.success(
         makeNode(psr.getAllocator(), csr, .Throw, expr.Success),
@@ -812,12 +803,13 @@ test "can parse try-catch" {
 
 pub fn parseExprStmt(psr: *TsParser) ParseResult {
     const expr = psr.parseExpr();
-    if (expr.isSuccess()) {
-        if (eatSemi(psr)) |err|
-            return err;
-        return expr;
-    } else {
-        return ParseResult.expected("a statement", psr.lexer.token);
+    switch (expr) {
+        .Success => {
+            eatSemi(psr);
+            return expr;
+        },
+        .Error => return expr,
+        .NoMatch => return ParseResult.expected("a statement", psr.lexer.token),
     }
 }
 

@@ -55,3 +55,8 @@ try {
 } finally {
 	3 + 4;
 }
+
+// Functions
+function adder(a: number, b: number) : number {
+	a + b;
+}

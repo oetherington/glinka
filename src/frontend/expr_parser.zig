@@ -312,11 +312,14 @@ fn parseFunctionExpr(psr: *TsParser) ParseResult {
         func.retTy = null;
     }
 
-    const body = psr.parseBlock();
-    if (!body.isSuccess())
-        return body;
-
-    func.body = body.Success;
+    switch (psr.parseBlock()) {
+        .Success => |body| func.body = body,
+        .Error => |err| return ParseResult.err(err),
+        .NoMatch => return ParseResult.expected(
+            "function body or return type",
+            psr.lexer.token,
+        ),
+    }
 
     return ParseResult.success(makeNode(
         psr.getAllocator(),

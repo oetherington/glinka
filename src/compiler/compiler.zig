@@ -39,6 +39,7 @@ const declaration = @import("declaration.zig");
 const conditional = @import("conditional.zig");
 const loop = @import("loop.zig");
 const throw = @import("throw.zig");
+const function = @import("function.zig");
 const allocate = @import("../common/allocate.zig");
 const NopBackend = @import("compiler_test_case.zig").NopBackend;
 
@@ -155,6 +156,12 @@ pub const Compiler = struct {
             .BinaryOp,
             .Ternary,
             .Ident,
+            .True,
+            .False,
+            .Null,
+            .Undefined,
+            .Int,
+            .String,
             => expression.processExpression(self, nd),
             .Block => block.processBlock(self, nd),
             .Decl => declaration.processDecl(self, nd),
@@ -165,6 +172,7 @@ pub const Compiler = struct {
             .Continue => loop.processContinue(self, nd),
             .Throw => throw.processThrow(self, nd),
             .Try => throw.processTry(self, nd),
+            .Function => function.processFunction(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},
@@ -179,7 +187,8 @@ pub const Compiler = struct {
 
         for (nd.data.Program.items) |child| {
             self.processNode(child);
-            try self.backend.processNode(child);
+            if (!self.hasErrors())
+                try self.backend.processNode(child);
         }
 
         try self.backend.epilog();

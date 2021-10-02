@@ -72,3 +72,9 @@ pub fn processTry(cmp: *Compiler, nd: Node) void {
         cmp.scope.ctx = null;
     }
 }
+
+test "can compile a 'try/catch/finally' statement" {
+    try (CompilerTestCase{
+        .code = "try { var a = 6; } catch (e) { true; } finally { null; }",
+    }).run();
+}

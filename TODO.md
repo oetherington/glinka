@@ -19,7 +19,8 @@
  - [x] Throw
  - [x] Try/catch/finally
  - [ ] Functions
- - [ ] Arrow functions
+   - [ ] Fake 'this' parameter
+   - [ ] Arrow functions
  - [x] Unions
  - [ ] Tuples
  - [ ] Arrays

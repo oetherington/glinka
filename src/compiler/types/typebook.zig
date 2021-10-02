@@ -139,6 +139,8 @@ pub const TypeBook = struct {
     numberTy: Type = Type.newNumber(),
     stringTy: Type = Type.newString(),
     booleanTy: Type = Type.newBoolean(),
+    objectTy: Type = Type.newObject(),
+    functionTys: Type.FunctionType.Map,
     unionTys: Type.UnionType.Map,
 
     pub fn new(alloc: *Allocator) *TypeBook {
@@ -146,6 +148,7 @@ pub const TypeBook = struct {
         self.* = TypeBook{
             .alloc = alloc,
             .opMap = undefined,
+            .functionTys = Type.FunctionType.Map.new(alloc),
             .unionTys = Type.UnionType.Map.new(alloc),
         };
         createOpMap(self);
@@ -154,6 +157,7 @@ pub const TypeBook = struct {
 
     pub fn deinit(self: *TypeBook) void {
         self.unionTys.deinit();
+        self.functionTys.deinit();
         self.alloc.destroy(self);
     }
 
@@ -197,6 +201,18 @@ pub const TypeBook = struct {
         return &self.booleanTy;
     }
 
+    pub fn getObject(self: *TypeBook) Type.Ptr {
+        return &self.objectTy;
+    }
+
+    pub fn getFunction(
+        self: *TypeBook,
+        ret: Type.Ptr,
+        args: []Type.Ptr,
+    ) Type.Ptr {
+        return self.functionTys.get(ret, args);
+    }
+
     pub fn getUnion(self: *TypeBook, tys: []Type.Ptr) Type.Ptr {
         return self.unionTys.get(tys);
     }
@@ -215,6 +231,7 @@ test "type book can return builtin types" {
     try expectEqual(Type.Type.Number, book.getNumber().getType());
     try expectEqual(Type.Type.String, book.getString().getType());
     try expectEqual(Type.Type.Boolean, book.getBoolean().getType());
+    try expectEqual(Type.Type.Object, book.getObject().getType());
 }
 
 test "type book can create and retrieve union types" {
@@ -239,6 +256,27 @@ test "type book can create and retrieve union types" {
     const boolean = &book.booleanTy;
     const boolNum = book.getUnion(&.{ boolean, num });
     try expect(numStr != boolNum);
+}
+
+test "type book can create and retrieve function types" {
+    var book = TypeBook.new(std.testing.allocator);
+    defer book.deinit();
+
+    const n: *const Type = &book.numberTy;
+    const s: *const Type = &book.stringTy;
+    const b: *const Type = &book.booleanTy;
+
+    const func = book.getFunction(n, &[_]Type.Ptr{ s, b });
+
+    try expectEqual(Type.Type.Function, func.getType());
+    try expectEqual(n, func.Function.ret);
+    try expectEqual(@intCast(usize, 2), func.Function.args.len);
+    try expectEqual(s, func.Function.args[0]);
+    try expectEqual(b, func.Function.args[1]);
+
+    const func2 = book.getFunction(n, &[_]Type.Ptr{ s, b });
+
+    try expectEqual(func, func2);
 }
 
 test "type book can return an OpEntry" {

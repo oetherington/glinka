@@ -30,6 +30,9 @@ pub const Scope = struct {
         Try,
         Catch,
         Finally,
+        Switch,
+        Function,
+        ArrowFunction,
     };
 
     pub const Symbol = struct {

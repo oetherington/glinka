@@ -28,9 +28,9 @@ pub const Type = union(This.Type) {
 
     pub const TupleType = @import("tuple_type.zig");
     pub const ArrayType = @import("array_type.zig");
-    pub const ObjectType = @import("object_type.zig");
+    pub const ClassType = @import("class_type.zig");
     pub const EnumType = @import("enum_type.zig");
-    pub const FunctionType = @import("function_type.zig");
+    pub const FunctionType = @import("function_type.zig").FunctionType;
     pub const OptionalType = @import("optional_type.zig");
     pub const UnionType = @import("union_type.zig").UnionType;
     pub const AliasType = @import("alias_type.zig");
@@ -46,9 +46,10 @@ pub const Type = union(This.Type) {
         Number,
         String,
         Boolean,
+        Object,
         Tuple,
         Array,
-        Object,
+        Class,
         Enum,
         Function,
         Optional,
@@ -66,9 +67,10 @@ pub const Type = union(This.Type) {
     Number,
     String,
     Boolean,
+    Object,
     Tuple: TupleType,
     Array: ArrayType,
-    Object: ObjectType,
+    Class: ClassType,
     Enum: EnumType,
     Function: FunctionType,
     Optional: OptionalType,
@@ -116,6 +118,14 @@ pub const Type = union(This.Type) {
         return This{ .Boolean = {} };
     }
 
+    pub fn newObject() This {
+        return This{ .Object = {} };
+    }
+
+    pub fn newFunction(func: FunctionType) This {
+        return This{ .Function = func };
+    }
+
     pub fn newUnion(un: UnionType) This {
         return This{ .Union = un };
     }
@@ -150,9 +160,10 @@ pub const Type = union(This.Type) {
             .Number => try writer.print("number", .{}),
             .String => try writer.print("string", .{}),
             .Boolean => try writer.print("boolean", .{}),
+            .Object => try writer.print("object", .{}),
             .Tuple => try writer.print("tuple", .{}),
             .Array => try writer.print("array", .{}),
-            .Object => try writer.print("object", .{}),
+            .Class => try writer.print("class", .{}),
             .Enum => try writer.print("enum", .{}),
             .Function => try writer.print("function", .{}),
             .Optional => try writer.print("optional", .{}),
@@ -206,6 +217,11 @@ test "can create a string type" {
 test "can create a boolean type" {
     const ty = Type.newBoolean();
     try expectEqual(Type.Type.Boolean, ty.getType());
+}
+
+test "can create an object type" {
+    const ty = Type.newObject();
+    try expectEqual(Type.Type.Object, ty.getType());
 }
 
 const AssignableTestCase = struct {
@@ -373,11 +389,18 @@ test "can write a boolean type" {
     }).run();
 }
 
+test "can write an object type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newObject(),
+        .expected = "object",
+    }).run();
+}
+
 // TODO: Add test for writing a tuple type
 
 // TODO: Add test for writing an array type
 
-// TODO: Add test for writing an object type
+// TODO: Add test for writing a class type
 
 // TODO: Add test for writing an enum type
 
