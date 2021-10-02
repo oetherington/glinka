@@ -17,43 +17,47 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
-const Cursor = @import("../common/cursor.zig").Cursor;
-const TokenType = @import("../common/token.zig").Token.Type;
-const Type = @import("types/type.zig").Type;
+const expectEqualStrings = std.testing.expectEqualStrings;
+const Cursor = @import("../../common/cursor.zig").Cursor;
+const TokenType = @import("../../common/token.zig").Token.Type;
+const Type = @import("../../common/types/type.zig").Type;
 
-pub const OpError = struct {
+pub const ContextError = struct {
     csr: Cursor,
-    op: TokenType,
-    ty: Type.Ptr,
+    found: []const u8,
+    expectedContext: []const u8,
 
-    pub fn new(csr: Cursor, op: TokenType, ty: Type.Ptr) OpError {
-        return OpError{
+    pub fn new(
+        csr: Cursor,
+        found: []const u8,
+        expectedContext: []const u8,
+    ) ContextError {
+        return ContextError{
             .csr = csr,
-            .op = op,
-            .ty = ty,
+            .found = found,
+            .expectedContext = expectedContext,
         };
     }
 
-    pub fn report(self: OpError, writer: anytype) !void {
+    pub fn report(self: ContextError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: Operator '{s}' is not defined for type '",
+            "Error: {d}:{d}: {s} cannot occur outside of {s}\n",
             .{
                 self.csr.ln,
                 self.csr.ch,
-                @tagName(self.op),
+                self.found,
+                self.expectedContext,
             },
         );
-        try self.ty.write(writer);
-        try writer.print("'\n", .{});
     }
 };
 
-test "can initialize an OpError" {
+test "can initialize a ContextError" {
     const csr = Cursor.new(2, 5);
-    const op = TokenType.Sub;
-    const ty = Type.newString();
-    const err = OpError.new(csr, op, &ty);
+    const found = "Something";
+    const expectedContext = "a context";
+    const err = ContextError.new(csr, found, expectedContext);
     try expectEqual(csr, err.csr);
-    try expectEqual(op, err.op);
-    try expectEqual(&ty, err.ty);
+    try expectEqualStrings(found, err.found);
+    try expectEqualStrings(expectedContext, err.expectedContext);
 }

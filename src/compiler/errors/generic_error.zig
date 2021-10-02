@@ -18,46 +18,37 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const Cursor = @import("../common/cursor.zig").Cursor;
-const TokenType = @import("../common/token.zig").Token.Type;
-const Type = @import("types/type.zig").Type;
+const Cursor = @import("../../common/cursor.zig").Cursor;
+const TokenType = @import("../../common/token.zig").Token.Type;
+const Type = @import("../../common/types/type.zig").Type;
 
-pub const ContextError = struct {
+pub const GenericError = struct {
     csr: Cursor,
-    found: []const u8,
-    expectedContext: []const u8,
+    msg: []const u8,
 
-    pub fn new(
-        csr: Cursor,
-        found: []const u8,
-        expectedContext: []const u8,
-    ) ContextError {
-        return ContextError{
+    pub fn new(csr: Cursor, msg: []const u8) GenericError {
+        return GenericError{
             .csr = csr,
-            .found = found,
-            .expectedContext = expectedContext,
+            .msg = msg,
         };
     }
 
-    pub fn report(self: ContextError, writer: anytype) !void {
+    pub fn report(self: GenericError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: {s} cannot occur outside of {s}\n",
+            "Error: {d}:{d}: {s}\n",
             .{
                 self.csr.ln,
                 self.csr.ch,
-                self.found,
-                self.expectedContext,
+                self.msg,
             },
         );
     }
 };
 
-test "can initialize a ContextError" {
+test "can initialize a GenericError" {
     const csr = Cursor.new(2, 5);
-    const found = "Something";
-    const expectedContext = "a context";
-    const err = ContextError.new(csr, found, expectedContext);
+    const msg = "Some error message";
+    const err = GenericError.new(csr, msg);
     try expectEqual(csr, err.csr);
-    try expectEqualStrings(found, err.found);
-    try expectEqualStrings(expectedContext, err.expectedContext);
+    try expectEqualStrings(msg, err.msg);
 }

@@ -21,9 +21,9 @@ const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
-const Type = @import("types/type.zig").Type;
-const ContextError = @import("context_error.zig").ContextError;
-const CompileError = @import("compile_error.zig").CompileError;
+const Type = @import("../common/types/type.zig").Type;
+const ContextError = @import("errors/context_error.zig").ContextError;
+const CompileError = @import("errors/compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 const allocate = @import("../common/allocate.zig");
 

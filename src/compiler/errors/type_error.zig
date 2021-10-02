@@ -18,7 +18,7 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const Cursor = @import("../../common/cursor.zig").Cursor;
-const Type = @import("type.zig").Type;
+const Type = @import("../../common/types/type.zig").Type;
 
 pub const TypeError = struct {
     csr: Cursor,

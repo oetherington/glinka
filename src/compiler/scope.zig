@@ -19,8 +19,8 @@ const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
-const Type = @import("types/type.zig").Type;
-const TypeBook = @import("types/typebook.zig").TypeBook;
+const Type = @import("../common/types/type.zig").Type;
+const TypeBook = @import("../common/types/typebook.zig").TypeBook;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const allocate = @import("../common/allocate.zig");
 

@@ -17,38 +17,41 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
-const expectEqualStrings = std.testing.expectEqualStrings;
-const Cursor = @import("../common/cursor.zig").Cursor;
-const TokenType = @import("../common/token.zig").Token.Type;
-const Type = @import("types/type.zig").Type;
+const Cursor = @import("../../common/cursor.zig").Cursor;
+const TokenType = @import("../../common/token.zig").Token.Type;
+const Type = @import("../../common/types/type.zig").Type;
 
-pub const GenericError = struct {
+pub const AssignError = struct {
     csr: Cursor,
-    msg: []const u8,
+    left: Type.Ptr,
+    right: Type.Ptr,
 
-    pub fn new(csr: Cursor, msg: []const u8) GenericError {
-        return GenericError{
+    pub fn new(csr: Cursor, left: Type.Ptr, right: Type.Ptr) AssignError {
+        return AssignError{
             .csr = csr,
-            .msg = msg,
+            .left = left,
+            .right = right,
         };
     }
 
-    pub fn report(self: GenericError, writer: anytype) !void {
+    pub fn report(self: AssignError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: {s}\n",
-            .{
-                self.csr.ln,
-                self.csr.ch,
-                self.msg,
-            },
+            "Error: {d}:{d}: Value of type '",
+            .{ self.csr.ln, self.csr.ch },
         );
+        try self.right.write(writer);
+        try writer.print("' cannot be assigned to a variable of type '", .{});
+        try self.left.write(writer);
+        try writer.print("'\n", .{});
     }
 };
 
-test "can initialize a GenericError" {
+test "can initialize an AssignError" {
     const csr = Cursor.new(2, 5);
-    const msg = "Some error message";
-    const err = GenericError.new(csr, msg);
+    const left = Type.newString();
+    const right = Type.newNumber();
+    const err = AssignError.new(csr, &left, &right);
     try expectEqual(csr, err.csr);
-    try expectEqualStrings(msg, err.msg);
+    try expectEqual(&left, err.left);
+    try expectEqual(&right, err.right);
 }

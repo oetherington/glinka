@@ -21,9 +21,9 @@ const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
-const Type = @import("types/type.zig").Type;
-const GenericError = @import("generic_error.zig").GenericError;
-const CompileError = @import("compile_error.zig").CompileError;
+const Type = @import("../common/types/type.zig").Type;
+const GenericError = @import("errors/generic_error.zig").GenericError;
+const CompileError = @import("errors/compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 
 pub fn processBlock(cmp: *Compiler, nd: Node) void {

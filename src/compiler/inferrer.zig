@@ -24,11 +24,11 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Scope = @import("scope.zig").Scope;
-const Type = @import("types/type.zig").Type;
-const TypeBook = @import("types/typebook.zig").TypeBook;
-const CompileError = @import("compile_error.zig").CompileError;
-const OpError = @import("op_error.zig").OpError;
-const AssignError = @import("assign_error.zig").AssignError;
+const Type = @import("../common/types/type.zig").Type;
+const TypeBook = @import("../common/types/typebook.zig").TypeBook;
+const CompileError = @import("errors/compile_error.zig").CompileError;
+const OpError = @import("errors/op_error.zig").OpError;
+const AssignError = @import("errors/assign_error.zig").AssignError;
 
 pub const InferResult = union(Variant) {
     pub const Variant = enum {
@@ -67,7 +67,7 @@ test "can create a success InferResult" {
 test "can create an error InferResult" {
     const cursor = Cursor.new(2, 5);
     const symbol = "anySymbol";
-    const implicitAnyError = @import("types/implicit_any_error.zig");
+    const implicitAnyError = @import("errors/implicit_any_error.zig");
     const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
     const err = ImplicitAnyError.new(cursor, symbol);
     const compileError = CompileError.implicitAnyError(err);

@@ -17,41 +17,43 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
-const Cursor = @import("../common/cursor.zig").Cursor;
-const TokenType = @import("../common/token.zig").Token.Type;
-const Type = @import("types/type.zig").Type;
+const Cursor = @import("../../common/cursor.zig").Cursor;
+const TokenType = @import("../../common/token.zig").Token.Type;
+const Type = @import("../../common/types/type.zig").Type;
 
-pub const AssignError = struct {
+pub const OpError = struct {
     csr: Cursor,
-    left: Type.Ptr,
-    right: Type.Ptr,
+    op: TokenType,
+    ty: Type.Ptr,
 
-    pub fn new(csr: Cursor, left: Type.Ptr, right: Type.Ptr) AssignError {
-        return AssignError{
+    pub fn new(csr: Cursor, op: TokenType, ty: Type.Ptr) OpError {
+        return OpError{
             .csr = csr,
-            .left = left,
-            .right = right,
+            .op = op,
+            .ty = ty,
         };
     }
 
-    pub fn report(self: AssignError, writer: anytype) !void {
+    pub fn report(self: OpError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: Value of type '",
-            .{ self.csr.ln, self.csr.ch },
+            "Error: {d}:{d}: Operator '{s}' is not defined for type '",
+            .{
+                self.csr.ln,
+                self.csr.ch,
+                @tagName(self.op),
+            },
         );
-        try self.right.write(writer);
-        try writer.print("' cannot be assigned to a variable of type '", .{});
-        try self.left.write(writer);
+        try self.ty.write(writer);
         try writer.print("'\n", .{});
     }
 };
 
-test "can initialize an AssignError" {
+test "can initialize an OpError" {
     const csr = Cursor.new(2, 5);
-    const left = Type.newString();
-    const right = Type.newNumber();
-    const err = AssignError.new(csr, &left, &right);
+    const op = TokenType.Sub;
+    const ty = Type.newString();
+    const err = OpError.new(csr, op, &ty);
     try expectEqual(csr, err.csr);
-    try expectEqual(&left, err.left);
-    try expectEqual(&right, err.right);
+    try expectEqual(op, err.op);
+    try expectEqual(&ty, err.ty);
 }

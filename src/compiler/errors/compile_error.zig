@@ -18,18 +18,18 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const Type = @import("types/type.zig").Type;
-const TypeError = @import("types/type_error.zig").TypeError;
-const implicitAnyError = @import("types/implicit_any_error.zig");
+const Type = @import("../../common/types/type.zig").Type;
+const TypeError = @import("type_error.zig").TypeError;
+const implicitAnyError = @import("implicit_any_error.zig");
 const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const OpError = @import("op_error.zig").OpError;
 const ContextError = @import("context_error.zig").ContextError;
 const RedefinitionError = @import("redefinition_error.zig").RedefinitionError;
 const GenericError = @import("generic_error.zig").GenericError;
 const AssignError = @import("assign_error.zig").AssignError;
-const ParseError = @import("../common/parse_error.zig").ParseError;
-const TokenType = @import("../common/token.zig").Token.Type;
-const Cursor = @import("../common/cursor.zig").Cursor;
+const ParseError = @import("../../common/parse_error.zig").ParseError;
+const TokenType = @import("../../common/token.zig").Token.Type;
+const Cursor = @import("../../common/cursor.zig").Cursor;
 
 pub const CompileError = union(CompileError.Type) {
     pub const Type = enum(u8) {

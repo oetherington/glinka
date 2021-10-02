@@ -18,7 +18,7 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const Cursor = @import("../common/cursor.zig").Cursor;
+const Cursor = @import("../../common/cursor.zig").Cursor;
 
 pub const RedefinitionError = struct {
     name: []const u8,
