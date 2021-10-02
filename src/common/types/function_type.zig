@@ -95,4 +95,19 @@ pub const FunctionType = struct {
 
     ret: Type.Ptr,
     args: []Type.Ptr,
+
+    pub fn write(self: FunctionType, writer: anytype) !void {
+        try writer.print("function(", .{});
+
+        var prefix: []const u8 = "";
+        for (self.args) |arg| {
+            try writer.print("{s}", .{prefix});
+            try arg.write(writer);
+            prefix = ", ";
+        }
+
+        try writer.print(") : ", .{});
+
+        try self.ret.write(writer);
+    }
 };

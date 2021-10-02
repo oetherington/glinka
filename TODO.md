@@ -18,7 +18,9 @@
  - [ ] In/of for loops
  - [x] Throw
  - [x] Try/catch/finally
- - [ ] Functions
+ - [x] Functions
+   - [x] Return
+   - [ ] Check all code paths return correctly
    - [ ] Fake 'this' parameter
    - [ ] Arrow functions
  - [x] Unions

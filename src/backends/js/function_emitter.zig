@@ -71,3 +71,31 @@ test "JsBackend can emit function" {
         .expectedOutput = "function aFunction(a, b) {\n}\n",
     }).run();
 }
+
+pub fn emitReturn(self: *JsBackend, expr: ?Node) Backend.Error!void {
+    if (expr) |val| {
+        try self.out.print("return ", .{});
+        try self.emitExpr(val);
+        try self.out.print(";\n", .{});
+    } else {
+        try self.out.print("return;\n", .{});
+    }
+}
+
+test "JsBackend can emit return without a value" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Return, null),
+        .expectedOutput = "return;\n",
+    }).run();
+}
+
+test "JsBackend can emit return with a value" {
+    const alloc = std.testing.allocator;
+    const value = EmitTestCase.makeNode(.Null, {});
+    defer alloc.destroy(value);
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Return, value),
+        .expectedOutput = "return null;\n",
+    }).run();
+}

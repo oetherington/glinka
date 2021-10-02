@@ -176,6 +176,7 @@ pub const Compiler = struct {
             .Throw => throw.processThrow(self, nd),
             .Try => throw.processTry(self, nd),
             .Function => function.processFunction(self, nd),
+            .Return => function.processReturn(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

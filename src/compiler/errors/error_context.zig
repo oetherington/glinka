@@ -51,10 +51,14 @@ pub const ErrorContext = struct {
         return self.list.items[index];
     }
 
-    pub fn report(self: ErrorContext) !void {
-        const writer = std.io.getStdErr().writer();
+    pub fn reportWithWriter(self: ErrorContext, writer: anytype) !void {
         for (self.list.items) |err|
             try err.report(writer);
+    }
+
+    pub fn report(self: ErrorContext) !void {
+        const writer = std.io.getStdErr().writer();
+        try self.reportWithWriter(writer);
     }
 };
 

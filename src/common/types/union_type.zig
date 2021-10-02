@@ -102,4 +102,13 @@ pub const UnionType = struct {
 
         return false;
     }
+
+    pub fn write(self: UnionType, writer: anytype) !void {
+        var prefix: []const u8 = "";
+        for (self.tys) |ty| {
+            try writer.print("{s}", .{prefix});
+            try ty.write(writer);
+            prefix = "|";
+        }
+    }
 };

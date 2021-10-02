@@ -149,7 +149,7 @@ pub const Type = union(This.Type) {
         return false;
     }
 
-    pub fn write(self: This, writer: anytype) !void {
+    pub fn write(self: This, writer: anytype) anyerror!void {
         switch (self) {
             .Unknown => try writer.print("unknown", .{}),
             .Any => try writer.print("any", .{}),
@@ -165,12 +165,18 @@ pub const Type = union(This.Type) {
             .Array => try writer.print("array", .{}),
             .Class => try writer.print("class", .{}),
             .Enum => try writer.print("enum", .{}),
-            .Function => try writer.print("function", .{}),
+            .Function => |func| try func.write(writer),
             .Optional => try writer.print("optional", .{}),
-            .Union => try writer.print("union", .{}),
+            .Union => |un| try un.write(writer),
             .Alias => try writer.print("alias", .{}),
             .Interface => try writer.print("interface", .{}),
         }
+    }
+
+    pub fn dump(self: This) void {
+        const writer = std.io.getStdOut().writer();
+        self.write(writer) catch unreachable;
+        writer.print("\n", .{}) catch unreachable;
     }
 };
 
@@ -404,11 +410,28 @@ test "can write an object type" {
 
 // TODO: Add test for writing an enum type
 
-// TODO: Add test for writing a function type
+test "can write a function type" {
+    const n = Type.newNumber();
+    const s = Type.newString();
+    try (WriteTypeTestCase{
+        .ty = Type.newFunction(Type.FunctionType{
+            .ret = &n,
+            .args = &[_]Type.Ptr{ &n, &s },
+        }),
+        .expected = "function(number, string) : number",
+    }).run();
+}
 
 // TODO: Add test for writing an optional type
 
-// TODO: Add test for writing a union type
+test "can write an object type" {
+    const n = Type.newNumber();
+    const s = Type.newString();
+    try (WriteTypeTestCase{
+        .ty = Type.newUnion(Type.UnionType{ .tys = &[_]Type.Ptr{ &n, &s } }),
+        .expected = "number|string",
+    }).run();
+}
 
 // TODO: Add test for writing an alias type
 

@@ -66,6 +66,18 @@ pub fn parseTypeName(psr: *TsParser) ParseResult {
 
             return ParseResult.success(nd);
         },
+        .Void => {
+            const nd = makeNode(
+                psr.getAllocator(),
+                psr.lexer.token.csr,
+                NodeType.TypeName,
+                "void",
+            );
+
+            _ = psr.lexer.next();
+
+            return ParseResult.success(nd);
+        },
         else => return ParseResult.noMatch(null),
     }
 }
@@ -79,6 +91,20 @@ test "can parse type names" {
                 try expectEqual(Cursor.new(1, 2), res.Success.csr);
                 try expectEqual(NodeType.TypeName, res.Success.data.getType());
                 try expectEqualStrings("ATypeName", res.Success.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse void type" {
+    try (ParseTypeTestCase{
+        .code = " void ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.TypeName, res.Success.data.getType());
+                try expectEqualStrings("void", res.Success.data.TypeName);
             }
         }).check,
     }).run();

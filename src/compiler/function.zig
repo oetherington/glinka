@@ -23,10 +23,11 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const Type = @import("../common/types/type.zig").Type;
 const TypeError = @import("errors/type_error.zig").TypeError;
-const RedefinitionError = @import("errors/redefinition_error.zig").RedefinitionError;
+const ReturnError = @import("errors/return_error.zig").ReturnError;
 const GenericError = @import("errors/generic_error.zig").GenericError;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
+const WriteContext = @import("../common/writer.zig").WriteContext;
 const allocate = @import("../common/allocate.zig");
 
 fn checkName(cmp: *Compiler, csr: Cursor, func: node.Function) bool {
@@ -109,6 +110,46 @@ fn getArgType(
     }
 }
 
+fn checkReturnExpr(
+    cmp: *Compiler,
+    csr: Cursor,
+    expectedTy: Type.Ptr,
+    actualTy: ?Type.Ptr,
+) void {
+    if (actualTy) |ty| {
+        if (!ty.isAssignableTo(expectedTy)) {
+            cmp.errors.append(CompileError.returnError(
+                ReturnError.new(csr, expectedTy, ty),
+            )) catch allocate.reportAndExit();
+        }
+    } else if (expectedTy.getType() != .Void) {
+        cmp.errors.append(CompileError.returnError(
+            ReturnError.new(csr, expectedTy, null),
+        )) catch allocate.reportAndExit();
+    }
+}
+
+fn traceReturns(cmp: *Compiler, nd: Node, retTy: Type.Ptr) void {
+    // TODO: Check all code paths return a suitable value
+
+    std.debug.assert(nd.getType() == .Block);
+
+    if (retTy.getType() == .Any)
+        return;
+
+    for (nd.data.Block.items) |item| {
+        switch (item.data) {
+            .Return => |expr| checkReturnExpr(
+                cmp,
+                item.csr,
+                retTy,
+                if (expr) |exp| exp.ty else null,
+            ),
+            else => continue,
+        }
+    }
+}
+
 pub fn processFunction(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == NodeType.Function);
 
@@ -144,12 +185,12 @@ pub fn processFunction(cmp: *Compiler, nd: Node) void {
 
     cmp.processNode(func.body);
 
-    // TODO: Check all code paths return a value of the correct type
+    traceReturns(cmp, func.body, funcTy.Function.ret);
 }
 
 test "can compile a function" {
     try (CompilerTestCase{
-        .code = "function adder(a: number, b: number) : number { a + b; }",
+        .code = "function adder(a: number, b: number) : void { a + b; }",
     }).run();
 }
 
@@ -227,5 +268,70 @@ test "function throws error if symbol is already defined" {
     try fnGenericErrorTestCase(
         "function someFunction() {} function someFunction() {}",
         "Symbol 'someFunction' is already defined",
+    );
+}
+
+pub fn processReturn(cmp: *Compiler, nd: Node) void {
+    std.debug.assert(nd.getType() == NodeType.Return);
+
+    if (nd.data.Return) |expr|
+        _ = cmp.inferExprType(expr);
+}
+
+test "can compile a return statement" {
+    try (CompilerTestCase{
+        .code = "function id(a: number) : number { return a; }",
+    }).run();
+}
+
+fn returnErrorTestCase(
+    comptime code: []const u8,
+    comptime expectedErr: []const u8,
+) !void {
+    try (CompilerTestCase{
+        .code = code,
+        .check = (struct {
+            pub fn check(self: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try self.expectEqual(@intCast(usize, 1), cmp.errors.count());
+
+                const err = cmp.getError(0);
+                try self.expectEqual(
+                    CompileError.Type.ReturnError,
+                    err.getType(),
+                );
+
+                var ctx = try WriteContext(.{}).new(std.testing.allocator);
+                defer ctx.deinit();
+                var writer = ctx.writer();
+
+                try cmp.errors.reportWithWriter(writer);
+
+                var str = try ctx.toString();
+                defer ctx.freeString(str);
+
+                try self.expectEqualStrings(expectedErr, str);
+            }
+        }).check,
+    }).run();
+}
+
+test "return statement expressions must have the correct type" {
+    try returnErrorTestCase(
+        "function f() : number { return 'not a number'; }",
+        "Error: 1:25: Cannot return a value of type string from a function returning number\n",
+    );
+}
+
+test "void functions must not return a value" {
+    try returnErrorTestCase(
+        "function f() : void { return 'not a number'; }",
+        "Error: 1:23: Cannot return a value from a void function\n",
+    );
+}
+
+test "non-void functions cannot return without a value" {
+    try returnErrorTestCase(
+        "function f() : string { return; }",
+        "Error: 1:25: Non-void function must return value of type string\n",
     );
 }
