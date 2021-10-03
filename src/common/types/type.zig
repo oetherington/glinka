@@ -31,7 +31,6 @@ pub const Type = union(This.Type) {
     pub const ClassType = @import("class_type.zig");
     pub const EnumType = @import("enum_type.zig");
     pub const FunctionType = @import("function_type.zig").FunctionType;
-    pub const OptionalType = @import("optional_type.zig");
     pub const UnionType = @import("union_type.zig").UnionType;
     pub const AliasType = @import("alias_type.zig");
     pub const InterfaceType = @import("interface_type.zig");
@@ -52,7 +51,6 @@ pub const Type = union(This.Type) {
         Class,
         Enum,
         Function,
-        Optional,
         Union,
         Alias,
         Interface,
@@ -73,7 +71,6 @@ pub const Type = union(This.Type) {
     Class: ClassType,
     Enum: EnumType,
     Function: FunctionType,
-    Optional: OptionalType,
     Union: UnionType,
     Alias: AliasType,
     Interface: InterfaceType,
@@ -131,6 +128,9 @@ pub const Type = union(This.Type) {
     }
 
     pub fn isAssignableTo(self: This.Ptr, target: This.Ptr) bool {
+        if (self.getType() == .Undefined)
+            return true;
+
         if (target.getType() == .Any)
             return true;
 
@@ -166,7 +166,6 @@ pub const Type = union(This.Type) {
             .Class => try writer.print("class", .{}),
             .Enum => try writer.print("enum", .{}),
             .Function => |func| try func.write(writer),
-            .Optional => try writer.print("optional", .{}),
             .Union => |un| try un.write(writer),
             .Alias => try writer.print("alias", .{}),
             .Interface => try writer.print("interface", .{}),
@@ -260,6 +259,21 @@ const AssignableTestCase = struct {
         );
     }
 };
+
+test "undefined is assignable to all other types" {
+    const n = Type.newNumber();
+    const a = Type.newAny();
+    const b = Type.newBoolean();
+    const v = Type.newVoid();
+    const s = Type.newString();
+    const u = Type.newUndefined();
+
+    try AssignableTestCase.new(&u, &n).run();
+    try AssignableTestCase.new(&u, &a).run();
+    try AssignableTestCase.new(&u, &b).run();
+    try AssignableTestCase.new(&u, &v).run();
+    try AssignableTestCase.new(&u, &s).run();
+}
 
 test "all types are assignable to 'any'" {
     const n = Type.newNumber();
@@ -421,8 +435,6 @@ test "can write a function type" {
         .expected = "function(number, string) : number",
     }).run();
 }
-
-// TODO: Add test for writing an optional type
 
 test "can write an object type" {
     const n = Type.newNumber();

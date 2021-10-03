@@ -16,6 +16,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Cursor = @import("../common/cursor.zig").Cursor;
@@ -24,11 +25,12 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Scope = @import("scope.zig").Scope;
+const TypeBook = @import("typebook.zig").TypeBook;
 const Type = @import("../common/types/type.zig").Type;
-const TypeBook = @import("../common/types/typebook.zig").TypeBook;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const OpError = @import("errors/op_error.zig").OpError;
 const AssignError = @import("errors/assign_error.zig").AssignError;
+const allocate = @import("../common/allocate.zig");
 
 pub const InferResult = union(Variant) {
     pub const Variant = enum {
@@ -120,7 +122,7 @@ pub fn inferExprType(scope: *Scope, typebook: *TypeBook, nd: Node) InferResult {
                 .Error => |err| return InferResult.err(err),
             };
 
-            if (left != right)
+            if (!right.isAssignableTo(left))
                 return InferResult.err(CompileError.assignError(
                     AssignError.new(nd.csr, left, right),
                 ));
@@ -213,25 +215,25 @@ const InferTestCase = struct {
     }
 };
 
-test "can inter type of int literal" {
+test "can infer type of int literal" {
     try (InferTestCase{
         .expectedTy = .Number,
     }).run(.Int, "1234");
 }
 
-test "can inter type of string literals" {
+test "can infer type of string literals" {
     try (InferTestCase{
         .expectedTy = .String,
     }).run(.String, "'a string'");
 }
 
-test "can inter type of template literals" {
+test "can infer type of template literals" {
     try (InferTestCase{
         .expectedTy = .String,
     }).run(.Template, "`a template`");
 }
 
-test "can inter type of booleans" {
+test "can infer type of booleans" {
     try (InferTestCase{
         .expectedTy = .Boolean,
     }).run(.True, {});
@@ -241,19 +243,19 @@ test "can inter type of booleans" {
     }).run(.False, {});
 }
 
-test "can inter type of 'null'" {
+test "can infer type of 'null'" {
     try (InferTestCase{
         .expectedTy = .Null,
     }).run(.Null, {});
 }
 
-test "can inter type of 'undefined'" {
+test "can infer type of 'undefined'" {
     try (InferTestCase{
         .expectedTy = .Undefined,
     }).run(.Undefined, {});
 }
 
-test "can inter type of an identifier" {
+test "can infer type of an identifier" {
     try (InferTestCase{
         .expectedTy = .String,
         .setup = (struct {
@@ -353,25 +355,84 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
                 return null;
             }
         },
+        .UnionType => |un| {
+            const alloc = scope.getAllocator();
+            const tys = allocate.alloc(alloc, Type.Ptr, un.items.len);
+            defer alloc.free(tys);
+
+            for (un.items) |item, index| {
+                if (findType(scope, typebook, item)) |ty|
+                    tys[index] = ty
+                else
+                    return null;
+            }
+
+            return typebook.getUnion(tys);
+        },
         else => return null,
     }
 }
 
+const FindTypeTestCase = struct {
+    inputNode: Node,
+    check: fn (ty: ?Type.Ptr) anyerror!void,
+
+    pub fn run(self: FindTypeTestCase) !void {
+        const scope = Scope.new(std.testing.allocator, null);
+        defer scope.deinit();
+
+        var typebook = TypeBook.new(std.testing.allocator);
+        defer typebook.deinit();
+
+        defer std.testing.allocator.destroy(self.inputNode);
+
+        const ty = findType(scope, typebook, self.inputNode);
+        try self.check(ty);
+    }
+};
+
 test "can lookup builtin types" {
-    const scope = Scope.new(std.testing.allocator, null);
-    defer scope.deinit();
+    try (FindTypeTestCase{
+        .inputNode = makeNode(
+            std.testing.allocator,
+            Cursor.new(11, 4),
+            .TypeName,
+            "number",
+        ),
+        .check = (struct {
+            fn check(ty: ?Type.Ptr) anyerror!void {
+                try expect(ty != null);
+                try expectEqual(Type.Type.Number, ty.?.getType());
+            }
+        }).check,
+    }).run();
+}
 
-    var typebook = TypeBook.new(std.testing.allocator);
-    defer typebook.deinit();
+test "can lookup union types" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(6, 7);
 
-    const nd = makeNode(
-        std.testing.allocator,
-        Cursor.new(11, 4),
-        .TypeName,
-        "number",
-    );
-    defer std.testing.allocator.destroy(nd);
+    const string = makeNode(alloc, csr, .TypeName, "string");
+    const number = makeNode(alloc, csr, .TypeName, "number");
+    defer alloc.destroy(string);
+    defer alloc.destroy(number);
 
-    const ty = findType(scope, typebook, nd);
-    try expectEqual(Type.Type.Number, ty.?.getType());
+    var list = node.NodeList{};
+    defer list.deinit(alloc);
+    try list.append(alloc, string);
+    try list.append(alloc, number);
+
+    try (FindTypeTestCase{
+        .inputNode = makeNode(alloc, csr, .UnionType, list),
+        .check = (struct {
+            fn check(ty: ?Type.Ptr) anyerror!void {
+                try expectEqual(Type.Type.Union, ty.?.getType());
+
+                const tys: []Type.Ptr = ty.?.Union.tys;
+                try expectEqual(@intCast(usize, 2), tys.len);
+                try expectEqual(Type.Type.Number, tys[0].getType());
+                try expectEqual(Type.Type.String, tys[1].getType());
+            }
+        }).check,
+    }).run();
 }

@@ -19,9 +19,9 @@ const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
-const Type = @import("type.zig").Type;
-const TokenType = @import("../../common/token.zig").Token.Type;
-const allocate = @import("../../common/allocate.zig");
+const Type = @import("../common/types/type.zig").Type;
+const TokenType = @import("../common/token.zig").Token.Type;
+const allocate = @import("../common/allocate.zig");
 
 const OpEntry = union(Variant) {
     const Variant = enum {

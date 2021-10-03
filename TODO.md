@@ -26,7 +26,6 @@
  - [x] Unions
  - [ ] Tuples
  - [ ] Arrays
- - [ ] Optional
  - [ ] Type aliases
  - [ ] Interfaces
  - [ ] Enums

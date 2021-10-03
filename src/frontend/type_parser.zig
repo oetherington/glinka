@@ -110,8 +110,66 @@ test "can parse void type" {
     }).run();
 }
 
+pub fn parseUnionType(psr: *TsParser) ParseResult {
+    const res = parseTypeName(psr);
+    if (!res.isSuccess() or psr.lexer.token.ty != .BitOr)
+        return res;
+
+    const alloc = psr.getAllocator();
+
+    const un = makeNode(
+        alloc,
+        psr.lexer.token.csr,
+        NodeType.UnionType,
+        node.NodeList{},
+    );
+
+    un.data.UnionType.append(
+        alloc,
+        res.Success,
+    ) catch allocate.reportAndExit();
+
+    while (psr.lexer.token.ty == .BitOr) {
+        _ = psr.lexer.next();
+
+        const right = parseTypeName(psr);
+        if (!right.isSuccess())
+            return right;
+
+        un.data.UnionType.append(
+            alloc,
+            right.Success,
+        ) catch allocate.reportAndExit();
+    }
+
+    return ParseResult.success(un);
+}
+
+test "can parse union types" {
+    try (ParseTypeTestCase{
+        .code = " number | string | boolean ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+
+                const un = res.Success;
+                try expectEqual(NodeType.UnionType, un.getType());
+
+                const tys = un.data.UnionType.items;
+                try expectEqual(@intCast(usize, 3), tys.len);
+                try expectEqual(NodeType.TypeName, tys[0].getType());
+                try expectEqualStrings("number", tys[0].data.TypeName);
+                try expectEqual(NodeType.TypeName, tys[1].getType());
+                try expectEqualStrings("string", tys[1].data.TypeName);
+                try expectEqual(NodeType.TypeName, tys[2].getType());
+                try expectEqualStrings("boolean", tys[2].data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseType(psr: *Parser) ParseResult {
-    return parseTypeName(@fieldParentPtr(TsParser, "parser", psr));
+    return parseUnionType(@fieldParentPtr(TsParser, "parser", psr));
 }
 
 test "invalid types return NoMatch" {

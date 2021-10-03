@@ -428,6 +428,7 @@ pub const NodeType = enum {
     BinaryOp,
     Ternary,
     TypeName,
+    UnionType,
     Function,
     Block,
     If,
@@ -465,6 +466,7 @@ pub const NodeData = union(NodeType) {
     BinaryOp: BinaryOp,
     Ternary: Ternary,
     TypeName: []const u8,
+    UnionType: NodeList,
     Function: Function,
     Block: NodeList,
     If: If,
@@ -493,7 +495,7 @@ pub const NodeData = union(NodeType) {
                 "{s}: \"{s}\"\n",
                 .{ @tagName(self), s },
             ),
-            .Program, .Comma, .Array, .Block => |list| {
+            .Program, .Comma, .UnionType, .Array, .Block => |list| {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 for (list.items) |item|
                     try item.dumpIndented(writer, indent + 2);

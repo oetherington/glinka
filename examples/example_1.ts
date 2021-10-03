@@ -60,3 +60,7 @@ try {
 function adder(a: number, b: number) : number {
 	return a + b;
 }
+
+// Unions
+let aUnion: string|number = "hello world";
+aUnion = 4;

@@ -19,8 +19,8 @@ const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
+const TypeBook = @import("typebook.zig").TypeBook;
 const Type = @import("../common/types/type.zig").Type;
-const TypeBook = @import("../common/types/typebook.zig").TypeBook;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const allocate = @import("../common/allocate.zig");
 
@@ -63,9 +63,13 @@ pub const Scope = struct {
     }
 
     pub fn deinit(self: *Scope) void {
-        var alloc = self.map.allocator;
+        const alloc = self.getAllocator();
         self.map.deinit();
         alloc.destroy(self);
+    }
+
+    pub fn getAllocator(self: *Scope) *Allocator {
+        return self.map.allocator;
     }
 
     pub fn put(
