@@ -136,7 +136,7 @@ pub const Compiler = struct {
     }
 
     pub fn inferExprType(self: *Compiler, nd: Node) ?Type.Ptr {
-        const valTy = inferrer.inferExprType(self.scope, self.typebook, nd);
+        const valTy = inferrer.inferExprType(self, nd);
         switch (valTy) {
             .Success => |ty| {
                 nd.ty = ty;

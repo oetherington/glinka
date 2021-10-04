@@ -20,10 +20,12 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const Cursor = @import("../common/cursor.zig").Cursor;
+const Config = @import("../common/config.zig").Config;
 const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
+const Compiler = @import("compiler.zig").Compiler;
 const Scope = @import("scope.zig").Scope;
 const TypeBook = @import("typebook.zig").TypeBook;
 const Type = @import("../common/types/type.zig").Type;
@@ -31,6 +33,7 @@ const CompileError = @import("errors/compile_error.zig").CompileError;
 const OpError = @import("errors/op_error.zig").OpError;
 const AssignError = @import("errors/assign_error.zig").AssignError;
 const GenericError = @import("errors/generic_error.zig").GenericError;
+const NopBackend = @import("compiler_test_case.zig").NopBackend;
 const allocate = @import("../common/allocate.zig");
 
 pub const InferResult = union(Variant) {
@@ -82,90 +85,89 @@ test "can create an error InferResult" {
     try expectEqualStrings(symbol, e.symbol);
 }
 
-pub fn inferExprType(scope: *Scope, typebook: *TypeBook, nd: Node) InferResult {
-    const ty = switch (nd.data) {
-        .Int => typebook.getNumber(),
-        .String, .Template => typebook.getString(),
-        .True, .False => typebook.getBoolean(),
-        .Null => typebook.getNull(),
-        .Undefined => typebook.getUndefined(),
-        .Ident => |ident| if (scope.get(ident)) |sym|
+pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
+    switch (nd.data) {
+        .Int => nd.ty = cmp.typebook.getNumber(),
+        .String, .Template => nd.ty = cmp.typebook.getString(),
+        .True, .False => nd.ty = cmp.typebook.getBoolean(),
+        .Null => nd.ty = cmp.typebook.getNull(),
+        .Undefined => nd.ty = cmp.typebook.getUndefined(),
+        .Ident => |ident| nd.ty = if (cmp.scope.get(ident)) |sym|
             sym.ty
         else
-            typebook.getUndefined(),
+            cmp.typebook.getUndefined(),
         .PrefixOp, .PostfixOp => |op| {
-            const expr = switch (inferExprType(scope, typebook, op.expr)) {
+            const expr = switch (inferExprType(cmp, op.expr)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
+
+            const entry = cmp.typebook.getOpEntry(op.op);
 
             // We assume it's unary, otherwise the Node wouldn't have parsed
-            if (typebook.getOpEntry(op.op)) |entry|
-                if (expr.isAssignableTo(entry.Unary.input))
-                    return InferResult.success(
-                        if (entry.Unary.output) |out| out else expr,
-                    );
+            if (entry == null or !expr.isAssignableTo(entry.?.Unary.input)) {
+                return InferResult.err(CompileError.opError(OpError.new(
+                    nd.csr,
+                    op.op,
+                    expr,
+                )));
+            }
 
-            return InferResult.err(CompileError.opError(OpError.new(
-                nd.csr,
-                op.op,
-                expr,
-            )));
+            nd.ty = if (entry.?.Unary.output) |out| out else expr;
         },
         .BinaryOp => |op| {
-            const left = switch (inferExprType(scope, typebook, op.left)) {
+            const left = switch (inferExprType(cmp, op.left)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const right = switch (inferExprType(scope, typebook, op.right)) {
+            const right = switch (inferExprType(cmp, op.right)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            if (!right.isAssignableTo(left))
+            if (!right.isAssignableTo(left)) {
                 return InferResult.err(CompileError.assignError(
                     AssignError.new(nd.csr, left, right),
                 ));
+            }
+
+            const entry = cmp.typebook.getOpEntry(op.op);
 
             // We assume it's binary, otherwise the Node wouldn't have parsed
-            if (typebook.getOpEntry(op.op)) |entry|
-                if (left.isAssignableTo(entry.Binary.input))
-                    return InferResult.success(
-                        if (entry.Binary.output) |out| out else left,
-                    );
+            if (entry == null or !left.isAssignableTo(entry.?.Binary.input)) {
+                return InferResult.err(CompileError.opError(OpError.new(
+                    nd.csr,
+                    op.op,
+                    left,
+                )));
+            }
 
-            return InferResult.err(CompileError.opError(OpError.new(
-                nd.csr,
-                op.op,
-                left,
-            )));
+            nd.ty = if (entry.?.Binary.output) |out| out else left;
         },
         .Ternary => |trn| {
-            _ = switch (inferExprType(scope, typebook, trn.cond)) {
+            _ = switch (inferExprType(cmp, trn.cond)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const ifT = switch (inferExprType(scope, typebook, trn.ifTrue)) {
+            const ifT = switch (inferExprType(cmp, trn.ifTrue)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const ifF = switch (inferExprType(scope, typebook, trn.ifFalse)) {
+            const ifF = switch (inferExprType(cmp, trn.ifFalse)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const ty = if (ifT == ifF)
+            nd.ty = if (ifT == ifF)
                 ifT
             else
-                typebook.getUnion(&.{ ifT, ifF });
-
-            return InferResult.success(ty);
+                cmp.typebook.getUnion(&.{ ifT, ifF });
         },
         .Call => |call| {
-            const func = inferExprType(scope, typebook, call.expr);
+            const func = inferExprType(cmp, call.expr);
             if (func.getType() != .Success)
                 return func;
 
@@ -192,12 +194,12 @@ pub fn inferExprType(scope: *Scope, typebook: *TypeBook, nd: Node) InferResult {
             // ));
             // }
 
-            return InferResult.success(funcTy.ret);
+            nd.ty = funcTy.ret;
         },
-        else => typebook.getUnknown(),
-    };
+        else => nd.ty = cmp.typebook.getUnknown(),
+    }
 
-    return InferResult.success(ty);
+    return InferResult.success(nd.ty.?);
 }
 
 const InferTestCase = struct {
@@ -217,14 +219,18 @@ const InferTestCase = struct {
         comptime nodeType: NodeType,
         nodeData: anytype,
     ) !void {
-        const scope = Scope.new(std.testing.allocator, null);
-        defer scope.deinit();
+        const config = Config{};
+        var backend = NopBackend.new();
 
-        var typebook = TypeBook.new(std.testing.allocator);
-        defer typebook.deinit();
+        var compiler = Compiler.new(
+            std.testing.allocator,
+            &config,
+            &backend.backend,
+        );
+        defer compiler.deinit();
 
         if (self.setup) |setup|
-            try setup(scope, typebook);
+            try setup(compiler.scope, compiler.typebook);
 
         const nd = makeNode(
             std.testing.allocator,
@@ -234,15 +240,17 @@ const InferTestCase = struct {
         );
         defer std.testing.allocator.destroy(nd);
 
-        const res = inferExprType(scope, typebook, nd);
+        const res = inferExprType(&compiler, nd);
 
         if (self.expectedTy) |expectedTy| {
             try expectEqual(InferResult.Success, res.getType());
             try expectEqual(expectedTy, res.Success.getType());
+            try expect(nd.ty != null);
+            try expectEqual(expectedTy, nd.ty.?.getType());
         }
 
         if (self.check) |check|
-            try check(scope, typebook, res);
+            try check(compiler.scope, compiler.typebook, res);
     }
 };
 
