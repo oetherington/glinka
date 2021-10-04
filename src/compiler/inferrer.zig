@@ -30,6 +30,7 @@ const Type = @import("../common/types/type.zig").Type;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const OpError = @import("errors/op_error.zig").OpError;
 const AssignError = @import("errors/assign_error.zig").AssignError;
+const GenericError = @import("errors/generic_error.zig").GenericError;
 const allocate = @import("../common/allocate.zig");
 
 pub const InferResult = union(Variant) {
@@ -162,6 +163,36 @@ pub fn inferExprType(scope: *Scope, typebook: *TypeBook, nd: Node) InferResult {
                 typebook.getUnion(&.{ ifT, ifF });
 
             return InferResult.success(ty);
+        },
+        .Call => |call| {
+            const func = inferExprType(scope, typebook, call.expr);
+            if (func.getType() != .Success)
+                return func;
+
+            if (func.Success.getType() != .Function) {
+                return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        call.expr.csr,
+                        "Invalid function call as expression is not a function",
+                    ),
+                ));
+            }
+
+            const funcTy = func.Success.Function;
+
+            // if (funcTy.args.len != call.args.len) {
+            // return InferResult.err(CompileError.genericError(
+            // GenericError.new(
+            // call.expr.csr,
+            // cmp.fmt(
+            // "Function expected {d} arguments but found {d}",
+            // .{ funcTy.args.len, call.args.len },
+            // ),
+            // ),
+            // ));
+            // }
+
+            return InferResult.success(funcTy.ret);
         },
         else => typebook.getUnknown(),
     };

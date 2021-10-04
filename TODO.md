@@ -23,6 +23,8 @@
    - [ ] Check all code paths return correctly
    - [ ] Fake 'this' parameter
    - [ ] Arrow functions
+ - [ ] Function calls
+ - [ ] Array indexing
  - [x] Unions
  - [ ] Tuples
  - [ ] Arrays
