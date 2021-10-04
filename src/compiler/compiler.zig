@@ -33,6 +33,7 @@ const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const ErrorContext = @import("errors/error_context.zig").ErrorContext;
 const inferrer = @import("inferrer.zig");
+const typeFinder = @import("type_finder.zig");
 const expression = @import("expression.zig");
 const block = @import("block.zig");
 const declaration = @import("declaration.zig");
@@ -149,7 +150,7 @@ pub const Compiler = struct {
     }
 
     pub fn findType(self: *Compiler, nd: Node) ?Type.Ptr {
-        return inferrer.findType(self.scope, self.typebook, nd);
+        return typeFinder.findType(self.scope, self.typebook, nd);
     }
 
     pub fn processNode(self: *Compiler, nd: Node) void {
