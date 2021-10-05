@@ -33,6 +33,7 @@ const CompileError = @import("errors/compile_error.zig").CompileError;
 const OpError = @import("errors/op_error.zig").OpError;
 const AssignError = @import("errors/assign_error.zig").AssignError;
 const GenericError = @import("errors/generic_error.zig").GenericError;
+const TypeError = @import("errors/type_error.zig").TypeError;
 const NopBackend = @import("compiler_test_case.zig").NopBackend;
 const allocate = @import("../common/allocate.zig");
 
@@ -182,17 +183,31 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
 
             const funcTy = func.Success.Function;
 
-            // if (funcTy.args.len != call.args.len) {
-            // return InferResult.err(CompileError.genericError(
-            // GenericError.new(
-            // call.expr.csr,
-            // cmp.fmt(
-            // "Function expected {d} arguments but found {d}",
-            // .{ funcTy.args.len, call.args.len },
-            // ),
-            // ),
-            // ));
-            // }
+            if (funcTy.args.len != call.args.items.len) {
+                return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        call.expr.csr,
+                        cmp.fmt(
+                            "Function expected {d} arguments but found {d}",
+                            .{ funcTy.args.len, call.args.items.len },
+                        ),
+                    ),
+                ));
+            }
+
+            for (call.args.items) |arg, index| {
+                const res = inferExprType(cmp, arg);
+                if (res.getType() != .Success)
+                    return res;
+
+                const ty = res.Success;
+                const argTy = funcTy.args[index];
+                if (!ty.isAssignableTo(argTy)) {
+                    return InferResult.err(CompileError.typeError(
+                        TypeError.new(arg.csr, ty, argTy),
+                    ));
+                }
+            }
 
             nd.ty = funcTy.ret;
         },
@@ -241,6 +256,9 @@ const InferTestCase = struct {
         defer std.testing.allocator.destroy(nd);
 
         const res = inferExprType(&compiler, nd);
+
+        if (res.getType() != .Success and self.expectedTy != null)
+            try res.Error.report(std.io.getStdErr().writer());
 
         if (self.expectedTy) |expectedTy| {
             try expectEqual(InferResult.Success, res.getType());
@@ -368,5 +386,186 @@ test "can infer type of a non-homogeneous ternary expression" {
         .cond = cond,
         .ifTrue = ifTrue,
         .ifFalse = ifFalse,
+    });
+}
+
+test "can infer type of function call with no arguments" {
+    const alloc = std.testing.allocator;
+
+    const func = makeNode(alloc, Cursor.new(0, 0), .Ident, "aFunction");
+    defer alloc.destroy(func);
+
+    const args = node.NodeList{};
+
+    try (InferTestCase{
+        .expectedTy = .Boolean,
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                scope.put(
+                    "aFunction",
+                    typebook.getFunction(typebook.getBoolean(), &[_]Type.Ptr{}),
+                    true,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+    }).run(.Call, .{
+        .expr = func,
+        .args = args,
+    });
+}
+
+test "can infer type of function call with arguments" {
+    const alloc = std.testing.allocator;
+
+    const func = makeNode(alloc, Cursor.new(0, 0), .Ident, "aFunction");
+    defer alloc.destroy(func);
+
+    const arg1 = makeNode(alloc, Cursor.new(0, 0), .Int, "34");
+    const arg2 = makeNode(alloc, Cursor.new(0, 0), .String, "a string");
+    defer alloc.destroy(arg1);
+    defer alloc.destroy(arg2);
+
+    var args = node.NodeList{};
+    defer args.deinit(alloc);
+    try args.append(alloc, arg1);
+    try args.append(alloc, arg2);
+
+    try (InferTestCase{
+        .expectedTy = .Boolean,
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                scope.put(
+                    "aFunction",
+                    typebook.getFunction(
+                        typebook.getBoolean(),
+                        &[_]Type.Ptr{
+                            typebook.getNumber(),
+                            typebook.getString(),
+                        },
+                    ),
+                    true,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+    }).run(.Call, .{
+        .expr = func,
+        .args = args,
+    });
+}
+
+test "an error is thrown when calling a function with a wrong argument count" {
+    const alloc = std.testing.allocator;
+
+    const func = makeNode(alloc, Cursor.new(0, 0), .Ident, "aFunction");
+    defer alloc.destroy(func);
+
+    const arg = makeNode(alloc, Cursor.new(0, 0), .Int, "34");
+    defer alloc.destroy(arg);
+
+    var args = node.NodeList{};
+    defer args.deinit(alloc);
+    try args.append(alloc, arg);
+
+    try (InferTestCase{
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                scope.put(
+                    "aFunction",
+                    typebook.getFunction(
+                        typebook.getBoolean(),
+                        &[_]Type.Ptr{
+                            typebook.getNumber(),
+                            typebook.getString(),
+                        },
+                    ),
+                    true,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+                _ = typebook;
+
+                try expectEqual(InferResult.Variant.Error, res.getType());
+
+                const err = res.Error;
+                try expectEqual(CompileError.Type.GenericError, err.getType());
+                try expectEqualStrings(
+                    "Function expected 2 arguments but found 1",
+                    err.GenericError.msg,
+                );
+            }
+        }).check,
+    }).run(.Call, .{
+        .expr = func,
+        .args = args,
+    });
+}
+
+test "an error is thrown if function arguments have incorrect types" {
+    const alloc = std.testing.allocator;
+
+    const func = makeNode(alloc, Cursor.new(0, 0), .Ident, "aFunction");
+    defer alloc.destroy(func);
+
+    const arg = makeNode(alloc, Cursor.new(0, 0), .Int, "34");
+    defer alloc.destroy(arg);
+
+    var args = node.NodeList{};
+    defer args.deinit(alloc);
+    try args.append(alloc, arg);
+
+    try (InferTestCase{
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                scope.put(
+                    "aFunction",
+                    typebook.getFunction(typebook.getBoolean(), &[_]Type.Ptr{
+                        typebook.getString(),
+                    }),
+                    true,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+
+                try expectEqual(InferResult.Variant.Error, res.getType());
+
+                const err = res.Error;
+                try expectEqual(CompileError.Type.TypeError, err.getType());
+                try expectEqual(err.TypeError.valueTy, typebook.getNumber());
+                try expectEqual(err.TypeError.targetTy, typebook.getString());
+            }
+        }).check,
+    }).run(.Call, .{
+        .expr = func,
+        .args = args,
     });
 }

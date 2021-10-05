@@ -115,6 +115,20 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
             try self.emitExpr(trn.ifFalse);
             try self.out.print(")", .{});
         },
+        .Call => |call| {
+            try self.out.print("(", .{});
+            try self.emitExpr(call.expr);
+            try self.out.print("(", .{});
+
+            var prefix: []const u8 = "";
+            for (call.args.items) |arg| {
+                try self.out.print("{s}", .{prefix});
+                try self.emitExpr(arg);
+                prefix = ", ";
+            }
+
+            try self.out.print("))", .{});
+        },
         else => std.debug.panic(
             "Invalid Node type in emitExpr: {?}",
             .{value},
@@ -250,6 +264,31 @@ test "JsBackend can emit ternary expression" {
                 alloc.destroy(nd.data.Ternary.cond);
                 alloc.destroy(nd.data.Ternary.ifTrue);
                 alloc.destroy(nd.data.Ternary.ifFalse);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit function call expression" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
+            .Call,
+            node.Call{
+                .expr = EmitTestCase.makeNode(.Ident, "aFunction"),
+                .args = node.NodeList{
+                    .items = &[_]Node{
+                        EmitTestCase.makeNode(.Int, "4"),
+                        EmitTestCase.makeNode(.String, "'a'"),
+                    },
+                },
+            },
+        ),
+        .expectedOutput = "(aFunction(4, 'a'));\n",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.Call.expr);
+                alloc.destroy(nd.data.Call.args.items[0]);
+                alloc.destroy(nd.data.Call.args.items[1]);
             }
         }).cleanup,
     }).run();

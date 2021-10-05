@@ -103,6 +103,7 @@ pub const JsBackend = struct {
             .PostfixOp,
             .BinaryOp,
             .Ternary,
+            .Call,
             => {
                 try self.emitExpr(nd);
                 try self.out.print(";\n", .{});
