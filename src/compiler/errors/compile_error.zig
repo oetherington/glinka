@@ -31,6 +31,7 @@ const ReturnError = @import("return_error.zig").ReturnError;
 const ParseError = @import("../../common/parse_error.zig").ParseError;
 const TokenType = @import("../../common/token.zig").Token.Type;
 const Cursor = @import("../../common/cursor.zig").Cursor;
+const reportTestCase = @import("report_test_case.zig").reportTestCase;
 
 pub const CompileError = union(CompileError.Type) {
     pub const Type = enum(u8) {
@@ -138,6 +139,10 @@ test "can create a CompileError from a TypeError" {
     try expectEqual(cursor, compileError.TypeError.csr);
     try expectEqual(&valueTy, compileError.TypeError.valueTy);
     try expectEqual(&targetTy, compileError.TypeError.targetTy);
+    try reportTestCase(
+        compileError,
+        "Type Error: 5:7: The type string is not coercable to the type boolean\n",
+    );
 }
 
 test "can create a CompileError from an OpError" {
@@ -150,6 +155,10 @@ test "can create a CompileError from an OpError" {
     try expectEqual(cursor, compileError.OpError.csr);
     try expectEqual(op, compileError.OpError.op);
     try expectEqual(ty.getType(), compileError.OpError.ty.getType());
+    try reportTestCase(
+        compileError,
+        "Error: 5:7: Operator 'Sub' is not defined for type 'string'\n",
+    );
 }
 
 test "can create a CompileError from a ContextError" {
@@ -165,6 +174,10 @@ test "can create a CompileError from a ContextError" {
         expectedContext,
         compileError.ContextError.expectedContext,
     );
+    try reportTestCase(
+        compileError,
+        "Error: 5:7: Something cannot occur outside of a context\n",
+    );
 }
 
 test "can create a CompileError from a RedefinitionError" {
@@ -177,6 +190,10 @@ test "can create a CompileError from a RedefinitionError" {
     try expectEqualStrings(name, compileError.RedefinitionError.name);
     try expectEqual(firstDefined, compileError.RedefinitionError.firstDefined);
     try expectEqual(secondDefined, compileError.RedefinitionError.secondDefined);
+    try reportTestCase(
+        compileError,
+        "Error: 3:3: Redefinition of symbol 'aSymbol' (first defined at line 1)\n",
+    );
 }
 
 test "can create a CompileError from a GenericError" {
@@ -187,6 +204,7 @@ test "can create a CompileError from a GenericError" {
     try expectEqual(CompileError.Type.GenericError, compileError.getType());
     try expectEqual(csr, compileError.GenericError.csr);
     try expectEqualStrings(msg, compileError.GenericError.msg);
+    try reportTestCase(compileError, "Error: 3:3: Some error message\n");
 }
 
 test "can create a CompileError from an AssignError" {
@@ -199,6 +217,10 @@ test "can create a CompileError from an AssignError" {
     try expectEqual(csr, compileError.AssignError.csr);
     try expectEqual(&left, compileError.AssignError.left);
     try expectEqual(&right, compileError.AssignError.right);
+    try reportTestCase(
+        compileError,
+        "Error: 2:5: Value of type 'number' cannot be assigned to a variable of type 'string'\n",
+    );
 }
 
 test "can create a CompileError from a ReturnError" {
@@ -211,6 +233,10 @@ test "can create a CompileError from a ReturnError" {
     try expectEqual(csr, compileError.ReturnError.csr);
     try expectEqual(&expectedTy, compileError.ReturnError.expectedTy);
     try expectEqual(&actualTy, compileError.ReturnError.actualTy.?);
+    try reportTestCase(
+        compileError,
+        "Error: 2:5: Cannot return a value of type string from a function returning number\n",
+    );
 }
 
 test "can create a CompileError from an ImplicitAnyError" {
@@ -221,6 +247,10 @@ test "can create a CompileError from an ImplicitAnyError" {
     try expectEqual(CompileError.Type.ImplicitAnyError, compileError.getType());
     try expectEqual(cursor, compileError.ImplicitAnyError.csr);
     try expectEqualStrings(symbol, compileError.ImplicitAnyError.symbol);
+    try reportTestCase(
+        compileError,
+        "Error: 2:5: Untyped symbol 'anySymbol' implicitely has type 'any'\n",
+    );
 }
 
 test "can create a CompileError from a ParseError" {
@@ -231,4 +261,5 @@ test "can create a CompileError from a ParseError" {
     try expectEqual(CompileError.Type.ParseError, compileError.getType());
     try expectEqual(cursor, compileError.ParseError.csr);
     try expectEqualStrings(message, compileError.ParseError.data.Message);
+    // TODO: Add test for reporting ParseErrors
 }

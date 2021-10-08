@@ -304,7 +304,7 @@ fn returnErrorTestCase(
                 defer ctx.deinit();
                 var writer = ctx.writer();
 
-                try cmp.errors.reportWithWriter(writer);
+                try cmp.errors.report(writer);
 
                 var str = try ctx.toString();
                 defer ctx.freeString(str);

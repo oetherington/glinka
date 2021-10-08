@@ -101,7 +101,7 @@ pub const Compiler = struct {
     }
 
     pub fn reportErrors(self: Compiler) !void {
-        try self.errors.report();
+        try self.errors.reportToStdErr();
     }
 
     pub fn getError(self: Compiler, index: usize) CompileError {

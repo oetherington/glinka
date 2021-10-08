@@ -49,8 +49,8 @@ test "can initialize a TypeError" {
     const csr = Cursor.new(2, 5);
     const valueTy = Type.newNumber();
     const targetTy = Type.newString();
-    const typeError = TypeError.new(csr, &valueTy, &targetTy);
-    try expectEqual(csr, typeError.csr);
-    try expectEqual(&valueTy, typeError.valueTy);
-    try expectEqual(&targetTy, typeError.targetTy);
+    const err = TypeError.new(csr, &valueTy, &targetTy);
+    try expectEqual(csr, err.csr);
+    try expectEqual(&valueTy, err.valueTy);
+    try expectEqual(&targetTy, err.targetTy);
 }

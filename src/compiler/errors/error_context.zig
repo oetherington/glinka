@@ -23,6 +23,7 @@ const ParseError = @import("../../common/parse_error.zig").ParseError;
 const compileError = @import("compile_error.zig");
 const CompileErrorType = compileError.CompileErrorType;
 const CompileError = compileError.CompileError;
+const reportTestCase = @import("report_test_case.zig").reportTestCase;
 
 pub const ErrorContext = struct {
     const ErrorList = std.ArrayList(CompileError);
@@ -51,28 +52,44 @@ pub const ErrorContext = struct {
         return self.list.items[index];
     }
 
-    pub fn reportWithWriter(self: ErrorContext, writer: anytype) !void {
+    pub fn report(self: ErrorContext, writer: anytype) !void {
         for (self.list.items) |err|
             try err.report(writer);
     }
 
-    pub fn report(self: ErrorContext) !void {
+    pub fn reportToStdErr(self: ErrorContext) !void {
         const writer = std.io.getStdErr().writer();
-        try self.reportWithWriter(writer);
+        try self.report(writer);
     }
 };
 
-test "can append errors to an ErrorContext" {
+test "can append errors to an ErrorContext and report them" {
     var ctx = ErrorContext.new(std.testing.allocator);
     defer ctx.deinit();
 
-    const cursor = Cursor.new(3, 5);
-    const message = "Some error message";
-    const parseError = ParseError.message(cursor, message);
-    const err = CompileError.parseError(parseError);
+    const err1 = CompileError.parseError(
+        ParseError.message(Cursor.new(3, 5), "Some error message"),
+    );
+
+    const err2 = CompileError.parseError(
+        ParseError.message(Cursor.new(4, 6), "Some other error message"),
+    );
 
     try expectEqual(@intCast(usize, 0), ctx.count());
-    try ctx.append(err);
+
+    try ctx.append(err1);
     try expectEqual(@intCast(usize, 1), ctx.count());
-    try expectEqual(err, ctx.get(0));
+    try expectEqual(err1, ctx.get(0));
+
+    try ctx.append(err2);
+    try expectEqual(@intCast(usize, 2), ctx.count());
+    try expectEqual(err2, ctx.get(1));
+
+    try reportTestCase(
+        ctx,
+        \\Parse Error: 3:5: Some error message
+        \\Parse Error: 4:6: Some other error message
+        \\
+        ,
+    );
 }

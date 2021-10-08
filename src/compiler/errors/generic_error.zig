@@ -45,7 +45,7 @@ pub const GenericError = struct {
     }
 };
 
-test "can initialize a GenericError" {
+test "can initialize and report a GenericError" {
     const csr = Cursor.new(2, 5);
     const msg = "Some error message";
     const err = GenericError.new(csr, msg);
