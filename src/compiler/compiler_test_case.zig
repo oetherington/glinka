@@ -64,6 +64,7 @@ pub const CompilerTestCase = struct {
         case: CompilerTestCase,
         cmp: Compiler,
     ) anyerror!void = CompilerTestCase.checkNoErrors,
+    setup: ?fn (cmp: Compiler) anyerror!void = null,
 
     pub fn run(comptime self: @This()) !void {
         var arena = Arena.init(std.testing.allocator);
@@ -88,6 +89,9 @@ pub const CompilerTestCase = struct {
             &backend.backend,
         );
         defer compiler.deinit();
+
+        if (self.setup) |setup|
+            try setup(compiler);
 
         try compiler.compileProgramNode(res.Success);
 
@@ -118,6 +122,9 @@ pub const CompilerTestCase = struct {
     }
 
     pub fn checkNoErrors(self: CompilerTestCase, cmp: Compiler) anyerror!void {
-        try self.expect(!cmp.hasErrors());
+        const hasErrors = cmp.hasErrors();
+        if (hasErrors)
+            try cmp.reportErrors();
+        try self.expect(!hasErrors);
     }
 };

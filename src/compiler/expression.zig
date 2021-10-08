@@ -119,3 +119,22 @@ test "can compile ternary expressions" {
         .code = "true ? 1 : 0;",
     }).run();
 }
+
+test "can compile function call expressions" {
+    try (CompilerTestCase{
+        .code = "aFunction('a', 1);",
+        .setup = (struct {
+            pub fn setup(cmp: Compiler) anyerror!void {
+                const ty = cmp.typebook.getFunction(
+                    cmp.typebook.getVoid(),
+                    &[_]Type.Ptr{
+                        cmp.typebook.getString(),
+                        cmp.typebook.getNumber(),
+                    },
+                );
+
+                cmp.scope.put("aFunction", ty, true, Cursor.new(0, 0));
+            }
+        }).setup,
+    }).run();
+}

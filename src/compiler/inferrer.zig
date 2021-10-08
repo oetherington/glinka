@@ -176,7 +176,13 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
                 return InferResult.err(CompileError.genericError(
                     GenericError.new(
                         call.expr.csr,
-                        "Invalid function call as expression is not a function",
+                        if (call.expr.getType() == .Ident)
+                            cmp.fmt(
+                                "Variable '{s}' is not a function",
+                                .{call.expr.data.Ident},
+                            )
+                        else
+                            "Calling a value that is not a function",
                     ),
                 ));
             }

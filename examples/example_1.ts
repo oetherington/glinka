@@ -62,6 +62,7 @@ function adder(a: number, b: number) : number {
 }
 
 const aResult = adder(4, 5);
+adder(3, 5);
 
 // Unions
 let aUnion: string|number = "hello world";

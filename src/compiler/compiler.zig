@@ -166,6 +166,7 @@ pub const Compiler = struct {
             .Undefined,
             .Int,
             .String,
+            .Call,
             => expression.processExpression(self, nd),
             .Block => block.processBlock(self, nd),
             .Decl => declaration.processDecl(self, nd),
