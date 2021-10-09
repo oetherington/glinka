@@ -33,6 +33,16 @@ else if (aString)
 else
 	aNumber = 7;
 
+// Switch
+switch (aNumber) {
+	case 1:
+		break;
+	case 2:
+		null;
+	default:
+		break;
+}
+
 // Loops
 while (true)
 	break;

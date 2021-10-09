@@ -171,6 +171,7 @@ pub const Compiler = struct {
             .Block => block.processBlock(self, nd),
             .Decl => declaration.processDecl(self, nd),
             .If => conditional.processConditional(self, nd),
+            .Switch => conditional.processSwitch(self, nd),
             .While => loop.processWhile(self, nd),
             .Do => loop.processDo(self, nd),
             .Break => loop.processBreak(self, nd),

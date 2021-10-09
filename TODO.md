@@ -11,7 +11,7 @@
  - [x] Ternary expressions
  - [x] Var/let/const
  - [x] If/else if/else
- - [ ] Switch
+ - [x] Switch
  - [x] While loops
  - [x] Do loops
  - [ ] C-style for loops
