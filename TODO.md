@@ -46,3 +46,6 @@
  - [ ] Declare
  - [ ] Namespace
  - [ ] Async/await
+ - [ ] Type casting
+ - [ ] Type predicates
+ - [ ] Object destructuring

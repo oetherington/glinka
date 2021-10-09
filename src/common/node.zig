@@ -360,6 +360,45 @@ pub const Try = struct {
     }
 };
 
+pub const Switch = struct {
+    pub const Case = struct {
+        value: Node,
+        stmts: NodeList,
+
+        pub fn eql(a: Case, b: Case) bool {
+            return genericEql.eql(a, b);
+        }
+    };
+
+    pub const CaseList = std.ArrayListUnmanaged(Case);
+
+    expr: Node,
+    cases: CaseList,
+    default: ?NodeList,
+
+    pub fn dump(
+        self: Try,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Switch:\n", .{});
+        try self.expr.dumpIndented(writer, indent + 2);
+
+        for (self.cases.items) |item| {
+            try putInd(writer, indent + 2, "Case:\n", .{});
+            try item.value.dumpIndented(writer, indent + 4);
+            for (item.stmts) |stmt|
+                try stmt.dumpIndented(writer, indent + 4);
+        }
+
+        if (self.default) |default| {
+            try putInd(writer, indent + 2, "Default:\n", .{});
+            for (default.items) |stmt|
+                try stmt.dumpIndented(writer, indent + 4);
+        }
+    }
+};
+
 pub const Dot = struct {
     expr: Node,
     ident: []const u8,
@@ -433,6 +472,7 @@ pub const NodeType = enum {
     Function,
     Block,
     If,
+    Switch,
     While,
     Do,
     Return,
@@ -472,6 +512,7 @@ pub const NodeData = union(NodeType) {
     Function: Function,
     Block: NodeList,
     If: If,
+    Switch: Switch,
     While: While,
     Do: Do,
     Return: ?Node,
@@ -542,6 +583,7 @@ pub const NodeData = union(NodeType) {
             .Ternary => |ternary| try ternary.dump(writer, indent),
             .Function => |func| try func.dump(writer, indent),
             .If => |stmt| try stmt.dump(writer, indent),
+            .Switch => |stmt| try stmt.dump(writer, indent),
             .While => |loop| try loop.dump(writer, indent),
             .Do => |loop| try loop.dump(writer, indent),
             .Try => |t| try t.dump(writer, indent),

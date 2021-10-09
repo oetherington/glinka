@@ -54,6 +54,7 @@ const StmtTestCase = struct {
         try self.check(res.Success);
 
         const eof = parser.next();
+        try eof.reportIfError(std.io.getStdErr().writer());
         try expect(eof.isSuccess());
         try expectEqual(NodeType.EOF, eof.Success.getType());
     }
@@ -381,6 +382,171 @@ test "can parse an if statement with an 'else if' and an 'else' branch" {
 
                 const elseBranch = value.data.If.elseBranch.?;
                 try expectEqual(NodeType.Block, elseBranch.getType());
+            }
+        }).check,
+    }).run();
+}
+
+fn parseSwitch(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Switch);
+
+    const csr = psr.lexer.token.csr;
+
+    const lparen = psr.lexer.next();
+    if (lparen.ty != .LParen)
+        return ParseResult.expected(TokenType.LParen, lparen);
+
+    const next = psr.lexer.next();
+    const expr = switch (psr.parseExpr()) {
+        .Success => |exp| exp,
+        .Error => |err| return ParseResult.err(err),
+        .NoMatch => return ParseResult.expected(
+            "expression for switch statement",
+            next,
+        ),
+    };
+
+    if (psr.lexer.token.ty != .RParen)
+        return ParseResult.expected(TokenType.RParen, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    if (psr.lexer.token.ty != .LBrace)
+        return ParseResult.expected(TokenType.LBrace, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    const alloc = psr.getAllocator();
+
+    const nd = makeNode(alloc, csr, .Switch, node.Switch{
+        .expr = expr,
+        .cases = .{},
+        .default = null,
+    });
+
+    while (psr.lexer.token.ty == .Case) {
+        _ = psr.lexer.next();
+
+        const value = switch (psr.parseExpr()) {
+            .Success => |val| val,
+            .Error => |err| return ParseResult.err(err),
+            .NoMatch => return ParseResult.expected(
+                "expression after 'case'",
+                psr.lexer.token,
+            ),
+        };
+
+        var case = node.Switch.Case{
+            .value = value,
+            .stmts = node.NodeList{},
+        };
+
+        if (psr.lexer.token.ty != .Colon)
+            return ParseResult.expected(TokenType.Colon, psr.lexer.token);
+
+        _ = psr.lexer.next();
+
+        while (psr.lexer.token.ty != .Case and
+            psr.lexer.token.ty != .Default and
+            psr.lexer.token.ty != .RBrace)
+        {
+            switch (psr.parseStmt()) {
+                .Success => |stmt| case.stmts.append(
+                    alloc,
+                    stmt,
+                ) catch allocate.reportAndExit(),
+                .Error => |err| return ParseResult.err(err),
+                .NoMatch => return ParseResult.expected(
+                    "a statement",
+                    psr.lexer.token,
+                ),
+            }
+        }
+
+        nd.data.Switch.cases.append(alloc, case) catch allocate.reportAndExit();
+    }
+
+    if (psr.lexer.token.ty == .Default) {
+        _ = psr.lexer.next();
+
+        if (psr.lexer.token.ty != .Colon)
+            return ParseResult.expected(TokenType.Colon, psr.lexer.token);
+
+        _ = psr.lexer.next();
+
+        var default = node.NodeList{};
+
+        while (psr.lexer.token.ty != .RBrace) {
+            switch (psr.parseStmt()) {
+                .Success => |stmt| default.append(
+                    alloc,
+                    stmt,
+                ) catch allocate.reportAndExit(),
+                .Error => |err| return ParseResult.err(err),
+                .NoMatch => return ParseResult.expected(
+                    "a statement",
+                    psr.lexer.token,
+                ),
+            }
+        }
+
+        nd.data.Switch.default = default;
+    }
+
+    if (psr.lexer.token.ty != .RBrace)
+        return ParseResult.expected(TokenType.RBrace, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return ParseResult.success(nd);
+}
+
+test "can parse a switch statement" {
+    try (StmtTestCase{
+        .code = 
+        \\switch (a) {
+        \\  case 1:
+        \\    null;
+        \\    break;
+        \\  case 2:
+        \\    return;
+        \\  default:
+        \\    null;
+        \\}
+        ,
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Switch, value.getType());
+
+                const sw = value.data.Switch;
+                try expectEqual(NodeType.Ident, sw.expr.getType());
+                try expectEqualStrings("a", sw.expr.data.Ident);
+
+                const cases = sw.cases.items;
+                try expectEqual(@intCast(usize, 2), cases.len);
+
+                try expectEqual(NodeType.Int, cases[0].value.getType());
+                try expectEqualStrings("1", cases[0].value.data.Int);
+                try expectEqual(
+                    NodeType.Null,
+                    cases[0].stmts.items[0].getType(),
+                );
+                try expectEqual(
+                    NodeType.Break,
+                    cases[0].stmts.items[1].getType(),
+                );
+
+                try expectEqual(NodeType.Int, cases[1].value.getType());
+                try expectEqualStrings("2", cases[1].value.data.Int);
+                try expectEqual(
+                    NodeType.Return,
+                    cases[1].stmts.items[0].getType(),
+                );
+
+                try expect(sw.default != null);
+                const default = sw.default.?.items;
+                try expectEqual(@intCast(usize, 1), default.len);
+                try expectEqual(NodeType.Null, default[0].getType());
             }
         }).check,
     }).run();
@@ -882,6 +1048,7 @@ pub fn parseStmtInternal(psr: *TsParser) ParseResult {
         .Const => parseDecl(psr, .Const),
         .Return => parseReturn(psr),
         .If => parseIf(psr),
+        .Switch => parseSwitch(psr),
         .While => parseWhile(psr),
         .Do => parseDo(psr),
         .LBrace => parseBlockStmt(psr),
