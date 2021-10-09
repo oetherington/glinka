@@ -129,6 +129,16 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
 
             try self.out.print("))", .{});
         },
+        .Array => |arr| {
+            try self.out.print("[ ", .{});
+
+            for (arr.items) |item| {
+                try self.emitExpr(item);
+                try self.out.print(", ", .{});
+            }
+
+            try self.out.print("]", .{});
+        },
         else => std.debug.panic(
             "Invalid Node type in emitExpr: {?}",
             .{value},
@@ -289,6 +299,29 @@ test "JsBackend can emit function call expression" {
                 alloc.destroy(nd.data.Call.expr);
                 alloc.destroy(nd.data.Call.args.items[0]);
                 alloc.destroy(nd.data.Call.args.items[1]);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit array literal expression" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
+            .Array,
+            node.NodeList{
+                .items = &[_]Node{
+                    EmitTestCase.makeNode(.Int, "1"),
+                    EmitTestCase.makeNode(.String, "'a'"),
+                    EmitTestCase.makeNode(.Null, {}),
+                },
+            },
+        ),
+        .expectedOutput = "[ 1, 'a', null, ];\n",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.Array.items[0]);
+                alloc.destroy(nd.data.Array.items[1]);
+                alloc.destroy(nd.data.Array.items[2]);
             }
         }).cleanup,
     }).run();

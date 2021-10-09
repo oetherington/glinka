@@ -76,7 +76,13 @@ pub const ArrayType = struct {
     subtype: Type.Ptr,
 
     pub fn write(self: ArrayType, writer: anytype) !void {
-        try self.subtype.write(writer);
-        try writer.print("[]", .{});
+        if (self.subtype.getType() == .Union) {
+            try writer.print("(", .{});
+            try self.subtype.write(writer);
+            try writer.print(")[]", .{});
+        } else {
+            try self.subtype.write(writer);
+            try writer.print("[]", .{});
+        }
     }
 };

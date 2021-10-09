@@ -52,7 +52,7 @@ const ParseTypeTestCase = struct {
     }
 };
 
-pub fn parseTypeName(psr: *TsParser) ParseResult {
+fn parseTypeName(psr: *TsParser) ParseResult {
     switch (psr.lexer.token.ty) {
         .Ident => {
             const nd = makeNode(
@@ -77,6 +77,16 @@ pub fn parseTypeName(psr: *TsParser) ParseResult {
             _ = psr.lexer.next();
 
             return ParseResult.success(nd);
+        },
+        .LParen => {
+            _ = psr.lexer.next();
+            const res = parseTypeInternal(psr);
+            if (!res.isSuccess())
+                return res;
+            if (psr.lexer.token.ty != .RParen)
+                return ParseResult.expected(TokenType.RParen, psr.lexer.token);
+            _ = psr.lexer.next();
+            return res;
         },
         else => return ParseResult.noMatch(null),
     }
@@ -110,7 +120,7 @@ test "can parse void type" {
     }).run();
 }
 
-pub fn parseArrayType(psr: *TsParser) ParseResult {
+fn parseArrayType(psr: *TsParser) ParseResult {
     var res = parseTypeName(psr);
     if (!res.isSuccess())
         return res;
@@ -170,7 +180,7 @@ test "can parse multidimensional array type" {
     }).run();
 }
 
-pub fn parseUnionType(psr: *TsParser) ParseResult {
+fn parseUnionType(psr: *TsParser) ParseResult {
     const res = parseArrayType(psr);
     if (!res.isSuccess() or psr.lexer.token.ty != .BitOr)
         return res;
@@ -228,8 +238,36 @@ test "can parse union types" {
     }).run();
 }
 
+fn parseTypeInternal(psr: *TsParser) ParseResult {
+    return parseUnionType(psr);
+}
+
 pub fn parseType(psr: *Parser) ParseResult {
-    return parseUnionType(@fieldParentPtr(TsParser, "parser", psr));
+    return parseTypeInternal(@fieldParentPtr(TsParser, "parser", psr));
+}
+
+test "can parse nested types" {
+    try (ParseTypeTestCase{
+        .code = " (number|string)[] ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+
+                const ty = res.Success;
+                try expectEqual(NodeType.ArrayType, ty.getType());
+
+                const sub = ty.data.ArrayType;
+                try expectEqual(NodeType.UnionType, sub.getType());
+
+                const tys = sub.data.UnionType.items;
+                try expectEqual(@intCast(usize, 2), tys.len);
+                try expectEqual(NodeType.TypeName, tys[0].getType());
+                try expectEqualStrings("number", tys[0].data.TypeName);
+                try expectEqual(NodeType.TypeName, tys[1].getType());
+                try expectEqualStrings("string", tys[1].data.TypeName);
+            }
+        }).check,
+    }).run();
 }
 
 test "invalid types return NoMatch" {

@@ -66,6 +66,17 @@ const UnionTypeMap = struct {
         self.map.deinit();
     }
 
+    const TypeList = std.ArrayList(Type.Ptr);
+
+    fn flattenTypes(out: *TypeList, in: []Type.Ptr) void {
+        for (in) |ty| {
+            switch (ty.*) {
+                .Union => |un| UnionTypeMap.flattenTypes(out, un.tys),
+                else => out.append(ty) catch allocate.reportAndExit(),
+            }
+        }
+    }
+
     pub fn get(self: *UnionTypeMap, tys_: []Type.Ptr) Type.Ptr {
         const Context = struct {
             pub fn lessThan(_: @This(), lhs: Type.Ptr, rhs: Type.Ptr) bool {
@@ -73,13 +84,16 @@ const UnionTypeMap = struct {
             }
         };
 
-        var tys = allocate.alloc(self.map.allocator, Type.Ptr, tys_.len);
-        std.mem.copy(Type.Ptr, tys, tys_);
+        var flattened = TypeList.init(self.map.allocator);
+        flattened.ensureTotalCapacity(tys_.len) catch allocate.reportAndExit();
+        UnionTypeMap.flattenTypes(&flattened, tys_);
+
+        const tys = flattened.items;
         std.sort.insertionSort(Type.Ptr, tys, Context{}, Context.lessThan);
 
         const existing = self.map.get(tys);
         if (existing) |ty| {
-            self.map.allocator.free(tys);
+            flattened.deinit();
             return ty;
         }
 

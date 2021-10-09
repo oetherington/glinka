@@ -223,6 +223,12 @@ pub const TypeBook = struct {
     pub fn getUnion(self: *TypeBook, tys: []Type.Ptr) Type.Ptr {
         return self.unionTys.get(tys);
     }
+
+    pub fn combine(self: *TypeBook, a: Type.Ptr, b: Type.Ptr) Type.Ptr {
+        if (b.isAssignableTo(a))
+            return a;
+        return self.getUnion(&[_]Type.Ptr{ a, b });
+    }
 };
 
 test "type book can return builtin types" {
@@ -325,4 +331,20 @@ test "invalid token types don't have an OpEntry" {
     const ty = TokenType.LParen;
     const entry = book.getOpEntry(ty);
     try expect(entry == null);
+}
+
+test "typebook can combine types" {
+    var book = TypeBook.new(std.testing.allocator);
+    defer book.deinit();
+
+    const num = book.getNumber();
+    const str = book.getString();
+
+    const a = book.combine(num, num);
+    try expectEqual(num, a);
+
+    const b = book.combine(num, str);
+    try expectEqual(Type.Type.Union, b.getType());
+    try expectEqual(num, b.Union.tys[0]);
+    try expectEqual(str, b.Union.tys[1]);
 }

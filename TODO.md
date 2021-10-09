@@ -24,10 +24,10 @@
    - [ ] Fake 'this' parameter
    - [ ] Arrow functions
  - [x] Function calls
- - [ ] Array indexing
  - [x] Unions
  - [ ] Tuples
- - [ ] Arrays
+ - [x] Arrays
+   - [ ] Array indexing
    - [ ] Array<> generic
  - [ ] Type aliases
  - [ ] Interfaces

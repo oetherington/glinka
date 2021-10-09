@@ -141,6 +141,25 @@ pub const Type = union(This.Type) {
         if (self == target)
             return true;
 
+        switch (self.*) {
+            .Array => |arr| {
+                if (target.getType() != .Array)
+                    return false;
+
+                if (arr.subtype.getType() == .Unknown)
+                    return true;
+
+                return arr.subtype.isAssignableTo(target.Array.subtype);
+            },
+            .Union => |un| {
+                for (un.tys) |ty|
+                    if (!ty.isAssignableTo(target))
+                        return false;
+                return true;
+            },
+            else => {},
+        }
+
         switch (target.*) {
             .Union => |un| {
                 for (un.tys) |ty|
@@ -358,6 +377,30 @@ test "unions can be assigned from any of their subtypes" {
     try AssignableTestCase.newF(&s, &u).run();
 }
 
+test "array subtypes must match for assignment" {
+    const n = Type.newNumber();
+    const b = Type.newBoolean();
+    const na = Type.newArray(Type.ArrayType{ .subtype = &n });
+    const ba = Type.newArray(Type.ArrayType{ .subtype = &b });
+
+    try AssignableTestCase.new(&na, &na).run();
+    try AssignableTestCase.new(&ba, &ba).run();
+    try AssignableTestCase.newF(&na, &ba).run();
+}
+
+test "unknown[] can be assigned to any array type" {
+    const n = Type.newNumber();
+    const b = Type.newBoolean();
+    const u = Type.newUnknown();
+    const na = Type.newArray(Type.ArrayType{ .subtype = &n });
+    const ba = Type.newArray(Type.ArrayType{ .subtype = &b });
+    const ua = Type.newArray(Type.ArrayType{ .subtype = &u });
+
+    try AssignableTestCase.new(&ua, &na).run();
+    try AssignableTestCase.new(&ua, &ba).run();
+    try AssignableTestCase.newF(&na, &ua).run();
+}
+
 test "other type assignments are invalid" {
     const n = Type.newNumber();
     const a = Type.newAny();
@@ -460,6 +503,16 @@ test "can write an array type" {
     try (WriteTypeTestCase{
         .ty = Type.newArray(Type.ArrayType{ .subtype = &n }),
         .expected = "number[]",
+    }).run();
+}
+
+test "can write a nested array type" {
+    const n = Type.newNumber();
+    const s = Type.newString();
+    const u = Type.newUnion(Type.UnionType{ .tys = &[_]Type.Ptr{ &n, &s } });
+    try (WriteTypeTestCase{
+        .ty = Type.newArray(Type.ArrayType{ .subtype = &u }),
+        .expected = "(number|string)[]",
     }).run();
 }
 

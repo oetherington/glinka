@@ -104,6 +104,7 @@ pub const JsBackend = struct {
             .BinaryOp,
             .Ternary,
             .Call,
+            .Array,
             => {
                 try self.emitExpr(nd);
                 try self.out.print(";\n", .{});

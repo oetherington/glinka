@@ -217,6 +217,27 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
 
             nd.ty = funcTy.ret;
         },
+        .Array => |arr| {
+            if (arr.items.len == 0) {
+                nd.ty = cmp.typebook.getArray(cmp.typebook.getUnknown());
+            } else {
+                var res = inferExprType(cmp, arr.items[0]);
+                if (res.getType() != .Success)
+                    return res;
+
+                var subtype = res.Success;
+
+                for (arr.items[1..]) |item| {
+                    res = inferExprType(cmp, item);
+                    if (res.getType() != .Success)
+                        return res;
+
+                    subtype = cmp.typebook.combine(subtype, res.Success);
+                }
+
+                nd.ty = cmp.typebook.getArray(subtype);
+            }
+        },
         else => nd.ty = cmp.typebook.getUnknown(),
     }
 
@@ -574,4 +595,11 @@ test "an error is thrown if function arguments have incorrect types" {
         .expr = func,
         .args = args,
     });
+}
+
+test "can infer type of an empty array" {
+    const items = node.NodeList{ .items = &[_]Node{} };
+    try (InferTestCase{
+        .expectedTy = .Array,
+    }).run(.Array, items);
 }

@@ -69,4 +69,11 @@ let aUnion: string|number = "hello world";
 aUnion = 4;
 
 // Arrays
-let anArray: number[];
+let anEmptyArray: string[] = [];
+let aHomogeneousArray: number[] = [ 1, 2, 3 ];
+let anInhomogeneousArray: (string|number|boolean)[] = [ 1, 'a', true ];
+aHomogeneousArray = [ 4, 5, 6 ];
+anInhomogeneousArray = [ 'a', 'b', 'c' ];
+anInhomogeneousArray = [ 1, 1, 2, 3, 5, 8, 13, ];
+anInhomogeneousArray = [ true, true, false, ];
+anInhomogeneousArray = [ false, 0, ];
