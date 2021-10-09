@@ -139,6 +139,12 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
 
             try self.out.print("]", .{});
         },
+        .ArrayAccess => |access| {
+            try self.emitExpr(access.expr);
+            try self.out.print("[", .{});
+            try self.emitExpr(access.index);
+            try self.out.print("]", .{});
+        },
         else => std.debug.panic(
             "Invalid Node type in emitExpr: {?}",
             .{value},
@@ -322,6 +328,25 @@ test "JsBackend can emit array literal expression" {
                 alloc.destroy(nd.data.Array.items[0]);
                 alloc.destroy(nd.data.Array.items[1]);
                 alloc.destroy(nd.data.Array.items[2]);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit array access expression" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
+            .ArrayAccess,
+            node.ArrayAccess{
+                .expr = EmitTestCase.makeNode(.Ident, "anArray"),
+                .index = EmitTestCase.makeNode(.Int, "1"),
+            },
+        ),
+        .expectedOutput = "anArray[1];\n",
+        .cleanup = (struct {
+            fn cleanup(alloc: *Allocator, nd: Node) void {
+                alloc.destroy(nd.data.ArrayAccess.expr);
+                alloc.destroy(nd.data.ArrayAccess.index);
             }
         }).cleanup,
     }).run();

@@ -27,7 +27,7 @@
  - [x] Unions
  - [ ] Tuples
  - [x] Arrays
-   - [ ] Array indexing
+   - [x] Array accesses
    - [ ] Array<> generic
  - [ ] Type aliases
  - [ ] Interfaces

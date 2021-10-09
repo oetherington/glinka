@@ -238,7 +238,42 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
                 nd.ty = cmp.typebook.getArray(subtype);
             }
         },
-        else => nd.ty = cmp.typebook.getUnknown(),
+        .ArrayAccess => |access| {
+            const expr = inferExprType(cmp, access.expr);
+            if (expr.getType() != .Success)
+                return expr;
+
+            const exprTy = expr.Success;
+            if (exprTy.getType() != .Array) {
+                return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        access.expr.csr,
+                        "Invalid array access - expression is not an array",
+                    ),
+                ));
+            }
+
+            const index = inferExprType(cmp, access.index);
+            if (index.getType() != .Success)
+                return index;
+
+            const indexTy = index.Success;
+            if (indexTy.getType() != .Number) {
+                return InferResult.err(CompileError.typeError(
+                    TypeError.new(
+                        access.index.csr,
+                        indexTy,
+                        cmp.typebook.getNumber(),
+                    ),
+                ));
+            }
+
+            nd.ty = exprTy.Array.subtype;
+        },
+        else => std.debug.panic(
+            "Unhandled node type in inferExprType: {?}\n",
+            .{nd},
+        ),
     }
 
     return InferResult.success(nd.ty.?);
@@ -602,4 +637,112 @@ test "can infer type of an empty array" {
     try (InferTestCase{
         .expectedTy = .Array,
     }).run(.Array, items);
+}
+
+test "can infer type of a homogeneous array" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(0, 0);
+
+    const items = node.NodeList{ .items = &[_]Node{
+        makeNode(alloc, csr, .Int, "1"),
+        makeNode(alloc, csr, .Int, "2"),
+    } };
+    defer alloc.destroy(items.items[0]);
+    defer alloc.destroy(items.items[1]);
+
+    try (InferTestCase{
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+                _ = typebook;
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+
+                const arr = res.Success;
+                try expectEqual(Type.Type.Array, arr.getType());
+                try expectEqual(Type.Type.Number, arr.Array.subtype.getType());
+            }
+        }).check,
+    }).run(.Array, items);
+}
+
+test "can infer type of an inhomogeneous array" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(0, 0);
+
+    const items = node.NodeList{ .items = &[_]Node{
+        makeNode(alloc, csr, .Int, "1"),
+        makeNode(alloc, csr, .String, "'a'"),
+    } };
+    defer alloc.destroy(items.items[0]);
+    defer alloc.destroy(items.items[1]);
+
+    try (InferTestCase{
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+                _ = typebook;
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+
+                const arr = res.Success;
+                try expectEqual(Type.Type.Array, arr.getType());
+
+                const sub = arr.Array.subtype;
+                try expectEqual(Type.Type.Union, sub.getType());
+                try expectEqual(Type.Type.Number, sub.Union.tys[0].getType());
+                try expectEqual(Type.Type.String, sub.Union.tys[1].getType());
+            }
+        }).check,
+    }).run(.Array, items);
+}
+
+test "can infer type of an array access" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(0, 0);
+
+    const expr = makeNode(alloc, csr, .Ident, "anArray");
+    const index = makeNode(alloc, csr, .Int, "1");
+    defer alloc.destroy(expr);
+    defer alloc.destroy(index);
+
+    try (InferTestCase{
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                scope.put(
+                    "anArray",
+                    typebook.getArray(typebook.getString()),
+                    true,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+                _ = typebook;
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+                try expectEqual(Type.Type.String, res.Success.getType());
+            }
+        }).check,
+    }).run(.ArrayAccess, node.ArrayAccess{
+        .expr = expr,
+        .index = index,
+    });
 }
