@@ -140,6 +140,7 @@ pub const TypeBook = struct {
     stringTy: Type = Type.newString(),
     booleanTy: Type = Type.newBoolean(),
     objectTy: Type = Type.newObject(),
+    arrayTys: Type.ArrayType.Map,
     functionTys: Type.FunctionType.Map,
     unionTys: Type.UnionType.Map,
 
@@ -148,6 +149,7 @@ pub const TypeBook = struct {
         self.* = TypeBook{
             .alloc = alloc,
             .opMap = undefined,
+            .arrayTys = Type.ArrayType.Map.new(alloc),
             .functionTys = Type.FunctionType.Map.new(alloc),
             .unionTys = Type.UnionType.Map.new(alloc),
         };
@@ -158,6 +160,7 @@ pub const TypeBook = struct {
     pub fn deinit(self: *TypeBook) void {
         self.unionTys.deinit();
         self.functionTys.deinit();
+        self.arrayTys.deinit();
         self.alloc.destroy(self);
     }
 
@@ -205,6 +208,10 @@ pub const TypeBook = struct {
         return &self.objectTy;
     }
 
+    pub fn getArray(self: *TypeBook, subtype: Type.Ptr) Type.Ptr {
+        return self.arrayTys.get(subtype);
+    }
+
     pub fn getFunction(
         self: *TypeBook,
         ret: Type.Ptr,
@@ -234,6 +241,28 @@ test "type book can return builtin types" {
     try expectEqual(Type.Type.Object, book.getObject().getType());
 }
 
+test "type book can create and retrieve array types" {
+    var book = TypeBook.new(std.testing.allocator);
+    defer book.deinit();
+
+    const num: *const Type = &book.numberTy;
+    const str: *const Type = &book.stringTy;
+
+    const numArray = book.getArray(num);
+    try expectEqual(Type.Type.Array, numArray.getType());
+    try expectEqual(num, numArray.Array.subtype);
+
+    const strArray = book.getArray(str);
+    try expectEqual(Type.Type.Array, strArray.getType());
+    try expectEqual(str, strArray.Array.subtype);
+    try expect(numArray != strArray);
+
+    const numArrayArray = book.getArray(numArray);
+    try expectEqual(Type.Type.Array, numArrayArray.getType());
+    try expectEqual(numArray, numArrayArray.Array.subtype);
+    try expect(numArray != numArrayArray);
+}
+
 test "type book can create and retrieve union types" {
     var book = TypeBook.new(std.testing.allocator);
     defer book.deinit();
@@ -245,7 +274,7 @@ test "type book can create and retrieve union types" {
 
     const tys = numStr.Union.tys;
     try expectEqual(@intCast(usize, 2), tys.len);
-    try expect((tys[0] == num and tys[1] == str) or (tys[0] == str and tys[1] == num));
+    try expect(tys[0] == num and tys[1] == str);
 
     const numStr2 = book.getUnion(&.{ num, str });
     try expectEqual(numStr, numStr2);

@@ -51,6 +51,13 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
                 return null;
             }
         },
+        .ArrayType => |arr| {
+            const subtype = findType(scope, typebook, arr);
+            return if (subtype) |st|
+                typebook.getArray(st)
+            else
+                null;
+        },
         .UnionType => |un| {
             const alloc = scope.getAllocator();
             const tys = allocate.alloc(alloc, Type.Ptr, un.items.len);
@@ -65,6 +72,7 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
 
             return typebook.getUnion(tys);
         },
+        // TODO: Process function type literals
         else => return null,
     }
 }
@@ -99,6 +107,24 @@ test "can lookup builtin types" {
             fn check(ty: ?Type.Ptr) anyerror!void {
                 try expect(ty != null);
                 try expectEqual(Type.Type.Number, ty.?.getType());
+            }
+        }).check,
+    }).run();
+}
+
+test "can lookup array types" {
+    const alloc = std.testing.allocator;
+    const csr = Cursor.new(6, 7);
+
+    const string = makeNode(alloc, csr, .TypeName, "string");
+    defer alloc.destroy(string);
+
+    try (FindTypeTestCase{
+        .inputNode = makeNode(alloc, csr, .ArrayType, string),
+        .check = (struct {
+            fn check(ty: ?Type.Ptr) anyerror!void {
+                try expectEqual(Type.Type.Array, ty.?.getType());
+                try expectEqual(Type.Type.String, ty.?.Array.subtype.getType());
             }
         }).check,
     }).run();

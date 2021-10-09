@@ -67,3 +67,6 @@ adder(3, 5);
 // Unions
 let aUnion: string|number = "hello world";
 aUnion = 4;
+
+// Arrays
+let anArray: number[];

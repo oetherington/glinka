@@ -27,7 +27,7 @@ pub const Type = union(This.Type) {
     pub const Ptr = *const This;
 
     pub const TupleType = @import("tuple_type.zig");
-    pub const ArrayType = @import("array_type.zig");
+    pub const ArrayType = @import("array_type.zig").ArrayType;
     pub const ClassType = @import("class_type.zig");
     pub const EnumType = @import("enum_type.zig");
     pub const FunctionType = @import("function_type.zig").FunctionType;
@@ -119,6 +119,10 @@ pub const Type = union(This.Type) {
         return This{ .Object = {} };
     }
 
+    pub fn newArray(arr: ArrayType) This {
+        return This{ .Array = arr };
+    }
+
     pub fn newFunction(func: FunctionType) This {
         return This{ .Function = func };
     }
@@ -162,7 +166,7 @@ pub const Type = union(This.Type) {
             .Boolean => try writer.print("boolean", .{}),
             .Object => try writer.print("object", .{}),
             .Tuple => try writer.print("tuple", .{}),
-            .Array => try writer.print("array", .{}),
+            .Array => |arr| try arr.write(writer),
             .Class => try writer.print("class", .{}),
             .Enum => try writer.print("enum", .{}),
             .Function => |func| try func.write(writer),
@@ -227,6 +231,39 @@ test "can create a boolean type" {
 test "can create an object type" {
     const ty = Type.newObject();
     try expectEqual(Type.Type.Object, ty.getType());
+}
+
+test "can create an array type" {
+    const sub = Type.newBoolean();
+    const ty = Type.newArray(Type.ArrayType{ .subtype = &sub });
+    try expectEqual(Type.Type.Array, ty.getType());
+    try expectEqual(Type.Type.Boolean, ty.Array.subtype.getType());
+}
+
+test "can create a union type" {
+    const str = Type.newString();
+    const num = Type.newNumber();
+    const ty = Type.newUnion(Type.UnionType{
+        .tys = &[_]Type.Ptr{ &str, &num },
+    });
+    try expectEqual(Type.Type.Union, ty.getType());
+    try expectEqual(@intCast(usize, 2), ty.Union.tys.len);
+    try expectEqual(Type.Type.String, ty.Union.tys[0].getType());
+    try expectEqual(Type.Type.Number, ty.Union.tys[1].getType());
+}
+
+test "can create a function type" {
+    const str = Type.newString();
+    const num = Type.newNumber();
+    const ty = Type.newFunction(Type.FunctionType{
+        .ret = &str,
+        .args = &[_]Type.Ptr{ &str, &num },
+    });
+    try expectEqual(Type.Type.Function, ty.getType());
+    try expectEqual(Type.Type.String, ty.Function.ret.getType());
+    try expectEqual(@intCast(usize, 2), ty.Function.args.len);
+    try expectEqual(Type.Type.String, ty.Function.args[0].getType());
+    try expectEqual(Type.Type.Number, ty.Function.args[1].getType());
 }
 
 const AssignableTestCase = struct {
@@ -418,7 +455,13 @@ test "can write an object type" {
 
 // TODO: Add test for writing a tuple type
 
-// TODO: Add test for writing an array type
+test "can write an array type" {
+    const n = Type.newNumber();
+    try (WriteTypeTestCase{
+        .ty = Type.newArray(Type.ArrayType{ .subtype = &n }),
+        .expected = "number[]",
+    }).run();
+}
 
 // TODO: Add test for writing a class type
 
@@ -436,7 +479,7 @@ test "can write a function type" {
     }).run();
 }
 
-test "can write an object type" {
+test "can write a union type" {
     const n = Type.newNumber();
     const s = Type.newString();
     try (WriteTypeTestCase{

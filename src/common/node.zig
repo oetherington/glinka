@@ -429,6 +429,7 @@ pub const NodeType = enum {
     Ternary,
     TypeName,
     UnionType,
+    ArrayType,
     Function,
     Block,
     If,
@@ -467,6 +468,7 @@ pub const NodeData = union(NodeType) {
     Ternary: Ternary,
     TypeName: []const u8,
     UnionType: NodeList,
+    ArrayType: Node,
     Function: Function,
     Block: NodeList,
     If: If,
@@ -520,12 +522,16 @@ pub const NodeData = union(NodeType) {
                 if (ret) |expr|
                     try expr.dumpIndented(writer, indent + 2);
             },
-            .Break, .Continue => |nd| try putInd(
+            .Break, .Continue => |label| try putInd(
                 writer,
                 indent,
                 "{s} {s}\n",
-                .{ @tagName(self), if (nd) |label| label else "" },
+                .{ @tagName(self), if (label) |l| l else "" },
             ),
+            .ArrayType => |nd| {
+                try putInd(writer, indent, "ArrayType\n", .{});
+                try nd.dumpIndented(writer, indent + 2);
+            },
             .Throw => |nd| try putInd(
                 writer,
                 indent,

@@ -76,8 +76,7 @@ const FunctionTypeMap = struct {
             .args = args,
         };
 
-        const existing = self.map.get(funcTy);
-        if (existing) |ty|
+        if (self.map.get(funcTy)) |ty|
             return ty;
 
         funcTy.args = allocate.alloc(self.map.allocator, Type.Ptr, args.len);
