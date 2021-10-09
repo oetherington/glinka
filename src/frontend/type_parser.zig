@@ -29,7 +29,7 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
 const Decl = node.Decl;
-const TokenType = @import("../common/token.zig").TokenType;
+const TokenType = @import("../common/token.zig").Token.Type;
 const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
@@ -110,8 +110,68 @@ test "can parse void type" {
     }).run();
 }
 
+pub fn parseArrayType(psr: *TsParser) ParseResult {
+    var res = parseTypeName(psr);
+    if (!res.isSuccess())
+        return res;
+
+    while (psr.lexer.token.ty == .LBrack) {
+        const next = psr.lexer.next();
+        if (next.ty != .RBrack)
+            return ParseResult.expected(TokenType.RBrack, next);
+
+        _ = psr.lexer.next();
+
+        res = ParseResult.success(makeNode(
+            psr.getAllocator(),
+            res.Success.csr,
+            NodeType.ArrayType,
+            res.Success,
+        ));
+    }
+
+    return res;
+}
+
+test "can parse array type" {
+    try (ParseTypeTestCase{
+        .code = " number[] ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.ArrayType, res.Success.getType());
+
+                const subtype = res.Success.data.ArrayType;
+                try expectEqual(NodeType.TypeName, subtype.getType());
+                try expectEqualStrings("number", subtype.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse multidimensional array type" {
+    try (ParseTypeTestCase{
+        .code = " string[][] ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.ArrayType, res.Success.getType());
+
+                const subtype1 = res.Success.data.ArrayType;
+                try expectEqual(NodeType.ArrayType, subtype1.getType());
+
+                const subtype2 = subtype1.data.ArrayType;
+                try expectEqual(NodeType.TypeName, subtype2.getType());
+                try expectEqualStrings("string", subtype2.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
 pub fn parseUnionType(psr: *TsParser) ParseResult {
-    const res = parseTypeName(psr);
+    const res = parseArrayType(psr);
     if (!res.isSuccess() or psr.lexer.token.ty != .BitOr)
         return res;
 
@@ -132,7 +192,7 @@ pub fn parseUnionType(psr: *TsParser) ParseResult {
     while (psr.lexer.token.ty == .BitOr) {
         _ = psr.lexer.next();
 
-        const right = parseTypeName(psr);
+        const right = parseArrayType(psr);
         if (!right.isSuccess())
             return right;
 

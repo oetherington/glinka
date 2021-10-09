@@ -28,6 +28,7 @@
  - [x] Unions
  - [ ] Tuples
  - [ ] Arrays
+   - [ ] Array<> generic
  - [ ] Type aliases
  - [ ] Interfaces
  - [ ] Enums
