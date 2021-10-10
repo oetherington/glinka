@@ -280,6 +280,83 @@ pub const If = struct {
     }
 };
 
+pub const For = struct {
+    pub const Clause = union(Clause.Type) {
+        pub const Type = enum {
+            CStyle,
+            Each,
+        };
+
+        pub const ForEach = struct {
+            pub const Variant = enum {
+                Of,
+                In,
+            };
+
+            scoping: Decl.Scoping,
+            variant: Variant,
+            name: []const u8,
+            expr: Node,
+        };
+
+        CStyle: struct {
+            pre: Node,
+            cond: Node,
+            post: Node,
+        },
+        Each: ForEach,
+
+        pub fn getType(self: Clause) Clause.Type {
+            return @as(Clause.Type, self);
+        }
+
+        pub fn dump(
+            self: While,
+            writer: anytype,
+            indent: usize,
+        ) std.os.WriteError!void {
+            try putInd(writer, indent, "{s}:\n", .{@tagName(self)});
+
+            switch (self) {
+                .CStyle => |cs| {
+                    try cs.pre.dumpIndented(writer, indent + 2);
+                    try cs.cond.dumpIndented(writer, indent + 2);
+                    try cs.post.dumpIndented(writer, indent + 2);
+                },
+                .Each => |each| {
+                    try putInd(writer, indent + 2, "{s}\n", .{
+                        @tagName(each.scoping),
+                    });
+                    try putInd(writer, indent + 2, "{s}\n", .{each.name});
+                    try putInd(writer, indent + 2, "{s}\n", .{
+                        @tagName(each.variant),
+                    });
+                    try each.expr.dumpIndented(writer, indent + 2);
+                },
+            }
+        }
+    };
+
+    clause: Clause,
+    body: Node,
+
+    pub fn getType(self: For) Clause.Type {
+        return self.clause.getType();
+    }
+
+    pub fn dump(
+        self: While,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "For:\n", .{});
+        try self.clause.dump(writer, indent + 2);
+        try putInd(writer, indent + 2, "Body:\n", .{});
+        for (self.body) |stmt|
+            try stmt.dumpIndented(writer, indent + 4);
+    }
+};
+
 pub const While = struct {
     cond: Node,
     body: Node,
@@ -473,6 +550,7 @@ pub const NodeType = enum {
     Block,
     If,
     Switch,
+    For,
     While,
     Do,
     Return,
@@ -513,6 +591,7 @@ pub const NodeData = union(NodeType) {
     Block: NodeList,
     If: If,
     Switch: Switch,
+    For: For,
     While: While,
     Do: Do,
     Return: ?Node,
@@ -584,6 +663,7 @@ pub const NodeData = union(NodeType) {
             .Function => |func| try func.dump(writer, indent),
             .If => |stmt| try stmt.dump(writer, indent),
             .Switch => |stmt| try stmt.dump(writer, indent),
+            .For => |loop| try loop.dump(writer, indent),
             .While => |loop| try loop.dump(writer, indent),
             .Do => |loop| try loop.dump(writer, indent),
             .Try => |t| try t.dump(writer, indent),

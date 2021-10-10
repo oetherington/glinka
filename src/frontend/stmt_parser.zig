@@ -552,7 +552,191 @@ test "can parse a switch statement" {
     }).run();
 }
 
-pub fn parseWhile(psr: *TsParser) ParseResult {
+fn parseForEachClause(psr: *TsParser) ?node.For.Clause {
+    const save = psr.lexer.save();
+
+    const scoping = switch (psr.lexer.token.ty) {
+        .Var => node.Decl.Scoping.Var,
+        .Let => node.Decl.Scoping.Let,
+        .Const => node.Decl.Scoping.Const,
+        else => return null,
+    };
+
+    const name = psr.lexer.next();
+    if (name.ty != .Ident) {
+        psr.lexer.restore(save);
+        return null;
+    }
+
+    const variant = switch (psr.lexer.next().ty) {
+        .In => node.For.Clause.ForEach.Variant.In,
+        .Of => node.For.Clause.ForEach.Variant.Of,
+        else => {
+            psr.lexer.restore(save);
+            return null;
+        },
+    };
+
+    _ = psr.lexer.next();
+
+    return node.For.Clause{
+        .Each = .{
+            .scoping = scoping,
+            .variant = variant,
+            .name = name.data,
+            .expr = undefined,
+        },
+    };
+}
+
+fn getForError(psr: *TsParser, res: ParseResult) ?ParseResult {
+    return switch (res) {
+        .Success => null,
+        .Error => |err| ParseResult.err(err),
+        .NoMatch => ParseResult.expected("statement in for loop", psr.lexer.token),
+    };
+}
+
+fn parseFor(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .For);
+
+    const csr = psr.lexer.token.csr;
+
+    const lparen = psr.lexer.next();
+    if (lparen.ty != .LParen)
+        return ParseResult.expected(TokenType.LParen, lparen);
+
+    _ = psr.lexer.next();
+
+    var loop: node.For = undefined;
+
+    if (parseForEachClause(psr)) |each| {
+        loop.clause = each;
+        switch (psr.parseExpr()) {
+            .Success => |expr| loop.clause.Each.expr = expr,
+            .Error => |err| return ParseResult.err(err),
+            .NoMatch => return ParseResult.expected(
+                "expression in for each loop",
+                psr.lexer.token,
+            ),
+        }
+    } else {
+        const pre = psr.parseStmt();
+        if (getForError(psr, pre)) |err|
+            return err;
+
+        const cond = psr.parseStmt();
+        if (getForError(psr, cond)) |err|
+            return err;
+
+        const post = psr.parseStmt();
+        if (getForError(psr, post)) |err|
+            return err;
+
+        loop.clause = node.For.Clause{
+            .CStyle = .{
+                .pre = pre.Success,
+                .cond = cond.Success,
+                .post = post.Success,
+            },
+        };
+    }
+
+    if (psr.lexer.token.ty != .RParen)
+        return ParseResult.expected(TokenType.RParen, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    const body = psr.parseStmt();
+    switch (body) {
+        .Success => |bd| loop.body = bd,
+        .Error => |err| return ParseResult.err(err),
+        .NoMatch => return ParseResult.expected(
+            "for loop body",
+            psr.lexer.token,
+        ),
+    }
+
+    return ParseResult.success(makeNode(psr.getAllocator(), csr, .For, loop));
+}
+
+test "can parse c-style for loop" {
+    try (StmtTestCase{
+        .code = "for (let i = 0; i < 4; i++) { a += i; }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.For, value.getType());
+
+                const loop = value.data.For;
+                try expectEqual(node.For.Clause.Type.CStyle, loop.getType());
+
+                const c = loop.clause.CStyle;
+                try expectEqual(NodeType.Decl, c.pre.getType());
+                try expectEqual(NodeType.BinaryOp, c.cond.getType());
+                try expectEqual(NodeType.PostfixOp, c.post.getType());
+
+                try expectEqual(NodeType.Block, loop.body.getType());
+                const block = loop.body.data.Block.items;
+                try expectEqual(@intCast(usize, 1), block.len);
+                try expectEqual(NodeType.BinaryOp, block[0].getType());
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse for..of loop" {
+    try (StmtTestCase{
+        .code = "for (let a of anArray) { a += 4; }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.For, value.getType());
+
+                const loop = value.data.For;
+                try expectEqual(node.For.Clause.Type.Each, loop.getType());
+
+                const e = loop.clause.Each;
+                try expectEqual(node.Decl.Scoping.Let, e.scoping);
+                try expectEqual(node.For.Clause.ForEach.Variant.Of, e.variant);
+                try expectEqualStrings("a", e.name);
+                try expectEqual(NodeType.Ident, e.expr.getType());
+                try expectEqualStrings("anArray", e.expr.data.Ident);
+
+                try expectEqual(NodeType.Block, loop.body.getType());
+                const block = loop.body.data.Block.items;
+                try expectEqual(@intCast(usize, 1), block.len);
+                try expectEqual(NodeType.BinaryOp, block[0].getType());
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse for..in loop" {
+    try (StmtTestCase{
+        .code = "for (const a in anArray) { a += 4; }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.For, value.getType());
+
+                const loop = value.data.For;
+                try expectEqual(node.For.Clause.Type.Each, loop.getType());
+
+                const e = loop.clause.Each;
+                try expectEqual(node.Decl.Scoping.Const, e.scoping);
+                try expectEqual(node.For.Clause.ForEach.Variant.In, e.variant);
+                try expectEqualStrings("a", e.name);
+                try expectEqual(NodeType.Ident, e.expr.getType());
+                try expectEqualStrings("anArray", e.expr.data.Ident);
+
+                try expectEqual(NodeType.Block, loop.body.getType());
+                const block = loop.body.data.Block.items;
+                try expectEqual(@intCast(usize, 1), block.len);
+                try expectEqual(NodeType.BinaryOp, block[0].getType());
+            }
+        }).check,
+    }).run();
+}
+
+fn parseWhile(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .While);
 
     const csr = psr.lexer.token.csr;
@@ -604,7 +788,7 @@ test "can parse while loop" {
     }).run();
 }
 
-pub fn parseDo(psr: *TsParser) ParseResult {
+fn parseDo(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Do);
 
     const csr = psr.lexer.token.csr;
@@ -727,7 +911,7 @@ test "can parse populated block" {
     }).run();
 }
 
-pub fn parseReturn(psr: *TsParser) ParseResult {
+fn parseReturn(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Return);
 
     const csr = psr.lexer.token.csr;
@@ -775,7 +959,7 @@ test "can parse 'return' with expression" {
     }).run();
 }
 
-pub fn parseBreakOrContinue(
+fn parseBreakOrContinue(
     psr: *TsParser,
     comptime ty: NodeType,
 ) ParseResult {
@@ -849,7 +1033,7 @@ test "can parse 'continue' with label" {
     }).run();
 }
 
-pub fn parseThrow(psr: *TsParser) ParseResult {
+fn parseThrow(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Throw);
 
     const csr = psr.lexer.token.csr;
@@ -881,7 +1065,7 @@ test "can parse 'throw' statement" {
     }).run();
 }
 
-pub fn parseTry(psr: *TsParser) ParseResult {
+fn parseTry(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Try);
 
     const csr = psr.lexer.token.csr;
@@ -967,7 +1151,7 @@ test "can parse try-catch" {
     }).run();
 }
 
-pub fn parseExprStmt(psr: *TsParser) ParseResult {
+fn parseExprStmt(psr: *TsParser) ParseResult {
     const expr = psr.parseExpr();
     switch (expr) {
         .Success => {
@@ -996,7 +1180,7 @@ test "can parse expression statements" {
     }).run();
 }
 
-pub fn parseLabelled(psr: *TsParser) ParseResult {
+fn parseLabelled(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Ident);
 
     const ctx = psr.lexer.save();
@@ -1038,7 +1222,7 @@ test "can parse labelled statement" {
     }).run();
 }
 
-pub fn parseStmtInternal(psr: *TsParser) ParseResult {
+fn parseStmtInternal(psr: *TsParser) ParseResult {
     while (psr.lexer.token.ty == .Semi)
         _ = psr.lexer.next();
 
@@ -1050,6 +1234,7 @@ pub fn parseStmtInternal(psr: *TsParser) ParseResult {
         .If => parseIf(psr),
         .Switch => parseSwitch(psr),
         .While => parseWhile(psr),
+        .For => parseFor(psr),
         .Do => parseDo(psr),
         .LBrace => parseBlockStmt(psr),
         .Break => parseBreakOrContinue(psr, .Break),
