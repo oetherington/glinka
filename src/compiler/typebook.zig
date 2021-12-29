@@ -128,7 +128,7 @@ fn createOpMap(b: *TypeBook) void {
 }
 
 pub const TypeBook = struct {
-    alloc: *Allocator,
+    alloc: Allocator,
     opMap: OpMap,
     unknownTy: Type = Type.newUnknown(),
     anyTy: Type = Type.newAny(),
@@ -144,7 +144,7 @@ pub const TypeBook = struct {
     functionTys: Type.FunctionType.Map,
     unionTys: Type.UnionType.Map,
 
-    pub fn new(alloc: *Allocator) *TypeBook {
+    pub fn new(alloc: Allocator) *TypeBook {
         var self = alloc.create(TypeBook) catch allocate.reportAndExit();
         self.* = TypeBook{
             .alloc = alloc,

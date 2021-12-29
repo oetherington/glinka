@@ -219,7 +219,7 @@ test "JsBackend can emit prefix op expression" {
         ),
         .expectedOutput = "(++a);\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.PrefixOp.expr);
             }
         }).cleanup,
@@ -237,7 +237,7 @@ test "JsBackend can emit postfix op expression" {
         ),
         .expectedOutput = "(a--);\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.PostfixOp.expr);
             }
         }).cleanup,
@@ -256,7 +256,7 @@ test "JsBackend can emit binary op expression" {
         ),
         .expectedOutput = "(a+4);\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.BinaryOp.left);
                 alloc.destroy(nd.data.BinaryOp.right);
             }
@@ -276,7 +276,7 @@ test "JsBackend can emit ternary expression" {
         ),
         .expectedOutput = "(a?3:false);\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.Ternary.cond);
                 alloc.destroy(nd.data.Ternary.ifTrue);
                 alloc.destroy(nd.data.Ternary.ifFalse);
@@ -301,7 +301,7 @@ test "JsBackend can emit function call expression" {
         ),
         .expectedOutput = "(aFunction(4, 'a'));\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.Call.expr);
                 alloc.destroy(nd.data.Call.args.items[0]);
                 alloc.destroy(nd.data.Call.args.items[1]);
@@ -324,7 +324,7 @@ test "JsBackend can emit array literal expression" {
         ),
         .expectedOutput = "[ 1, 'a', null, ];\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.Array.items[0]);
                 alloc.destroy(nd.data.Array.items[1]);
                 alloc.destroy(nd.data.Array.items[2]);
@@ -344,7 +344,7 @@ test "JsBackend can emit array access expression" {
         ),
         .expectedOutput = "anArray[1];\n",
         .cleanup = (struct {
-            fn cleanup(alloc: *Allocator, nd: Node) void {
+            fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.ArrayAccess.expr);
                 alloc.destroy(nd.data.ArrayAccess.index);
             }

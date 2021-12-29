@@ -32,10 +32,10 @@ pub fn WriteContext(comptime opts: WriteContextOpts) type {
         const PageList = std.ArrayList([]u8);
         const pageSize = opts.pageSize;
 
-        alloc: *Allocator,
+        alloc: Allocator,
         list: PageList,
 
-        pub fn new(alloc: *Allocator) !*This {
+        pub fn new(alloc: Allocator) !*This {
             // We allocate this on the heap as we need a stable pointer to
             // create the std.io.Writer instance
             var self = try alloc.create(This);

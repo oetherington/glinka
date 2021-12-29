@@ -30,7 +30,7 @@ pub const ErrorContext = struct {
 
     list: ErrorList,
 
-    pub fn new(alloc: *Allocator) ErrorContext {
+    pub fn new(alloc: Allocator) ErrorContext {
         return ErrorContext{
             .list = ErrorList.init(alloc),
         };

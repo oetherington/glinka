@@ -27,7 +27,7 @@ const JsBackend = @import("js_backend.zig").JsBackend;
 pub const EmitTestCase = struct {
     inputNode: Node,
     expectedOutput: []const u8,
-    cleanup: ?fn (alloc: *Allocator, nd: Node) void = null,
+    cleanup: ?fn (alloc: Allocator, nd: Node) void = null,
 
     pub fn run(self: EmitTestCase) !void {
         var backend = try JsBackend.new(std.testing.allocator);

@@ -47,7 +47,7 @@ const FunctionTypeMap = struct {
 
     map: Map,
 
-    pub fn new(alloc: *Allocator) FunctionTypeMap {
+    pub fn new(alloc: Allocator) FunctionTypeMap {
         return FunctionTypeMap{
             .map = Map.init(alloc),
         };

@@ -63,8 +63,8 @@ pub const TsParser = struct {
         };
     }
 
-    pub fn getAllocator(self: *TsParser) *Allocator {
-        return &self.arena.allocator;
+    pub fn getAllocator(self: *TsParser) Allocator {
+        return self.arena.allocator();
     }
 
     pub fn getParser(self: *TsParser) *Parser {

@@ -58,7 +58,7 @@ pub const Parser = struct {
     }
 
     pub fn getAst(self: *Parser, arena: *Arena) ParseResult {
-        var alloc = &arena.allocator;
+        var alloc = arena.allocator();
 
         var nd = node.makeNode(
             alloc,

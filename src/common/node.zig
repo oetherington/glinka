@@ -726,7 +726,7 @@ pub const NodeImpl = struct {
 pub const Node = *NodeImpl;
 
 pub fn makeNode(
-    alloc: *Allocator,
+    alloc: Allocator,
     csr: Cursor,
     comptime ty: NodeType,
     data: anytype,

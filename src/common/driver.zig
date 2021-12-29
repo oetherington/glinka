@@ -40,7 +40,7 @@ pub fn Driver(comptime ParserImpl: type) type {
             const cwd = std.fs.cwd();
 
             const code = try cwd.readFileAlloc(
-                &arena.allocator,
+                arena.allocator(),
                 path,
                 std.math.maxInt(usize),
             );

@@ -47,7 +47,7 @@ const NopBackend = @import("compiler_test_case.zig").NopBackend;
 pub const Compiler = struct {
     const StringList = std.ArrayList([]u8);
 
-    alloc: *Allocator,
+    alloc: Allocator,
     config: *const Config,
     backend: *Backend,
     scope: *Scope,
@@ -56,7 +56,7 @@ pub const Compiler = struct {
     strings: StringList,
 
     pub fn new(
-        alloc: *Allocator,
+        alloc: Allocator,
         config: *const Config,
         backend: *Backend,
     ) Compiler {

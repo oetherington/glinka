@@ -42,7 +42,7 @@ const ArrayTypeMap = struct {
 
     map: Map,
 
-    pub fn new(alloc: *Allocator) ArrayTypeMap {
+    pub fn new(alloc: Allocator) ArrayTypeMap {
         return ArrayTypeMap{
             .map = Map.init(alloc),
         };

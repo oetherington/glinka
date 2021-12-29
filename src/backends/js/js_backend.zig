@@ -39,7 +39,7 @@ pub const JsBackend = struct {
     writeCtx: *WriteCtx,
     out: WriteCtx.Writer,
 
-    pub fn new(alloc: *Allocator) !JsBackend {
+    pub fn new(alloc: Allocator) !JsBackend {
         var ctx = try WriteCtx.new(alloc);
         return JsBackend{
             .backend = Backend{

@@ -55,7 +55,7 @@ pub const Scope = struct {
     map: Map,
     ctx: ?Context = null,
 
-    pub fn new(alloc: *Allocator, parent: ?*Scope) *Scope {
+    pub fn new(alloc: Allocator, parent: ?*Scope) *Scope {
         var self = alloc.create(Scope) catch allocate.reportAndExit();
         self.parent = parent;
         self.map = Map.init(alloc);
@@ -68,7 +68,7 @@ pub const Scope = struct {
         alloc.destroy(self);
     }
 
-    pub fn getAllocator(self: *Scope) *Allocator {
+    pub fn getAllocator(self: *Scope) Allocator {
         return self.map.allocator;
     }
 

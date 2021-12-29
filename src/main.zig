@@ -37,9 +37,9 @@ pub fn main() !void {
         },
     );
 
-    var allocator = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = allocator.deinit();
-    var alloc = &allocator.allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    var alloc = gpa.allocator();
 
     const config = Config{};
 

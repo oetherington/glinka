@@ -18,11 +18,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub fn create(a: *Allocator, comptime T: type) *T {
+pub fn create(a: Allocator, comptime T: type) *T {
     return a.create(T) catch reportAndExit();
 }
 
-pub fn alloc(a: *Allocator, comptime T: type, n: usize) []T {
+pub fn alloc(a: Allocator, comptime T: type, n: usize) []T {
     return a.alloc(T, n) catch reportAndExit();
 }
 

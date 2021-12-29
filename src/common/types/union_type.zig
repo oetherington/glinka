@@ -47,7 +47,7 @@ const UnionTypeMap = struct {
 
     map: Map,
 
-    pub fn new(alloc: *Allocator) UnionTypeMap {
+    pub fn new(alloc: Allocator) UnionTypeMap {
         return UnionTypeMap{
             .map = Map.init(alloc),
         };
