@@ -43,18 +43,6 @@ switch (aNumber) {
 		break;
 }
 
-// Loops
-while (true)
-	break;
-
-while (true) {
-	var aWhileLoopVar = false;
-}
-
-do {
-	continue;
-} while (true);
-
 // Exceptions
 throw true;
 
@@ -89,3 +77,27 @@ anInhomogeneousArray = [ true, true, false, ];
 anInhomogeneousArray = [ false, 0, ];
 
 const anElement = aHomogeneousArray[1];
+
+// Loops
+for (let i = 0; i < 10; i++)
+	i += 1;
+
+/*
+for (let element in aHomogeneousArray)
+	element += 2;
+
+for (var element of anInhomogeneousArray) {
+	null;
+}
+*/
+
+while (true)
+	break;
+
+while (true) {
+	var aWhileLoopVar = false;
+}
+
+do {
+	continue;
+} while (true);

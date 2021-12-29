@@ -114,6 +114,7 @@ pub const JsBackend = struct {
             .Decl => try declEmitter.emitDecl(self, nd.data.Decl),
             .If => try condEmitter.emitCond(self, nd.data.If),
             .Switch => try condEmitter.emitSwitch(self, nd.data.Switch),
+            .For => try loopEmitter.emitFor(self, nd.data.For),
             .While => try loopEmitter.emitWhile(self, nd.data.While),
             .Do => try loopEmitter.emitDo(self, nd.data.Do),
             .Break => try loopEmitter.emitBreak(self, nd.data.Break),

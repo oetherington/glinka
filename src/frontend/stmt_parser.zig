@@ -569,8 +569,8 @@ fn parseForEachClause(psr: *TsParser) ?node.For.Clause {
     }
 
     const variant = switch (psr.lexer.next().ty) {
-        .In => node.For.Clause.ForEach.Variant.In,
-        .Of => node.For.Clause.ForEach.Variant.Of,
+        .In => node.For.Clause.EachClause.Variant.In,
+        .Of => node.For.Clause.EachClause.Variant.Of,
         else => {
             psr.lexer.restore(save);
             return null;
@@ -625,11 +625,16 @@ fn parseFor(psr: *TsParser) ParseResult {
         if (getForError(psr, pre)) |err|
             return err;
 
-        const cond = psr.parseStmt();
+        const cond = psr.parseExpr();
         if (getForError(psr, cond)) |err|
             return err;
 
-        const post = psr.parseStmt();
+        if (psr.lexer.token.ty != .Semi)
+            return ParseResult.expected(TokenType.Semi, psr.lexer.token);
+
+        _ = psr.lexer.next();
+
+        const post = psr.parseExpr();
         if (getForError(psr, post)) |err|
             return err;
 
@@ -696,7 +701,10 @@ test "can parse for..of loop" {
 
                 const e = loop.clause.Each;
                 try expectEqual(node.Decl.Scoping.Let, e.scoping);
-                try expectEqual(node.For.Clause.ForEach.Variant.Of, e.variant);
+                try expectEqual(
+                    node.For.Clause.EachClause.Variant.Of,
+                    e.variant,
+                );
                 try expectEqualStrings("a", e.name);
                 try expectEqual(NodeType.Ident, e.expr.getType());
                 try expectEqualStrings("anArray", e.expr.data.Ident);
@@ -722,7 +730,10 @@ test "can parse for..in loop" {
 
                 const e = loop.clause.Each;
                 try expectEqual(node.Decl.Scoping.Const, e.scoping);
-                try expectEqual(node.For.Clause.ForEach.Variant.In, e.variant);
+                try expectEqual(
+                    node.For.Clause.EachClause.Variant.In,
+                    e.variant,
+                );
                 try expectEqualStrings("a", e.name);
                 try expectEqual(NodeType.Ident, e.expr.getType());
                 try expectEqualStrings("anArray", e.expr.data.Ident);

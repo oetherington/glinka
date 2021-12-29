@@ -23,6 +23,81 @@ const Backend = @import("../../common/backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
 const EmitTestCase = @import("emit_test_case.zig").EmitTestCase;
 
+pub fn emitFor(self: *JsBackend, loop: node.For) Backend.Error!void {
+    try self.out.print("for (", .{});
+
+    switch (loop.clause) {
+        .CStyle => |c| {
+            try self.emitNode(c.pre);
+            try self.emitExpr(c.cond);
+            try self.out.print(";\n", .{});
+            try self.emitExpr(c.post);
+        },
+        .Each => |each| {
+            try self.out.print("{s} {s} {s} ", .{
+                each.scoping.toString(),
+                each.name,
+                each.variant.toString(),
+            });
+            try self.emitExpr(each.expr);
+        },
+    }
+
+    try self.out.print(") ", .{});
+    try self.emitNode(loop.body);
+}
+
+test "JsBackend can emit c-style for loop" {
+    const alloc = std.testing.allocator;
+
+    const pre = EmitTestCase.makeNode(.True, {});
+    const cond = EmitTestCase.makeNode(.False, {});
+    const post = EmitTestCase.makeNode(.Undefined, {});
+    const body = EmitTestCase.makeNode(.Null, {});
+    defer alloc.destroy(pre);
+    defer alloc.destroy(cond);
+    defer alloc.destroy(post);
+    defer alloc.destroy(body);
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.For, node.For{
+            .clause = .{
+                .CStyle = .{
+                    .pre = pre,
+                    .cond = cond,
+                    .post = post,
+                },
+            },
+            .body = body,
+        }),
+        .expectedOutput = "for (true;\nfalse;\nundefined) null;\n",
+    }).run();
+}
+
+test "JsBackend can emit for each loop" {
+    const alloc = std.testing.allocator;
+
+    const expr = EmitTestCase.makeNode(.True, {});
+    const body = EmitTestCase.makeNode(.Null, {});
+    defer alloc.destroy(expr);
+    defer alloc.destroy(body);
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.For, node.For{
+            .clause = .{
+                .Each = .{
+                    .scoping = .Let,
+                    .variant = .Of,
+                    .name = "a",
+                    .expr = expr,
+                },
+            },
+            .body = body,
+        }),
+        .expectedOutput = "for (let a of true) null;\n",
+    }).run();
+}
+
 pub fn emitWhile(self: *JsBackend, loop: node.While) Backend.Error!void {
     try self.out.print("while (", .{});
     try self.emitExpr(loop.cond);

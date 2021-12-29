@@ -287,10 +287,23 @@ pub const For = struct {
             Each,
         };
 
-        pub const ForEach = struct {
+        pub const CStyleClause = struct {
+            pre: Node,
+            cond: Node,
+            post: Node,
+        };
+
+        pub const EachClause = struct {
             pub const Variant = enum {
                 Of,
                 In,
+
+                pub fn toString(self: Variant) []const u8 {
+                    return switch (self) {
+                        .Of => "of",
+                        .In => "in",
+                    };
+                }
             };
 
             scoping: Decl.Scoping,
@@ -299,12 +312,8 @@ pub const For = struct {
             expr: Node,
         };
 
-        CStyle: struct {
-            pre: Node,
-            cond: Node,
-            post: Node,
-        },
-        Each: ForEach,
+        CStyle: CStyleClause,
+        Each: EachClause,
 
         pub fn getType(self: Clause) Clause.Type {
             return @as(Clause.Type, self);

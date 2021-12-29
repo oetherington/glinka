@@ -27,6 +27,51 @@ const CompileError = @import("errors/compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 const allocate = @import("../common/allocate.zig");
 
+fn processCStyleClause(
+    cmp: *Compiler,
+    clause: node.For.Clause.CStyleClause,
+) void {
+    cmp.processNode(clause.pre);
+    cmp.processNode(clause.cond);
+    cmp.processNode(clause.post);
+}
+
+fn processEachClause(
+    cmp: *Compiler,
+    clause: node.For.Clause.EachClause,
+) void {
+    _ = cmp;
+    _ = clause;
+    // TODO
+    // For each loops should be implemented once objects are implemented as
+    // they work on the 'iterable' property.
+    // See typescriptlang.org/docs/handbook/iterators-and-generators.html
+}
+
+pub fn processFor(cmp: *Compiler, nd: Node) void {
+    std.debug.assert(nd.getType() == .For);
+
+    cmp.pushScope();
+
+    const loop = nd.data.For;
+
+    switch (loop.clause) {
+        .CStyle => |clause| processCStyleClause(cmp, clause),
+        .Each => |clause| processEachClause(cmp, clause),
+    }
+
+    cmp.scope.ctx = .Loop;
+    cmp.processNode(loop.body);
+
+    cmp.popScope();
+}
+
+test "can compile c-style 'for' statements" {
+    try (CompilerTestCase{
+        .code = "for (let i = 0; i < 10; i--) i += 2;",
+    }).run();
+}
+
 pub fn processWhile(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == .While);
 
@@ -34,9 +79,10 @@ pub fn processWhile(cmp: *Compiler, nd: Node) void {
 
     _ = cmp.inferExprType(loop.cond);
 
+    cmp.pushScope();
     cmp.scope.ctx = .Loop;
     cmp.processNode(loop.body);
-    cmp.scope.ctx = null;
+    cmp.popScope();
 }
 
 test "can compile 'while' statements" {
