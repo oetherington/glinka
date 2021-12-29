@@ -200,6 +200,11 @@ pub const Ternary = struct {
     }
 };
 
+pub const Alias = struct {
+    name: []const u8,
+    value: Node,
+};
+
 pub const Function = struct {
     pub const Arg = struct {
         csr: Cursor,
@@ -555,6 +560,7 @@ pub const NodeType = enum {
     TypeName,
     UnionType,
     ArrayType,
+    Alias,
     Function,
     Block,
     If,
@@ -596,6 +602,7 @@ pub const NodeData = union(NodeType) {
     TypeName: []const u8,
     UnionType: NodeList,
     ArrayType: Node,
+    Alias: Alias,
     Function: Function,
     Block: NodeList,
     If: If,
