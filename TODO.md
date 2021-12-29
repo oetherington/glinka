@@ -1,5 +1,7 @@
 # TODO
 
+### Language Features
+
  - [x] Comments
  - [x] Int literals
  - [ ] Float literals/infinity/NaN
@@ -9,17 +11,17 @@
  - [x] Prefix/postfix operators
  - [x] Binary operators
  - [x] Ternary expressions
- - [x] Var/let/const
- - [x] If/else if/else
- - [x] Switch
+ - [x] `var`/`let`/`const`
+ - [x] `if`/`else if`/`else`
+ - [x] `switch`
  - [x] While loops
  - [x] Do loops
- - [ ] C-style for loops
- - [ ] In/of for loops
- - [x] Throw
- - [x] Try/catch/finally
+ - [x] C-style for loops
+ - [ ] For each loops
+ - [x] `throw`
+ - [x] `try`/`catch`/`finally`
  - [x] Functions
-   - [x] Return
+   - [x] `return`
    - [ ] Check all code paths return correctly
    - [ ] Fake 'this' parameter
    - [ ] Arrow functions
@@ -32,20 +34,39 @@
  - [ ] Type aliases
  - [ ] Interfaces
  - [ ] Enums
+   - [ ] Const enums
+   - [ ] Ambient enums
  - [ ] Object literals
- - [ ] Delete
+ - [ ] `delete`
  - [ ] Classes
-   -  [ ] New
-   -  [ ] Member variables
-   -  [ ] Member functions
-   -  [ ] Constructors
-   -  [ ] Destructors
-   -  [ ] Readonly
+   - [ ] `new`
+   - [ ] Member variables
+     - [ ] `public`/`protected`/`private`
+   - [ ] Member functions
+   - [ ] `constructor`
+   - [ ] `destructor`
+   - [ ] `readonly`
+   - [ ] `static`
+   - [ ] Inheritance
  - [ ] Generics
- - [ ] Modules/import/export
- - [ ] Declare
- - [ ] Namespace
- - [ ] Async/await
+ - [ ] Modules/`import`/`export`
+ - [ ] `declare`
+ - [ ] `namespace`
+ - [ ] `async`/`await`
  - [ ] Type casting
  - [ ] Type predicates
  - [ ] Object destructuring
+ - [ ] Decorators
+ - [ ] Symbol/unique symbol
+ - [ ] JSX
+
+### Compiler Features
+
+ - [ ] Read `jsconfig` files
+ - [ ] GCC style command line interface
+ - [ ] Strict flag
+ - [ ] `strictNullChecks`
+
+### Bugs
+
+ - [ ] `var` declarations currently have block scoping, not function scoping
