@@ -82,7 +82,7 @@ const anElement = aHomogeneousArray[1];
 for (let i = 0; i < 10; i++)
 	i += 1;
 
-/*
+/* TODO: Objects need to be implemented before iterables
 for (let element in aHomogeneousArray)
 	element += 2;
 
@@ -101,3 +101,13 @@ while (true) {
 do {
 	continue;
 } while (true);
+
+// Type aliases
+type IntOrString = number | string;
+
+let aliasTest1: IntOrString = 6;
+aliasTest1 = 'hello world';
+
+let aliasTest2: number | string = aliasTest1;
+aliasTest2 = 4;
+aliasTest1 = aliasTest2;

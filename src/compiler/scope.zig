@@ -49,27 +49,31 @@ pub const Scope = struct {
         }
     };
 
-    const Map = std.StringHashMap(Symbol);
+    const TypeMap = std.StringHashMap(Type.Ptr);
+    const SymbolMap = std.StringHashMap(Symbol);
 
     parent: ?*Scope,
-    map: Map,
+    typeMap: TypeMap,
+    symbolMap: SymbolMap,
     ctx: ?Context = null,
 
     pub fn new(alloc: Allocator, parent: ?*Scope) *Scope {
         var self = alloc.create(Scope) catch allocate.reportAndExit();
         self.parent = parent;
-        self.map = Map.init(alloc);
+        self.typeMap = TypeMap.init(alloc);
+        self.symbolMap = SymbolMap.init(alloc);
         return self;
     }
 
     pub fn deinit(self: *Scope) void {
         const alloc = self.getAllocator();
-        self.map.deinit();
+        self.symbolMap.deinit();
+        self.typeMap.deinit();
         alloc.destroy(self);
     }
 
     pub fn getAllocator(self: *Scope) Allocator {
-        return self.map.allocator;
+        return self.symbolMap.allocator;
     }
 
     pub fn put(
@@ -79,16 +83,17 @@ pub const Scope = struct {
         isConst: bool,
         csr: Cursor,
     ) void {
+        // It is the caller's responsibility to ensure the symbol doesn't exist
         std.debug.assert(self.getLocal(name) == null);
 
-        self.map.putNoClobber(
+        self.symbolMap.putNoClobber(
             name,
             Symbol.new(ty, isConst, csr),
         ) catch allocate.reportAndExit();
     }
 
     pub fn get(self: *Scope, name: []const u8) ?Symbol {
-        const res = self.map.get(name);
+        const res = self.symbolMap.get(name);
         if (res) |ty|
             return ty;
         if (self.parent) |parent|
@@ -97,7 +102,27 @@ pub const Scope = struct {
     }
 
     pub fn getLocal(self: *Scope, name: []const u8) ?Symbol {
-        return self.map.get(name);
+        return self.symbolMap.get(name);
+    }
+
+    pub fn putType(self: *Scope, name: []const u8, ty: Type.Ptr) void {
+        // It is the caller's responsibility to ensure the type doesn't exist
+        std.debug.assert(self.getTypeLocal(name) == null);
+
+        self.typeMap.putNoClobber(name, ty) catch allocate.reportAndExit();
+    }
+
+    pub fn getType(self: *Scope, name: []const u8) ?Type.Ptr {
+        const res = self.typeMap.get(name);
+        if (res) |ty|
+            return ty;
+        if (self.parent) |parent|
+            return parent.getType(name);
+        return null;
+    }
+
+    pub fn getTypeLocal(self: *Scope, name: []const u8) ?Type.Ptr {
+        return self.typeMap.get(name);
     }
 
     pub fn isInContext(self: *Scope, ctx: Context) bool {
@@ -110,7 +135,7 @@ pub const Scope = struct {
     }
 };
 
-test "can insert into and retrieve from scope" {
+test "can insert symbols into and retrieve symbols from scope" {
     var scope = Scope.new(std.testing.allocator, null);
     defer scope.deinit();
 
@@ -125,11 +150,81 @@ test "can insert into and retrieve from scope" {
 
     const res = scope.get(name);
     try expect(res != null);
-    if (res) |symbol| {
-        try expectEqual(ty, symbol.ty);
-        try expectEqual(isConst, symbol.isConst);
-        try expectEqual(csr, symbol.csr);
-    }
+    try expectEqual(ty, res.?.ty);
+    try expectEqual(isConst, res.?.isConst);
+    try expectEqual(csr, res.?.csr);
+}
+
+test "scope returns null for undefined symbols" {
+    var scope = Scope.new(std.testing.allocator, null);
+    defer scope.deinit();
+    const res = scope.get("anUndefinedSymbol");
+    try expect(res == null);
+}
+
+test "can retrieve symbols from scope recursively" {
+    var scope = Scope.new(std.testing.allocator, null);
+    defer scope.deinit();
+
+    var typebook = TypeBook.new(std.testing.allocator);
+    defer typebook.deinit();
+
+    const name = "aVariable";
+    const ty = typebook.getBoolean();
+    const isConst = true;
+    const csr = Cursor.new(2, 9);
+    scope.put(name, ty, isConst, csr);
+
+    var child = Scope.new(std.testing.allocator, scope);
+    defer child.deinit();
+
+    const res = child.get(name);
+    try expect(res != null);
+    try expectEqual(ty, res.?.ty);
+    try expectEqual(isConst, res.?.isConst);
+    try expectEqual(csr, res.?.csr);
+}
+
+test "can insert types into and retrieve types from scope" {
+    var scope = Scope.new(std.testing.allocator, null);
+    defer scope.deinit();
+
+    var typebook = TypeBook.new(std.testing.allocator);
+    defer typebook.deinit();
+
+    const name = "AnAlias";
+    const ty = typebook.getBoolean();
+    scope.putType(name, ty);
+
+    const res = scope.getType(name);
+    try expect(res != null);
+    try expectEqual(ty, res.?);
+}
+
+test "scope returns null for undefined types" {
+    var scope = Scope.new(std.testing.allocator, null);
+    defer scope.deinit();
+    const res = scope.getType("AnUndefinedType");
+    try expect(res == null);
+}
+
+test "can retrieve types from scope recursively" {
+    var scope = Scope.new(std.testing.allocator, null);
+    defer scope.deinit();
+
+    var typebook = TypeBook.new(std.testing.allocator);
+    defer typebook.deinit();
+
+    const name = "AnAlias";
+    const ty = typebook.getBoolean();
+    scope.putType(name, ty);
+
+    var child = Scope.new(std.testing.allocator, scope);
+    defer child.deinit();
+
+    const res = child.getType(name);
+    try expect(res != null);
+    try expectEqual(ty, res.?);
 }
 
 test "scope can retrieve context" {
@@ -150,36 +245,4 @@ test "scope can retrieve context" {
 
     try expect(second.isInContext(.Loop));
     try expect(!first.isInContext(.Loop));
-}
-
-test "scope returns null for undefined symbols" {
-    var scope = Scope.new(std.testing.allocator, null);
-    defer scope.deinit();
-    const res = scope.get("anUndefinedSymbol");
-    try expect(res == null);
-}
-
-test "can retrieve from scope recursively" {
-    var scope = Scope.new(std.testing.allocator, null);
-    defer scope.deinit();
-
-    var typebook = TypeBook.new(std.testing.allocator);
-    defer typebook.deinit();
-
-    const name = "aVariable";
-    const ty = typebook.getBoolean();
-    const isConst = true;
-    const csr = Cursor.new(2, 9);
-    scope.put(name, ty, isConst, csr);
-
-    var child = Scope.new(std.testing.allocator, scope);
-    defer child.deinit();
-
-    const res = child.get(name);
-    try expect(res != null);
-    if (res) |symbol| {
-        try expectEqual(ty, symbol.ty);
-        try expectEqual(isConst, symbol.isConst);
-        try expectEqual(csr, symbol.csr);
-    }
 }

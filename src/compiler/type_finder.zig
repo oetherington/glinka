@@ -40,16 +40,12 @@ const builtinMap = std.ComptimeStringMap(
 );
 
 pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
-    _ = scope;
-
     switch (nd.data) {
         .TypeName => |name| {
-            if (builtinMap.get(name)) |func| {
-                return func(typebook);
-            } else {
-                // TODO: Lookup in scope if not builtin
-                return null;
-            }
+            return if (builtinMap.get(name)) |func|
+                func(typebook)
+            else
+                scope.getType(name);
         },
         .ArrayType => |arr| {
             const subtype = findType(scope, typebook, arr);
@@ -79,6 +75,7 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
 
 const FindTypeTestCase = struct {
     inputNode: Node,
+    setup: ?fn (scope: *Scope, typebook: *TypeBook) anyerror!void,
     check: fn (ty: ?Type.Ptr) anyerror!void,
 
     pub fn run(self: FindTypeTestCase) !void {
@@ -89,6 +86,9 @@ const FindTypeTestCase = struct {
         defer typebook.deinit();
 
         defer std.testing.allocator.destroy(self.inputNode);
+
+        if (self.setup) |setup|
+            try setup(scope, typebook);
 
         const ty = findType(scope, typebook, self.inputNode);
         try self.check(ty);
@@ -103,10 +103,33 @@ test "can lookup builtin types" {
             .TypeName,
             "number",
         ),
+        .setup = null,
         .check = (struct {
             fn check(ty: ?Type.Ptr) anyerror!void {
                 try expect(ty != null);
                 try expectEqual(Type.Type.Number, ty.?.getType());
+            }
+        }).check,
+    }).run();
+}
+
+test "can lookup custom named types" {
+    try (FindTypeTestCase{
+        .inputNode = makeNode(
+            std.testing.allocator,
+            Cursor.new(11, 4),
+            .TypeName,
+            "AnAlias",
+        ),
+        .setup = (struct {
+            pub fn setup(scope: *Scope, typebook: *TypeBook) anyerror!void {
+                scope.putType("AnAlias", typebook.getBoolean());
+            }
+        }).setup,
+        .check = (struct {
+            fn check(ty: ?Type.Ptr) anyerror!void {
+                try expect(ty != null);
+                try expectEqual(Type.Type.Boolean, ty.?.getType());
             }
         }).check,
     }).run();
@@ -121,6 +144,7 @@ test "can lookup array types" {
 
     try (FindTypeTestCase{
         .inputNode = makeNode(alloc, csr, .ArrayType, string),
+        .setup = null,
         .check = (struct {
             fn check(ty: ?Type.Ptr) anyerror!void {
                 try expectEqual(Type.Type.Array, ty.?.getType());
@@ -146,6 +170,7 @@ test "can lookup union types" {
 
     try (FindTypeTestCase{
         .inputNode = makeNode(alloc, csr, .UnionType, list),
+        .setup = null,
         .check = (struct {
             fn check(ty: ?Type.Ptr) anyerror!void {
                 try expectEqual(Type.Type.Union, ty.?.getType());
