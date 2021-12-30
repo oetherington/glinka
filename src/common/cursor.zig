@@ -16,6 +16,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 
 const CursorImpl = u32;
@@ -44,4 +45,17 @@ test "cursor can be initialized" {
 
     try expectEqual(ln, c.ln);
     try expectEqual(ch, c.ch);
+}
+
+test "cursors can be compared for equality" {
+    const a = Cursor.new(2, 4);
+    const b = Cursor.new(2, 4);
+    const c = Cursor.new(4, 7);
+
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
 }
