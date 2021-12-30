@@ -1,6 +1,6 @@
 # Glinka
 
-![CI Workflow Status](https://github.com/oetherington/glinka/actions/workflows/ci.yml/badge.svg)
+[![CI Workflow Status](https://github.com/oetherington/glinka/actions/workflows/ci.yml/badge.svg)](https://github.com/oetherington/glinka/actions) [![Code Coverage](https://img.shields.io/badge/coverage-%3E90%25-informational)](https://www.etherington.io/glinka-code-coverage/)
 
 Glinka is a Typescript compiler written in Zig designed for speed. Please note
 that it is still a work in progress and large portions of the language are not
