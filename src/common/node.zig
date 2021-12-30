@@ -334,7 +334,7 @@ pub const For = struct {
         }
 
         pub fn dump(
-            self: While,
+            self: Clause,
             writer: anytype,
             indent: usize,
         ) std.os.WriteError!void {
@@ -368,15 +368,14 @@ pub const For = struct {
     }
 
     pub fn dump(
-        self: While,
+        self: For,
         writer: anytype,
         indent: usize,
     ) std.os.WriteError!void {
         try putInd(writer, indent, "For:\n", .{});
         try self.clause.dump(writer, indent + 2);
         try putInd(writer, indent + 2, "Body:\n", .{});
-        for (self.body) |stmt|
-            try stmt.dumpIndented(writer, indent + 4);
+        try self.body.dumpIndented(writer, indent + 4);
     }
 };
 
@@ -477,7 +476,7 @@ pub const Switch = struct {
     default: ?NodeList,
 
     pub fn dump(
-        self: Try,
+        self: Switch,
         writer: anytype,
         indent: usize,
     ) std.os.WriteError!void {
@@ -487,7 +486,7 @@ pub const Switch = struct {
         for (self.cases.items) |item| {
             try putInd(writer, indent + 2, "Case:\n", .{});
             try item.value.dumpIndented(writer, indent + 4);
-            for (item.stmts) |stmt|
+            for (item.stmts.items) |stmt|
                 try stmt.dumpIndented(writer, indent + 4);
         }
 
