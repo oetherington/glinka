@@ -203,6 +203,15 @@ pub const Ternary = struct {
 pub const Alias = struct {
     name: []const u8,
     value: Node,
+
+    pub fn dump(
+        self: Alias,
+        writer: anytype,
+        indent: usize,
+    ) std.os.WriteError!void {
+        try putInd(writer, indent, "Alias: '{s}'\n", .{self.name});
+        try self.value.dumpIndented(writer, indent + 2);
+    }
 };
 
 pub const Function = struct {
@@ -676,6 +685,7 @@ pub const NodeData = union(NodeType) {
             ),
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
             .Ternary => |ternary| try ternary.dump(writer, indent),
+            .Alias => |alias| try alias.dump(writer, indent),
             .Function => |func| try func.dump(writer, indent),
             .If => |stmt| try stmt.dump(writer, indent),
             .Switch => |stmt| try stmt.dump(writer, indent),

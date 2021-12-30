@@ -142,6 +142,7 @@ pub const Token = struct {
         Try,
         Catch,
         Finally,
+        Type,
     };
 
     ty: Type,

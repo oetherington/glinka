@@ -83,6 +83,14 @@ pub const ParseResult = union(Type) {
         return @as(Type, self) == .Success;
     }
 
+    pub fn isError(self: ParseResult) bool {
+        return @as(Type, self) == .Error;
+    }
+
+    pub fn isNoMatch(self: ParseResult) bool {
+        return @as(Type, self) == .NoMatch;
+    }
+
     pub fn reportIfError(self: ParseResult, writer: anytype) !void {
         switch (self) {
             .Success => {},

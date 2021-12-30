@@ -22,6 +22,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
 const TsParser = @import("ts_parser.zig").TsParser;
+const Token = @import("../common/token.zig").Token;
 const Parser = @import("../common/parser.zig").Parser;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
@@ -1233,6 +1234,62 @@ test "can parse labelled statement" {
     }).run();
 }
 
+fn parseAlias(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Type);
+
+    const csr = psr.lexer.token.csr;
+
+    const name = psr.lexer.next();
+    if (name.ty != .Ident)
+        return ParseResult.expected("type name", name);
+
+    _ = psr.lexer.next();
+
+    if (psr.lexer.token.ty != .Assign)
+        return ParseResult.expected(Token.Type.Assign, psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    const value = psr.parseType();
+    if (value.isError()) {
+        return value;
+    } else if (value.isNoMatch()) {
+        return ParseResult.expected("name for type alias", psr.lexer.token);
+    }
+
+    eatSemi(psr);
+
+    return ParseResult.success(makeNode(
+        psr.getAllocator(),
+        csr,
+        .Alias,
+        node.Alias{
+            .name = name.data,
+            .value = value.Success,
+        },
+    ));
+}
+
+test "can parse type alias statement" {
+    try (StmtTestCase{
+        .code = "type IntOrString = int | string;",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Alias, value.getType());
+                const alias = value.data.Alias;
+                try expectEqualStrings("IntOrString", alias.name);
+                try expectEqual(NodeType.UnionType, alias.value.getType());
+                const types = alias.value.data.UnionType.items;
+                try expectEqual(@intCast(usize, 2), types.len);
+                try expectEqual(NodeType.TypeName, types[0].getType());
+                try expectEqualStrings("int", types[0].data.TypeName);
+                try expectEqual(NodeType.TypeName, types[1].getType());
+                try expectEqualStrings("string", types[1].data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
 fn parseStmtInternal(psr: *TsParser) ParseResult {
     while (psr.lexer.token.ty == .Semi)
         _ = psr.lexer.next();
@@ -1252,6 +1309,7 @@ fn parseStmtInternal(psr: *TsParser) ParseResult {
         .Continue => parseBreakOrContinue(psr, .Continue),
         .Throw => parseThrow(psr),
         .Try => parseTry(psr),
+        .Type => parseAlias(psr),
         .EOF => ParseResult.success(makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,

@@ -73,6 +73,7 @@ const keywordMap = std.ComptimeStringMap(Token.Type, .{
     .{ "try", .Try },
     .{ "catch", .Catch },
     .{ "finally", .Finally },
+    .{ "type", .Type },
 });
 
 fn getIdentTokenType(ident: []const u8) Token.Type {
