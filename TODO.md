@@ -28,6 +28,8 @@
  - [x] Function calls
  - [x] Unions
  - [ ] Tuples
+ - [ ] `unknown` type
+ - [ ] `never` type
  - [x] Arrays
    - [x] Array accesses
    - [ ] Array<> generic

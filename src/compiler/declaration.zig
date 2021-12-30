@@ -45,6 +45,7 @@ fn declWithAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) void {
 
                 cmp.scope.put(decl.name, annotation, isConst, csr);
             } else {
+                annotationNode.dump();
                 cmp.errors.append(CompileError.genericError(
                     GenericError.new(csr, "Invalid type annotation"),
                 )) catch allocate.reportAndExit();

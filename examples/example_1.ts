@@ -111,3 +111,7 @@ aliasTest1 = 'hello world';
 let aliasTest2: number | string = aliasTest1;
 aliasTest2 = 4;
 aliasTest1 = aliasTest2;
+
+// Null and undefined can be used as values or type names
+const aNullVariable: null = null;
+const anUndefinedVariable: undefined = undefined;

@@ -35,6 +35,8 @@ const builtinMap = std.ComptimeStringMap(
         .{ "string", TypeBook.getString },
         .{ "boolean", TypeBook.getBoolean },
         .{ "void", TypeBook.getVoid },
+        .{ "null", TypeBook.getNull },
+        .{ "undefined", TypeBook.getUndefined },
         .{ "any", TypeBook.getAny },
     },
 );

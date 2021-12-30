@@ -78,6 +78,30 @@ fn parseTypeName(psr: *TsParser) ParseResult {
 
             return ParseResult.success(nd);
         },
+        .Null => {
+            const nd = makeNode(
+                psr.getAllocator(),
+                psr.lexer.token.csr,
+                NodeType.TypeName,
+                "null",
+            );
+
+            _ = psr.lexer.next();
+
+            return ParseResult.success(nd);
+        },
+        .Undefined => {
+            const nd = makeNode(
+                psr.getAllocator(),
+                psr.lexer.token.csr,
+                NodeType.TypeName,
+                "undefined",
+            );
+
+            _ = psr.lexer.next();
+
+            return ParseResult.success(nd);
+        },
         .LParen => {
             _ = psr.lexer.next();
             const res = parseTypeInternal(psr);
@@ -115,6 +139,34 @@ test "can parse void type" {
                 try expectEqual(Cursor.new(1, 2), res.Success.csr);
                 try expectEqual(NodeType.TypeName, res.Success.data.getType());
                 try expectEqualStrings("void", res.Success.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse null type" {
+    try (ParseTypeTestCase{
+        .code = " null ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.TypeName, res.Success.data.getType());
+                try expectEqualStrings("null", res.Success.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse undefined type" {
+    try (ParseTypeTestCase{
+        .code = " undefined ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.TypeName, res.Success.data.getType());
+                try expectEqualStrings("undefined", res.Success.data.TypeName);
             }
         }).check,
     }).run();
