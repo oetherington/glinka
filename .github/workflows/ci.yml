@@ -53,7 +53,9 @@ jobs:
           cd glinka-code-coverage
           rm -rf docs
           cp -r ../kcov-output/test.* docs
-          git add ./*
+          cd docs
+          sed -i 's/\.\.\/data\/bcov\.css/data\/bcov.css/g' *.html
+          git add ..
           git commit -m "Code coverage report for commit ${{ github.sha }}"
           git push -u origin $(git branch --show-current)
   build:
