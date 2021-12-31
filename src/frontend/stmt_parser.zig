@@ -556,12 +556,8 @@ test "can parse a switch statement" {
 fn parseForEachClause(psr: *TsParser) ?node.For.Clause {
     const save = psr.lexer.save();
 
-    const scoping = switch (psr.lexer.token.ty) {
-        .Var => node.Decl.Scoping.Var,
-        .Let => node.Decl.Scoping.Let,
-        .Const => node.Decl.Scoping.Const,
-        else => return null,
-    };
+    const scoping =
+        Decl.Scoping.fromTokenType(psr.lexer.token.ty) catch return null;
 
     const name = psr.lexer.next();
     if (name.ty != .Ident) {
@@ -1263,10 +1259,7 @@ fn parseAlias(psr: *TsParser) ParseResult {
         psr.getAllocator(),
         csr,
         .Alias,
-        node.Alias{
-            .name = name.data,
-            .value = value.Success,
-        },
+        node.Alias.new(name.data, value.Success),
     ));
 }
 

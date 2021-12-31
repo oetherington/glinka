@@ -19,10 +19,12 @@ const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
+const expectError = std.testing.expectError;
 const Allocator = std.mem.Allocator;
 const Token = @import("token.zig").Token;
 const Cursor = @import("cursor.zig").Cursor;
 const genericEql = @import("generic_eql.zig");
+const WriteContext = @import("writer.zig").WriteContext;
 const Type = @import("types/type.zig").Type;
 const allocate = @import("allocate.zig");
 
@@ -31,13 +33,44 @@ fn putInd(
     indent: usize,
     comptime fmt: []const u8,
     args: anytype,
-) std.os.WriteError!void {
+) !void {
     var i: usize = 0;
     while (i < indent) : (i += 1) {
         try writer.print(" ", .{});
     }
 
     try writer.print(fmt, args);
+}
+
+test "can format strings with indentation" {
+    const ctx = try WriteContext(.{}).new(std.testing.allocator);
+    defer ctx.deinit();
+    try putInd(ctx.writer(), 0, "hello {s}\n", .{"world"});
+    try putInd(ctx.writer(), 4, "hello {s}\n", .{"world"});
+    const str = try ctx.toString();
+    defer ctx.freeString(str);
+    try expectEqualStrings("hello world\n    hello world\n", str);
+}
+
+fn DumpTestCase(comptime T: type, comptime nodeType: NodeType) type {
+    return struct {
+        value: T,
+        expected: []const u8,
+
+        pub fn run(self: @This()) !void {
+            const ctx = try WriteContext(.{}).new(std.testing.allocator);
+            defer ctx.deinit();
+
+            const data = @unionInit(NodeData, @tagName(nodeType), self.value);
+
+            try data.dump(ctx.writer(), 0);
+
+            const str = try ctx.toString();
+            defer ctx.freeString(str);
+
+            try expectEqualStrings(self.expected, str);
+        }
+    };
 }
 
 pub const NodeList = std.ArrayListUnmanaged(Node);
@@ -59,7 +92,7 @@ pub const ObjectProperty = struct {
         self: ObjectProperty,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Property\n", .{});
         try self.key.dumpIndented(writer, indent + 2);
         try self.value.dumpIndented(writer, indent + 2);
@@ -69,6 +102,57 @@ pub const ObjectProperty = struct {
         return genericEql.eql(self, other);
     }
 };
+
+test "can dump an Object" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "1"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Object, .Object){
+        .value = Object{ .items = &[_]ObjectProperty{
+            ObjectProperty.new(nodes[0], nodes[1]),
+        } },
+        .expected = 
+        \\Object
+        \\  Property
+        \\    String Node (1:1)
+        \\      String: "a"
+        \\    String Node (2:1)
+        \\      String: "1"
+        \\
+        ,
+    }).run();
+}
+
+test "can compare object properties for equality" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "1"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .String, "b"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .String, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    const a = ObjectProperty.new(nodes[0], nodes[1]);
+    const b = ObjectProperty.new(nodes[0], nodes[1]);
+    const c = ObjectProperty.new(nodes[2], nodes[3]);
+
+    try expect(a.eql(a));
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(b.eql(b));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
+    try expect(c.eql(c));
+}
 
 pub const Decl = struct {
     pub const Scoping = enum {
@@ -81,6 +165,7 @@ pub const Decl = struct {
                 .Var => .Var,
                 .Let => .Let,
                 .Const => .Const,
+                else => error.InvalidScoping,
             };
         }
 
@@ -116,7 +201,7 @@ pub const Decl = struct {
         self: Decl,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "{s} Decl \"{s}\"\n", .{
             @tagName(self.scoping),
             self.name,
@@ -129,6 +214,41 @@ pub const Decl = struct {
             try value.dumpIndented(writer, indent + 2);
     }
 };
+
+test "can create Decl.Scoping from Token.Type" {
+    try expectEqual(Decl.Scoping.Var, try Decl.Scoping.fromTokenType(.Var));
+    try expectEqual(Decl.Scoping.Let, try Decl.Scoping.fromTokenType(.Let));
+    try expectEqual(Decl.Scoping.Const, try Decl.Scoping.fromTokenType(.Const));
+    try expectError(error.InvalidScoping, Decl.Scoping.fromTokenType(.Dot));
+}
+
+test "can convert Decl.Scoping to string" {
+    try expectEqualStrings("var", Decl.Scoping.Var.toString());
+    try expectEqualStrings("let", Decl.Scoping.Let.toString());
+    try expectEqualStrings("const", Decl.Scoping.Const.toString());
+}
+
+test "can dump a Decl" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .TypeName, "number"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "1"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Decl, .Decl){
+        .value = Decl.new(.Const, "aDeclaration", nodes[0], nodes[1]),
+        .expected = 
+        \\Const Decl "aDeclaration"
+        \\  TypeName Node (1:1)
+        \\    TypeName: "number"
+        \\  Int Node (2:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
 
 pub const UnaryOp = struct {
     op: Token.Type,
@@ -145,11 +265,43 @@ pub const UnaryOp = struct {
         self: UnaryOp,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "{s} Unary Op\n", .{@tagName(self.op)});
         try self.expr.dumpIndented(writer, indent + 2);
     }
 };
+
+test "can dump a prefix UnaryOp" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 5), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(UnaryOp, .PrefixOp){
+        .value = UnaryOp.new(.Sub, node),
+        .expected = 
+        \\PrefixOp
+        \\  Sub Unary Op
+        \\    Int Node (1:5)
+        \\      Int: "1"
+        \\
+        ,
+    }).run();
+}
+
+test "can dump a postfix UnaryOp" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 5), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(UnaryOp, .PostfixOp){
+        .value = UnaryOp.new(.Sub, node),
+        .expected = 
+        \\PostfixOp
+        \\  Sub Unary Op
+        \\    Int Node (1:5)
+        \\      Int: "1"
+        \\
+        ,
+    }).run();
+}
 
 pub const BinaryOp = struct {
     op: Token.Type,
@@ -168,12 +320,34 @@ pub const BinaryOp = struct {
         self: BinaryOp,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "{s} Binary Op\n", .{@tagName(self.op)});
         try self.left.dumpIndented(writer, indent + 2);
         try self.right.dumpIndented(writer, indent + 2);
     }
 };
+
+test "can dump a BinaryOp" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(BinaryOp, .BinaryOp){
+        .value = BinaryOp.new(.Add, nodes[0], nodes[1]),
+        .expected = 
+        \\Add Binary Op
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\  Int Node (2:1)
+        \\    Int: "2"
+        \\
+        ,
+    }).run();
+}
 
 pub const Ternary = struct {
     cond: Node,
@@ -192,7 +366,7 @@ pub const Ternary = struct {
         self: Ternary,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Ternary Expression\n", .{});
         try self.cond.dumpIndented(writer, indent + 2);
         try self.ifTrue.dumpIndented(writer, indent + 2);
@@ -200,19 +374,71 @@ pub const Ternary = struct {
     }
 };
 
+test "can dump a Ternary" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "3"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Ternary, .Ternary){
+        .value = Ternary.new(nodes[0], nodes[1], nodes[2]),
+        .expected = 
+        \\Ternary Expression
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\  Int Node (1:1)
+        \\    Int: "2"
+        \\  Int Node (2:1)
+        \\    Int: "3"
+        \\
+        ,
+    }).run();
+}
+
 pub const Alias = struct {
     name: []const u8,
     value: Node,
+
+    pub fn new(name: []const u8, value: Node) Alias {
+        return Alias{
+            .name = name,
+            .value = value,
+        };
+    }
 
     pub fn dump(
         self: Alias,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Alias: '{s}'\n", .{self.name});
         try self.value.dumpIndented(writer, indent + 2);
     }
 };
+
+test "can dump an Alias" {
+    const node = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 1),
+        .TypeName,
+        "number",
+    );
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Alias, .Alias){
+        .value = Alias.new("AnAlias", node),
+        .expected = 
+        \\Alias: 'AnAlias'
+        \\  TypeName Node (1:1)
+        \\    TypeName: "number"
+        \\
+        ,
+    }).run();
+}
 
 pub const Function = struct {
     pub const Arg = struct {
@@ -233,11 +459,27 @@ pub const Function = struct {
     args: ArgList,
     body: Node,
 
+    pub fn new(
+        isArrow: bool,
+        name: ?[]const u8,
+        retTy: ?Node,
+        args: ArgList,
+        body: Node,
+    ) Function {
+        return Function{
+            .isArrow = isArrow,
+            .name = name,
+            .retTy = retTy,
+            .args = args,
+            .body = body,
+        };
+    }
+
     pub fn dump(
         self: Function,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         const arrow = if (self.isArrow) "Arrow " else "";
         const name = if (self.name) |name| name else "<anonymous>";
 
@@ -258,6 +500,67 @@ pub const Function = struct {
     }
 };
 
+test "can check Function.Argument equality" {
+    const node = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 5),
+        .TypeName,
+        "number",
+    );
+    defer std.testing.allocator.destroy(node);
+
+    const a = Function.Arg{ .csr = Cursor.new(1, 1), .name = "a", .ty = node };
+    const b = Function.Arg{ .csr = Cursor.new(1, 1), .name = "a", .ty = node };
+    const c = Function.Arg{ .csr = Cursor.new(2, 1), .name = "b", .ty = null };
+
+    try expect(a.eql(a));
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(b.eql(b));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
+    try expect(c.eql(c));
+}
+
+test "can dump a Function" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .TypeName, "number"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .TypeName, "number"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "1"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    var args = Function.ArgList{};
+    defer args.deinit(std.testing.allocator);
+
+    try args.append(std.testing.allocator, Function.Arg{
+        .csr = Cursor.new(1, 2),
+        .name = "anArg",
+        .ty = nodes[0],
+    });
+
+    try (DumpTestCase(Function, .Function){
+        .value = Function.new(false, "aFunction", nodes[1], args, nodes[2]),
+        .expected = 
+        \\Function: aFunction
+        \\  TypeName Node (2:1)
+        \\    TypeName: "number"
+        \\Arguments:
+        \\  'anArg'
+        \\    TypeName Node (1:1)
+        \\      TypeName: "number"
+        \\Body:
+        \\  Int Node (3:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
+
 pub const If = struct {
     pub const Branch = struct {
         cond: Node,
@@ -273,11 +576,18 @@ pub const If = struct {
     branches: BranchList,
     elseBranch: ?Node,
 
+    pub fn new(branches: BranchList, elseBranch: ?Node) If {
+        return If{
+            .branches = branches,
+            .elseBranch = elseBranch,
+        };
+    }
+
     pub fn dump(
         self: If,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "If:\n", .{});
 
         for (self.branches.items) |item| {
@@ -293,6 +603,68 @@ pub const If = struct {
         }
     }
 };
+
+test "can check If.Branch equality" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "3"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .Int, "4"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    const a = If.Branch{ .cond = nodes[0], .ifTrue = nodes[1] };
+    const b = If.Branch{ .cond = nodes[0], .ifTrue = nodes[1] };
+    const c = If.Branch{ .cond = nodes[2], .ifTrue = nodes[3] };
+
+    try expect(a.eql(a));
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(b.eql(b));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
+    try expect(c.eql(c));
+}
+
+test "can dump an If" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "3"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    var branches = If.BranchList{};
+    defer branches.deinit(std.testing.allocator);
+
+    try branches.append(std.testing.allocator, If.Branch{
+        .cond = nodes[0],
+        .ifTrue = nodes[1],
+    });
+
+    try (DumpTestCase(If, .If){
+        .value = If.new(branches, nodes[2]),
+        .expected = 
+        \\If:
+        \\  Cond:
+        \\    Int Node (1:1)
+        \\      Int: "1"
+        \\  Branch:
+        \\    Int Node (1:1)
+        \\      Int: "2"
+        \\  Else:
+        \\    Int Node (1:1)
+        \\      Int: "3"
+        \\
+        ,
+    }).run();
+}
 
 pub const For = struct {
     pub const Clause = union(Clause.Type) {
@@ -337,7 +709,7 @@ pub const For = struct {
             self: Clause,
             writer: anytype,
             indent: usize,
-        ) std.os.WriteError!void {
+        ) !void {
             try putInd(writer, indent, "{s}:\n", .{@tagName(self)});
 
             switch (self) {
@@ -363,6 +735,13 @@ pub const For = struct {
     clause: Clause,
     body: Node,
 
+    pub fn new(clause: Clause, body: Node) For {
+        return For{
+            .clause = clause,
+            .body = body,
+        };
+    }
+
     pub fn getType(self: For) Clause.Type {
         return self.clause.getType();
     }
@@ -371,7 +750,7 @@ pub const For = struct {
         self: For,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "For:\n", .{});
         try self.clause.dump(writer, indent + 2);
         try putInd(writer, indent + 2, "Body:\n", .{});
@@ -379,49 +758,212 @@ pub const For = struct {
     }
 };
 
+test "can convert For.Clause.EachClause.Variant to string" {
+    try expectEqualStrings("of", For.Clause.EachClause.Variant.Of.toString());
+    try expectEqualStrings("in", For.Clause.EachClause.Variant.In.toString());
+}
+
+test "can dump a CStyle For" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .Int, "4"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "3"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(For, .For){
+        .value = For.new(For.Clause{
+            .CStyle = .{
+                .pre = nodes[1],
+                .cond = nodes[2],
+                .post = nodes[3],
+            },
+        }, nodes[0]),
+        .expected = 
+        \\For:
+        \\  CStyle:
+        \\    Int Node (1:1)
+        \\      Int: "1"
+        \\    Int Node (2:1)
+        \\      Int: "2"
+        \\    Int Node (3:1)
+        \\      Int: "3"
+        \\  Body:
+        \\    Int Node (4:1)
+        \\      Int: "4"
+        \\
+        ,
+    }).run();
+}
+
+test "can dump a For Each" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .Int, "4"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Ident, "anArray"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(For, .For){
+        .value = For.new(For.Clause{
+            .Each = .{
+                .scoping = .Const,
+                .variant = .Of,
+                .name = "i",
+                .expr = nodes[1],
+            },
+        }, nodes[0]),
+        .expected = 
+        \\For:
+        \\  Each:
+        \\    Const
+        \\    i
+        \\    Of
+        \\    Ident Node (1:1)
+        \\      Ident: "anArray"
+        \\  Body:
+        \\    Int Node (4:1)
+        \\      Int: "4"
+        \\
+        ,
+    }).run();
+}
+
 pub const While = struct {
     cond: Node,
     body: Node,
+
+    pub fn new(cond: Node, body: Node) While {
+        return While{
+            .cond = cond,
+            .body = body,
+        };
+    }
 
     pub fn dump(
         self: While,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "While:\n", .{});
-        try self.cond.dumpIndented(writer, indent + 2);
-        try self.body.dumpIndented(writer, indent + 2);
+        try putInd(writer, indent + 2, "Condition:\n", .{});
+        try self.cond.dumpIndented(writer, indent + 4);
+        try putInd(writer, indent + 2, "Body:\n", .{});
+        try self.body.dumpIndented(writer, indent + 4);
     }
 };
+
+test "can dump a While" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(While, .While){
+        .value = While.new(nodes[0], nodes[1]),
+        .expected = 
+        \\While:
+        \\  Condition:
+        \\    Int Node (1:1)
+        \\      Int: "1"
+        \\  Body:
+        \\    Int Node (2:1)
+        \\      Int: "2"
+        \\
+        ,
+    }).run();
+}
 
 pub const Do = struct {
     body: Node,
     cond: Node,
 
+    pub fn new(body: Node, cond: Node) Do {
+        return Do{
+            .body = body,
+            .cond = cond,
+        };
+    }
+
     pub fn dump(
         self: Do,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Do:\n", .{});
-        try self.body.dumpIndented(writer, indent + 2);
-        try self.cond.dumpIndented(writer, indent + 2);
+        try putInd(writer, indent + 2, "Body:\n", .{});
+        try self.body.dumpIndented(writer, indent + 4);
+        try putInd(writer, indent + 2, "Condition:\n", .{});
+        try self.cond.dumpIndented(writer, indent + 4);
     }
 };
+
+test "can dump a Do" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Do, .Do){
+        .value = Do.new(nodes[0], nodes[1]),
+        .expected = 
+        \\Do:
+        \\  Body:
+        \\    Int Node (1:1)
+        \\      Int: "1"
+        \\  Condition:
+        \\    Int Node (2:1)
+        \\      Int: "2"
+        \\
+        ,
+    }).run();
+}
 
 pub const Labelled = struct {
     label: []const u8,
     stmt: Node,
 
+    pub fn new(label: []const u8, stmt: Node) Labelled {
+        return Labelled{
+            .label = label,
+            .stmt = stmt,
+        };
+    }
+
     pub fn dump(
         self: Labelled,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Labelled \"{s}\":\n", .{self.label});
         try self.stmt.dumpIndented(writer, indent + 2);
     }
 };
+
+test "can dump a Labelled" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Labelled, .Labelled){
+        .value = Labelled.new("aLabel", node),
+        .expected = 
+        \\Labelled "aLabel":
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
 
 pub const Try = struct {
     pub const Catch = struct {
@@ -439,11 +981,23 @@ pub const Try = struct {
     catchBlocks: CatchList,
     finallyBlock: ?Node,
 
+    pub fn new(
+        tryBlock: Node,
+        catchBlocks: CatchList,
+        finallyBlock: ?Node,
+    ) Try {
+        return Try{
+            .tryBlock = tryBlock,
+            .catchBlocks = catchBlocks,
+            .finallyBlock = finallyBlock,
+        };
+    }
+
     pub fn dump(
         self: Try,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Try:\n", .{});
         try self.tryBlock.dumpIndented(writer, indent + 2);
 
@@ -458,6 +1012,62 @@ pub const Try = struct {
         }
     }
 };
+
+test "can compare Try.Catch equality" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    const a = Try.Catch{ .name = "a", .block = nodes[0] };
+    const b = Try.Catch{ .name = "a", .block = nodes[0] };
+    const c = Try.Catch{ .name = "b", .block = nodes[1] };
+
+    try expect(a.eql(a));
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(b.eql(b));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
+    try expect(c.eql(c));
+}
+
+test "can dump a Try" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "3"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Try, .Try){
+        .value = Try.new(nodes[0], Try.CatchList{
+            .items = &[_]Try.Catch{Try.Catch{
+                .name = "anException",
+                .block = nodes[1],
+            }},
+        }, nodes[2]),
+        .expected = 
+        \\Try:
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\Catch "anException":
+        \\  Int Node (2:1)
+        \\    Int: "2"
+        \\Finally:
+        \\  Int Node (3:1)
+        \\    Int: "3"
+        \\
+        ,
+    }).run();
+}
 
 pub const Switch = struct {
     pub const Case = struct {
@@ -475,11 +1085,19 @@ pub const Switch = struct {
     cases: CaseList,
     default: ?NodeList,
 
+    pub fn new(expr: Node, cases: CaseList, default: ?NodeList) Switch {
+        return Switch{
+            .expr = expr,
+            .cases = cases,
+            .default = default,
+        };
+    }
+
     pub fn dump(
         self: Switch,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Switch:\n", .{});
         try self.expr.dumpIndented(writer, indent + 2);
 
@@ -498,52 +1116,208 @@ pub const Switch = struct {
     }
 };
 
+test "can compare Switch.Case equality" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "3"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .Int, "4"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    const a = Switch.Case{
+        .value = nodes[0],
+        .stmts = NodeList{ .items = &[_]Node{nodes[1]} },
+    };
+    const b = Switch.Case{
+        .value = nodes[0],
+        .stmts = NodeList{ .items = &[_]Node{nodes[1]} },
+    };
+    const c = Switch.Case{
+        .value = nodes[2],
+        .stmts = NodeList{ .items = &[_]Node{nodes[3]} },
+    };
+
+    try expect(a.eql(a));
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(b.eql(b));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
+    try expect(c.eql(c));
+}
+
+test "can dump a Switch" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "3"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .Int, "4"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Switch, .Switch){
+        .value = Switch.new(
+            nodes[0],
+            Switch.CaseList{
+                .items = &[_]Switch.Case{Switch.Case{
+                    .value = nodes[1],
+                    .stmts = NodeList{ .items = &[_]Node{nodes[2]} },
+                }},
+            },
+            NodeList{ .items = &[_]Node{nodes[3]} },
+        ),
+        .expected = 
+        \\Switch:
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\  Case:
+        \\    Int Node (2:1)
+        \\      Int: "2"
+        \\    Int Node (3:1)
+        \\      Int: "3"
+        \\  Default:
+        \\    Int Node (4:1)
+        \\      Int: "4"
+        \\
+        ,
+    }).run();
+}
+
 pub const Dot = struct {
     expr: Node,
     ident: []const u8,
+
+    pub fn new(expr: Node, ident: []const u8) Dot {
+        return Dot{
+            .expr = expr,
+            .ident = ident,
+        };
+    }
 
     pub fn dump(
         self: Dot,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Dot \"{s}\":\n", .{self.ident});
         try self.expr.dumpIndented(writer, indent + 2);
     }
 };
 
+test "can dump a Dot" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Dot, .Dot){
+        .value = Dot.new(node, "aProperty"),
+        .expected = 
+        \\Dot "aProperty":
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
+
 pub const ArrayAccess = struct {
     expr: Node,
     index: Node,
+
+    pub fn new(expr: Node, index: Node) ArrayAccess {
+        return ArrayAccess{
+            .expr = expr,
+            .index = index,
+        };
+    }
 
     pub fn dump(
         self: ArrayAccess,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Array Access:\n", .{});
         try self.expr.dumpIndented(writer, indent + 2);
         try self.index.dumpIndented(writer, indent + 2);
     }
 };
 
+test "can dump an ArrayAccess" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(ArrayAccess, .ArrayAccess){
+        .value = ArrayAccess.new(nodes[0], nodes[1]),
+        .expected = 
+        \\Array Access:
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\  Int Node (2:1)
+        \\    Int: "2"
+        \\
+        ,
+    }).run();
+}
+
 pub const Call = struct {
     expr: Node,
     args: NodeList,
+
+    pub fn new(expr: Node, args: NodeList) Call {
+        return Call{
+            .expr = expr,
+            .args = args,
+        };
+    }
 
     pub fn dump(
         self: Call,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "Call:\n", .{});
-        try self.expr.dumpIndented(writer, indent + 2);
-
-        try putInd(writer, indent, "Args:\n", .{});
+        try putInd(writer, indent + 2, "Function:\n", .{});
+        try self.expr.dumpIndented(writer, indent + 4);
+        try putInd(writer, indent + 2, "Args:\n", .{});
         for (self.args.items) |arg|
             try arg.dumpIndented(writer, indent + 4);
     }
 };
+
+test "can dump a Call" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Call, .Call){
+        .value = Call.new(nodes[0], NodeList{ .items = &[_]Node{nodes[1]} }),
+        .expected = 
+        \\Call:
+        \\  Function:
+        \\    Int Node (1:1)
+        \\      Int: "1"
+        \\  Args:
+        \\    Int Node (2:1)
+        \\      Int: "2"
+        \\
+        ,
+    }).run();
+}
 
 pub const NodeType = enum {
     EOF,
@@ -632,7 +1406,7 @@ pub const NodeData = union(NodeType) {
         self: NodeData,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) anyerror!void {
         switch (self) {
             .Decl => |decl| try decl.dump(writer, indent),
             .Int, .TypeName, .Ident, .String, .Template => |s| try putInd(
@@ -659,7 +1433,7 @@ pub const NodeData = union(NodeType) {
             ),
             .PostfixOp, .PrefixOp => |unaryOp| {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
-                try unaryOp.dump(writer, indent);
+                try unaryOp.dump(writer, indent + 2);
             },
             .Return => |ret| {
                 try putInd(writer, indent, "Return\n", .{});
@@ -669,19 +1443,13 @@ pub const NodeData = union(NodeType) {
             .Break, .Continue => |label| try putInd(
                 writer,
                 indent,
-                "{s} {s}\n",
+                "{s} \"{s}\"\n",
                 .{ @tagName(self), if (label) |l| l else "" },
             ),
-            .ArrayType => |nd| {
-                try putInd(writer, indent, "ArrayType\n", .{});
+            .ArrayType, .Throw => |nd| {
+                try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 try nd.dumpIndented(writer, indent + 2);
             },
-            .Throw => |nd| try putInd(
-                writer,
-                indent,
-                "{s} {s}\n",
-                .{ @tagName(self), nd },
-            ),
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
             .Ternary => |ternary| try ternary.dump(writer, indent),
             .Alias => |alias| try alias.dump(writer, indent),
@@ -703,6 +1471,65 @@ pub const NodeData = union(NodeType) {
         return @as(NodeType, self);
     }
 };
+
+test "can dump Nodes with NodeList data" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(NodeList, .Program){
+        .value = NodeList{ .items = &[_]Node{node} },
+        .expected = 
+        \\Program
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
+
+test "can dump Nodes with void data" {
+    try (DumpTestCase(void, .True){
+        .value = {},
+        .expected = "True\n",
+    }).run();
+}
+
+test "can dump Nodes with ?Node data" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(?Node, .Return){
+        .value = node,
+        .expected = 
+        \\Return
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
+
+test "can dump Nodes with ?[]const u8 data" {
+    try (DumpTestCase(?[]const u8, .Break){
+        .value = "aLabel",
+        .expected = "Break \"aLabel\"\n",
+    }).run();
+}
+
+test "can dump Nodes with Node data" {
+    const node = makeNode(std.testing.allocator, Cursor.new(1, 1), .Int, "1");
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(Node, .ArrayType){
+        .value = node,
+        .expected = 
+        \\ArrayType
+        \\  Int Node (1:1)
+        \\    Int: "1"
+        \\
+        ,
+    }).run();
+}
 
 pub const NodeImpl = struct {
     csr: Cursor,
@@ -728,7 +1555,7 @@ pub const NodeImpl = struct {
         self: Node,
         writer: anytype,
         indent: usize,
-    ) std.os.WriteError!void {
+    ) !void {
         try putInd(writer, indent, "{s} Node ({d}:{d})\n", .{
             @tagName(self.data),
             self.csr.ln,
@@ -753,7 +1580,7 @@ pub fn makeNode(
     return n;
 }
 
-test "can initialize a var node" {
+test "can generically initialize Nodes with makeNode" {
     const name = "aVariableName";
     const node = makeNode(
         std.testing.allocator,
