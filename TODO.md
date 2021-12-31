@@ -33,7 +33,7 @@
  - [x] Arrays
    - [x] Array accesses
    - [ ] Array<> generic
- - [ ] Type aliases
+ - [x] Type aliases
  - [ ] Interfaces
  - [ ] Enums
    - [ ] Const enums
@@ -43,8 +43,8 @@
  - [ ] Classes
    - [ ] `new`
    - [ ] Member variables
-     - [ ] `public`/`protected`/`private`
    - [ ] Member functions
+   - [ ] `public`/`protected`/`private`
    - [ ] `constructor`
    - [ ] `destructor`
    - [ ] `readonly`
@@ -64,7 +64,7 @@
 
 ### Compiler Features
 
- - [ ] Read `jsconfig` files
+ - [ ] Read `tsconfig` files
  - [ ] GCC style command line interface
  - [ ] Strict flag
  - [ ] `strictNullChecks`

@@ -4,7 +4,7 @@ release:
 	@zig build -Drelease-fast=true
 run:
 	@echo
-	@zig build run
+	@zig build run -- examples/example_1.ts
 	@echo
 test:
 	@zig build test

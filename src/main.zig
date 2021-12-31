@@ -41,6 +41,16 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     var alloc = gpa.allocator();
 
+    const args = try std.process.argsAlloc(alloc);
+    defer std.process.argsFree(alloc, args);
+
+    const path = if (args.len == 2)
+        args[1]
+    else {
+        try std.io.getStdErr().writer().print("No filename provided", .{});
+        return;
+    };
+
     const config = Config{};
 
     const driver = Driver(TsParser){};
@@ -50,8 +60,6 @@ pub fn main() !void {
 
     var compiler = Compiler.new(alloc, &config, &backend.backend);
     defer compiler.deinit();
-
-    const path = "examples/example_1.ts";
 
     try compiler.compile(driver, path);
 
