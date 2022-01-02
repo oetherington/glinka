@@ -25,8 +25,6 @@ const nodeImp = @import("../node.zig");
 const Node = nodeImp.Node;
 const makeNode = nodeImp.makeNode;
 
-pub const Object = std.ArrayListUnmanaged(ObjectProperty);
-
 pub const ObjectProperty = struct {
     key: Node,
     value: Node,
@@ -53,6 +51,34 @@ pub const ObjectProperty = struct {
     }
 };
 
+test "can compare ObjectProperties for equality" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "1"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .String, "b"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .String, "2"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    const a = ObjectProperty.new(nodes[0], nodes[1]);
+    const b = ObjectProperty.new(nodes[0], nodes[1]);
+    const c = ObjectProperty.new(nodes[2], nodes[3]);
+
+    try expect(a.eql(a));
+    try expect(a.eql(b));
+    try expect(!a.eql(c));
+    try expect(b.eql(a));
+    try expect(b.eql(b));
+    try expect(!b.eql(c));
+    try expect(!c.eql(a));
+    try expect(!c.eql(b));
+    try expect(c.eql(c));
+}
+
+pub const Object = std.ArrayListUnmanaged(ObjectProperty);
+
 test "can dump an Object" {
     const nodes = [_]Node{
         makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
@@ -78,20 +104,44 @@ test "can dump an Object" {
     }).run();
 }
 
-test "can compare object properties for equality" {
-    const nodes = [_]Node{
-        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
-        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "1"),
-        makeNode(std.testing.allocator, Cursor.new(3, 1), .String, "b"),
-        makeNode(std.testing.allocator, Cursor.new(4, 1), .String, "2"),
-    };
+pub const ObjectTypeMember = struct {
+    name: []const u8,
+    ty: ?Node,
 
-    defer for (nodes) |node|
-        std.testing.allocator.destroy(node);
+    pub fn new(name: []const u8, ty: ?Node) ObjectTypeMember {
+        return ObjectTypeMember{
+            .name = name,
+            .ty = ty,
+        };
+    }
 
-    const a = ObjectProperty.new(nodes[0], nodes[1]);
-    const b = ObjectProperty.new(nodes[0], nodes[1]);
-    const c = ObjectProperty.new(nodes[2], nodes[3]);
+    pub fn eql(self: ObjectTypeMember, other: ObjectTypeMember) bool {
+        return genericEql.eql(self, other);
+    }
+
+    pub fn dump(
+        self: ObjectTypeMember,
+        writer: anytype,
+        indent: usize,
+    ) !void {
+        try putInd(writer, indent, "Member: {s}\n", .{self.name});
+        if (self.ty) |ty|
+            try ty.dumpIndented(writer, indent + 2);
+    }
+};
+
+test "can compare ObjectTypeMembers for equality" {
+    const node = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 1),
+        .TypeName,
+        "int",
+    );
+    defer std.testing.allocator.destroy(node);
+
+    const a = ObjectTypeMember.new("a", node);
+    const b = ObjectTypeMember.new("a", node);
+    const c = ObjectTypeMember.new("b", null);
 
     try expect(a.eql(a));
     try expect(a.eql(b));
@@ -102,4 +152,31 @@ test "can compare object properties for equality" {
     try expect(!c.eql(a));
     try expect(!c.eql(b));
     try expect(c.eql(c));
+}
+
+pub const ObjectType = std.ArrayListUnmanaged(ObjectTypeMember);
+
+test "can dump an ObjectType" {
+    const node = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 1),
+        .TypeName,
+        "int",
+    );
+    defer std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(ObjectType, .ObjectType){
+        .value = ObjectType{ .items = &[_]ObjectTypeMember{
+            ObjectTypeMember.new("a", node),
+            ObjectTypeMember.new("b", null),
+        } },
+        .expected = 
+        \\ObjectType
+        \\  Member: a
+        \\    TypeName Node (1:1)
+        \\      TypeName: "int"
+        \\  Member: b
+        \\
+        ,
+    }).run();
 }

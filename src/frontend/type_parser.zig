@@ -52,6 +52,111 @@ const ParseTypeTestCase = struct {
     }
 };
 
+fn parseObjectType(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .LBrace);
+
+    const alloc = psr.getAllocator();
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    var res = node.ObjectType{};
+
+    while (true) {
+        // TODO: Should strings be valid here as well as identifiers?
+        if (psr.lexer.token.ty != .Ident)
+            return ParseResult.expected(
+                "name for object member",
+                psr.lexer.token,
+            );
+
+        const name = psr.lexer.token.data;
+        var ty: ?Node = null;
+
+        if (psr.lexer.next().ty == .Colon) {
+            _ = psr.lexer.next();
+
+            const tyRes = parseTypeInternal(psr);
+            if (tyRes.isSuccess())
+                ty = tyRes.Success
+            else
+                return ParseResult.expected(
+                    "type for object member",
+                    psr.lexer.token,
+                );
+        }
+
+        res.append(
+            alloc,
+            node.ObjectTypeMember.new(name, ty),
+        ) catch allocate.reportAndExit();
+
+        switch (psr.lexer.token.ty) {
+            .Comma => if (psr.lexer.next().ty == .RBrace) break else continue,
+            .RBrace => {
+                _ = psr.lexer.next();
+                break;
+            },
+            else => return ParseResult.expected(
+                "comma or left brace",
+                psr.lexer.token,
+            ),
+        }
+    }
+
+    return ParseResult.success(makeNode(alloc, csr, .ObjectType, res));
+}
+
+test "can parse object types" {
+    try (ParseTypeTestCase{
+        .code = " { a: number, b, c: string } ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(
+                    NodeType.ObjectType,
+                    res.Success.data.getType(),
+                );
+
+                const members = res.Success.data.ObjectType.items;
+                try expectEqual(@intCast(usize, 3), members.len);
+                try expectEqualStrings("a", members[0].name);
+                try expect(members[0].ty != null);
+                try expectEqual(NodeType.TypeName, members[0].ty.?.getType());
+                try expectEqualStrings("number", members[0].ty.?.data.TypeName);
+                try expectEqualStrings("b", members[1].name);
+                try expect(members[1].ty == null);
+                try expectEqualStrings("c", members[2].name);
+                try expect(members[2].ty != null);
+                try expectEqual(NodeType.TypeName, members[2].ty.?.getType());
+                try expectEqualStrings("string", members[2].ty.?.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse object types with dangling comma" {
+    try (ParseTypeTestCase{
+        .code = " { a, } ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(
+                    NodeType.ObjectType,
+                    res.Success.data.getType(),
+                );
+
+                const members = res.Success.data.ObjectType.items;
+                try expectEqual(@intCast(usize, 1), members.len);
+                try expectEqualStrings("a", members[0].name);
+                try expect(members[0].ty == null);
+            }
+        }).check,
+    }).run();
+}
+
 fn parseTypeName(psr: *TsParser) ParseResult {
     switch (psr.lexer.token.ty) {
         .Ident => {
@@ -112,6 +217,7 @@ fn parseTypeName(psr: *TsParser) ParseResult {
             _ = psr.lexer.next();
             return res;
         },
+        .LBrace => return parseObjectType(psr),
         else => return ParseResult.noMatch(null),
     }
 }

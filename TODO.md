@@ -58,6 +58,7 @@
  - [ ] Type casting
  - [ ] Type predicates
  - [ ] Object destructuring
+ - [ ] Generator functions/`yield`
  - [ ] Decorators
  - [ ] Symbol/unique symbol
  - [ ] JSX
