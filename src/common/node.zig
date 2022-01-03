@@ -24,7 +24,6 @@ const Allocator = std.mem.Allocator;
 const Token = @import("token.zig").Token;
 const Cursor = @import("cursor.zig").Cursor;
 const genericEql = @import("generic_eql.zig");
-const WriteContext = @import("writer.zig").WriteContext;
 const Type = @import("types/type.zig").Type;
 const allocate = @import("allocate.zig");
 
