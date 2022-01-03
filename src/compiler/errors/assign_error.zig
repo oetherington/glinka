@@ -36,13 +36,13 @@ pub const AssignError = struct {
 
     pub fn report(self: AssignError, writer: anytype) !void {
         try writer.print(
-            "Error: {d}:{d}: Value of type '",
+            "Error: {d}:{d}: Value of type ",
             .{ self.csr.ln, self.csr.ch },
         );
         try self.right.write(writer);
-        try writer.print("' cannot be assigned to a variable of type '", .{});
+        try writer.print(" cannot be assigned to a variable of type ", .{});
         try self.left.write(writer);
-        try writer.print("'\n", .{});
+        try writer.print("\n", .{});
     }
 };
 

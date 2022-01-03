@@ -223,6 +223,9 @@ pub const Compiler = struct {
         };
 
         try self.compileProgramNode(nd);
+
+        if (self.hasErrors())
+            try self.reportErrors();
     }
 };
 

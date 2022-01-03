@@ -128,6 +128,23 @@ fn createOpMap(b: *TypeBook) void {
 }
 
 pub const TypeBook = struct {
+    const TypeMap = std.HashMap(
+        usize,
+        Type.Ptr,
+        struct {
+            pub fn hash(self: @This(), value: usize) u64 {
+                _ = self;
+                return value;
+            }
+
+            pub fn eql(self: @This(), a: usize, b: usize) bool {
+                _ = self;
+                return a == b;
+            }
+        },
+        std.hash_map.default_max_load_percentage,
+    );
+
     alloc: Allocator,
     opMap: OpMap,
     unknownTy: Type = Type.newUnknown(),
@@ -143,6 +160,7 @@ pub const TypeBook = struct {
     arrayTys: Type.ArrayType.Map,
     functionTys: Type.FunctionType.Map,
     unionTys: Type.UnionType.Map,
+    tyMap: TypeMap,
 
     pub fn new(alloc: Allocator) *TypeBook {
         var self = alloc.create(TypeBook) catch allocate.reportAndExit();
@@ -152,12 +170,24 @@ pub const TypeBook = struct {
             .arrayTys = Type.ArrayType.Map.new(alloc),
             .functionTys = Type.FunctionType.Map.new(alloc),
             .unionTys = Type.UnionType.Map.new(alloc),
+            .tyMap = TypeMap.init(alloc),
         };
         createOpMap(self);
         return self;
     }
 
     pub fn deinit(self: *TypeBook) void {
+        var it = self.tyMap.valueIterator();
+
+        while (it.next()) |val| {
+            // const ty = val.*.*;
+            // std.debug.assert(std.meta.activeTag(ty) == .Function);
+            // self.map.allocator.free(ty.Function.args);
+            self.tyMap.allocator.destroy(val.*);
+        }
+
+        self.tyMap.deinit();
+
         self.unionTys.deinit();
         self.functionTys.deinit();
         self.arrayTys.deinit();
@@ -222,6 +252,19 @@ pub const TypeBook = struct {
 
     pub fn getUnion(self: *TypeBook, tys: []Type.Ptr) Type.Ptr {
         return self.unionTys.get(tys);
+    }
+
+    pub fn getAlias(self: *TypeBook, name: []const u8, ty: Type.Ptr) Type.Ptr {
+        const alias = Type.AliasType.new(name, ty);
+        const hash = alias.hash();
+
+        if (self.tyMap.get(hash)) |t|
+            return t;
+
+        var t = allocate.create(self.alloc, Type);
+        t.* = Type{ .Alias = alias };
+        self.tyMap.put(hash, t) catch allocate.reportAndExit();
+        return t;
     }
 
     pub fn combine(self: *TypeBook, a: Type.Ptr, b: Type.Ptr) Type.Ptr {

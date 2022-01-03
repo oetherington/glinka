@@ -40,7 +40,7 @@ pub fn processAlias(cmp: *Compiler, nd: Node) void {
         return;
     };
 
-    cmp.scope.putType(name, ty);
+    cmp.scope.putType(name, cmp.typebook.getAlias(name, ty));
 }
 
 test "can compile a type alias declaration" {

@@ -32,7 +32,7 @@ pub const Type = union(This.Type) {
     pub const EnumType = @import("enum_type.zig");
     pub const FunctionType = @import("function_type.zig").FunctionType;
     pub const UnionType = @import("union_type.zig").UnionType;
-    pub const AliasType = @import("alias_type.zig");
+    pub const AliasType = @import("alias_type.zig").AliasType;
     pub const InterfaceType = @import("interface_type.zig");
 
     pub const Type = enum {
@@ -131,6 +131,10 @@ pub const Type = union(This.Type) {
         return This{ .Union = un };
     }
 
+    pub fn newAlias(alias: AliasType) This {
+        return This{ .Alias = alias };
+    }
+
     pub fn isAssignableTo(self: This.Ptr, target: This.Ptr) bool {
         if (self.getType() == .Undefined)
             return true;
@@ -157,6 +161,7 @@ pub const Type = union(This.Type) {
                         return false;
                 return true;
             },
+            .Alias => |al| return al.ty.isAssignableTo(target),
             else => {},
         }
 
@@ -166,6 +171,7 @@ pub const Type = union(This.Type) {
                     if (self.isAssignableTo(ty))
                         return true;
             },
+            .Alias => |al| return self.isAssignableTo(al.ty),
             else => {},
         }
 
@@ -190,7 +196,7 @@ pub const Type = union(This.Type) {
             .Enum => try writer.print("enum", .{}),
             .Function => |func| try func.write(writer),
             .Union => |un| try un.write(writer),
-            .Alias => try writer.print("alias", .{}),
+            .Alias => |al| try al.write(writer),
             .Interface => try writer.print("interface", .{}),
         }
     }
@@ -401,6 +407,17 @@ test "unknown[] can be assigned to any array type" {
     try AssignableTestCase.newF(&na, &ua).run();
 }
 
+test "aliases and their subtypes are interchangeable in assignments" {
+    const n = Type.newNumber();
+    const b = Type.newBoolean();
+    const na = Type.newAlias(Type.AliasType{ .name = "a", .ty = &n });
+
+    try AssignableTestCase.new(&n, &na).run();
+    try AssignableTestCase.new(&na, &n).run();
+    try AssignableTestCase.newF(&b, &na).run();
+    try AssignableTestCase.newF(&na, &b).run();
+}
+
 test "other type assignments are invalid" {
     const n = Type.newNumber();
     const a = Type.newAny();
@@ -437,6 +454,13 @@ test "can write an unknown type" {
     try (WriteTypeTestCase{
         .ty = Type.newUnknown(),
         .expected = "unknown",
+    }).run();
+}
+
+test "can write an any type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newAny(),
+        .expected = "any",
     }).run();
 }
 
@@ -541,6 +565,12 @@ test "can write a union type" {
     }).run();
 }
 
-// TODO: Add test for writing an alias type
+test "can write a union type" {
+    const n = Type.newNumber();
+    try (WriteTypeTestCase{
+        .ty = Type.newAlias(Type.AliasType{ .name = "AnAlias", .ty = &n }),
+        .expected = "AnAlias (an alias for number)",
+    }).run();
+}
 
 // TODO: Add test for writing an interface type

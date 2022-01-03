@@ -219,7 +219,7 @@ test "can create a CompileError from an AssignError" {
     try expectEqual(&right, compileError.AssignError.right);
     try reportTestCase(
         compileError,
-        "Error: 2:5: Value of type 'number' cannot be assigned to a variable of type 'string'\n",
+        "Error: 2:5: Value of type number cannot be assigned to a variable of type string\n",
     );
 }
 

@@ -63,9 +63,7 @@ pub fn main() !void {
 
     try compiler.compile(driver, path);
 
-    if (compiler.hasErrors()) {
-        try compiler.reportErrors();
-    } else {
+    if (!compiler.hasErrors()) {
         var res = try backend.toString();
         defer backend.freeString(res);
         std.log.info("Result: {s}", .{res});
