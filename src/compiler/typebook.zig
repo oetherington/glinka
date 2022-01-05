@@ -129,17 +129,17 @@ fn createOpMap(b: *TypeBook) void {
 
 pub const TypeBook = struct {
     const TypeMap = std.HashMap(
-        usize,
+        Type.Ptr,
         Type.Ptr,
         struct {
-            pub fn hash(self: @This(), value: usize) u64 {
+            pub fn hash(self: @This(), value: Type.Ptr) u64 {
                 _ = self;
-                return value;
+                return value.hash();
             }
 
-            pub fn eql(self: @This(), a: usize, b: usize) bool {
+            pub fn eql(self: @This(), a: Type.Ptr, b: Type.Ptr) bool {
                 _ = self;
-                return a == b;
+                return a.eql(b);
             }
         },
         std.hash_map.default_max_load_percentage,
@@ -180,6 +180,7 @@ pub const TypeBook = struct {
         var it = self.tyMap.valueIterator();
 
         while (it.next()) |val| {
+            // TODO: Properly free the types
             // const ty = val.*.*;
             // std.debug.assert(std.meta.activeTag(ty) == .Function);
             // self.map.allocator.free(ty.Function.args);
@@ -255,15 +256,14 @@ pub const TypeBook = struct {
     }
 
     pub fn getAlias(self: *TypeBook, name: []const u8, ty: Type.Ptr) Type.Ptr {
-        const alias = Type.AliasType.new(name, ty);
-        const hash = alias.hash();
+        const alias = Type{ .Alias = Type.AliasType.new(name, ty) };
 
-        if (self.tyMap.get(hash)) |t|
+        if (self.tyMap.get(&alias)) |t|
             return t;
 
         var t = allocate.create(self.alloc, Type);
-        t.* = Type{ .Alias = alias };
-        self.tyMap.put(hash, t) catch allocate.reportAndExit();
+        t.* = alias;
+        self.tyMap.put(&alias, t) catch allocate.reportAndExit();
         return t;
     }
 
