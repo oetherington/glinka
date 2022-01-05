@@ -80,7 +80,7 @@ fn createOpMap(b: *TypeBook) void {
     h.put(.Nullish, OpEntry.un(&b.anyTy, &b.anyTy)); // TODO: Fix output
 
     h.put(.Assign, OpEntry.bin(&b.anyTy, null));
-    h.put(.NullishAssign, OpEntry.bin(&b.anyTy, &b.anyTy)); // TODO Fix output
+    h.put(.NullishAssign, OpEntry.bin(&b.anyTy, &b.anyTy)); // TODO: Fix output
 
     h.put(
         .Add,

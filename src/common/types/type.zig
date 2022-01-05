@@ -16,8 +16,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
+const genericEql = @import("../generic_eql.zig").eql;
 const Allocator = std.mem.Allocator;
 const WriteContext = @import("../../common/writer.zig").WriteContext;
 
@@ -77,6 +79,10 @@ pub const Type = union(This.Type) {
 
     pub fn getType(self: This) This.Type {
         return @as(This.Type, self);
+    }
+
+    pub fn eql(self: This, other: Ptr) bool {
+        return genericEql(self, other.*);
     }
 
     pub fn newUnknown() This {
@@ -289,6 +295,32 @@ test "can create a function type" {
     try expectEqual(@intCast(usize, 2), ty.Function.args.len);
     try expectEqual(Type.Type.String, ty.Function.args[0].getType());
     try expectEqual(Type.Type.Number, ty.Function.args[1].getType());
+}
+
+test "can compare Type equality" {
+    const str = Type.newString();
+    const num = Type.newNumber();
+    const f1 = Type.newFunction(Type.FunctionType{
+        .ret = &str,
+        .args = &[_]Type.Ptr{ &str, &num },
+    });
+    const f2 = Type.newFunction(Type.FunctionType{
+        .ret = &num,
+        .args = &[_]Type.Ptr{ &str, &num },
+    });
+
+    const strp = &str;
+    const nump = &num;
+    const f1p = &f1;
+    const f2p = &f2;
+
+    try expect(strp.eql(strp));
+    try expect(!strp.eql(nump));
+    try expect(!nump.eql(strp));
+    try expect(!strp.eql(f1p));
+    try expect(!f1p.eql(f2p));
+    try expect(f1p.eql(f1p));
+    try expect(f2p.eql(f2p));
 }
 
 const AssignableTestCase = struct {
