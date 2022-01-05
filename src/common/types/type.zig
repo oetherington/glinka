@@ -85,6 +85,10 @@ pub const Type = union(This.Type) {
         return genericEql(self, other.*);
     }
 
+    pub fn hash(self: Ptr) usize {
+        return std.hash.Wyhash.hash(0, std.mem.asBytes(self));
+    }
+
     pub fn newUnknown() This {
         return This{ .Unknown = {} };
     }
@@ -321,6 +325,30 @@ test "can compare Type equality" {
     try expect(!f1p.eql(f2p));
     try expect(f1p.eql(f1p));
     try expect(f2p.eql(f2p));
+}
+
+test "can hash Types" {
+    const str = Type.newString();
+    const num = Type.newNumber();
+    const f1 = Type.newFunction(Type.FunctionType{
+        .ret = &str,
+        .args = &[_]Type.Ptr{ &str, &num },
+    });
+    const f2 = Type.newFunction(Type.FunctionType{
+        .ret = &num,
+        .args = &[_]Type.Ptr{ &str, &num },
+    });
+
+    const strp = &str;
+    const nump = &num;
+    const f1p = &f1;
+    const f2p = &f2;
+
+    try expect(strp.hash() == strp.hash());
+    try expect(strp.hash() != nump.hash());
+    try expect(strp.hash() != f1p.hash());
+    try expect(f1p.hash() == f1p.hash());
+    try expect(f1p.hash() != f2p.hash());
 }
 
 const AssignableTestCase = struct {
