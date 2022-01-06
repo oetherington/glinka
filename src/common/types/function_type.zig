@@ -16,84 +16,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 const Type = @import("type.zig").Type;
-const allocate = @import("../../common/allocate.zig");
 
-const MapContext = struct {
-    pub fn hash(self: @This(), ty: FunctionType) u64 {
-        _ = self;
+pub const FunctionType = struct {
+    ret: Type.Ptr,
+    args: []Type.Ptr,
 
-        var res: u64 = @ptrToInt(ty.ret);
-        for (ty.args) |arg|
-            res ^= @ptrToInt(arg);
-
-        return res;
-    }
-
-    pub fn eql(self: @This(), a: FunctionType, b: FunctionType) bool {
-        _ = self;
-        return a.ret == b.ret and std.mem.eql(Type.Ptr, a.args, b.args);
-    }
-};
-
-const FunctionTypeMap = struct {
-    const Map = std.HashMap(
-        FunctionType,
-        Type.Ptr,
-        MapContext,
-        std.hash_map.default_max_load_percentage,
-    );
-
-    map: Map,
-
-    pub fn new(alloc: Allocator) FunctionTypeMap {
-        return FunctionTypeMap{
-            .map = Map.init(alloc),
-        };
-    }
-
-    pub fn deinit(self: *FunctionTypeMap) void {
-        var it = self.map.valueIterator();
-
-        while (it.next()) |val| {
-            const funcTy = val.*.*;
-            std.debug.assert(std.meta.activeTag(funcTy) == .Function);
-            self.map.allocator.free(funcTy.Function.args);
-            self.map.allocator.destroy(val.*);
-        }
-
-        self.map.deinit();
-    }
-
-    pub fn get(
-        self: *FunctionTypeMap,
-        ret: Type.Ptr,
-        args: []Type.Ptr,
-    ) Type.Ptr {
-        var funcTy = FunctionType{
+    pub fn new(ret: Type.Ptr, args: []Type.Ptr) FunctionType {
+        return FunctionType{
             .ret = ret,
             .args = args,
         };
-
-        if (self.map.get(funcTy)) |ty|
-            return ty;
-
-        funcTy.args = allocate.alloc(self.map.allocator, Type.Ptr, args.len);
-        std.mem.copy(Type.Ptr, funcTy.args, args);
-
-        var ty = allocate.create(self.map.allocator, Type);
-        ty.* = Type{ .Function = funcTy };
-        self.map.put(funcTy, ty) catch allocate.reportAndExit();
-        return ty;
     }
-};
 
-pub const FunctionType = struct {
-    pub const Map = FunctionTypeMap;
+    pub fn hash(self: FunctionType) usize {
+        var result: usize = self.ret.hash() ^ 0xd35558c29b7438aa;
 
-    ret: Type.Ptr,
-    args: []Type.Ptr,
+        for (self.args) |arg, index|
+            result ^= arg.hash() >> @intCast(u6, index + 1);
+
+        return result;
+    }
 
     pub fn write(self: FunctionType, writer: anytype) !void {
         try writer.print("function(", .{});
@@ -110,3 +53,14 @@ pub const FunctionType = struct {
         try self.ret.write(writer);
     }
 };
+
+test "can hash a FunctionType" {
+    const num = Type.newNumber();
+    const str = Type.newString();
+
+    const a = FunctionType.new(&num, &[_]Type.Ptr{&str});
+    const b = FunctionType.new(&str, &[_]Type.Ptr{&num});
+
+    try std.testing.expectEqual(a.hash(), a.hash());
+    try std.testing.expect(a.hash() != b.hash());
+}

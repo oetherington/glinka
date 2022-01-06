@@ -19,9 +19,9 @@ const std = @import("std");
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const genericEql = @import("../generic_eql.zig").eql;
 const Allocator = std.mem.Allocator;
-const WriteContext = @import("../../common/writer.zig").WriteContext;
+const WriteContext = @import("../writer.zig").WriteContext;
+const genericEql = @import("../generic_eql.zig").eql;
 
 pub const Type = union(This.Type) {
     const This = @This();
@@ -85,8 +85,28 @@ pub const Type = union(This.Type) {
         return genericEql(self, other.*);
     }
 
-    pub fn hash(self: Ptr) usize {
-        return std.hash.Wyhash.hash(0, std.mem.asBytes(self));
+    pub fn hash(self: This) usize {
+        return switch (self) {
+            .Unknown,
+            .Any,
+            .Void,
+            .Null,
+            .Undefined,
+            .Never,
+            .Number,
+            .String,
+            .Boolean,
+            => @intCast(usize, @enumToInt(self.getType())) ^ 0xd16575db32f7806d,
+            .Object => @panic("TODO hash Object"),
+            .Tuple => @panic("TODO hash Tuple"),
+            .Array => |ar| ar.hash(),
+            .Class => @panic("TODO hash Class"),
+            .Enum => @panic("TODO hash Enum"),
+            .Function => |f| f.hash(),
+            .Union => |un| un.hash(),
+            .Alias => |al| al.hash(),
+            .Interface => @panic("TODO hash Interface"),
+        };
     }
 
     pub fn newUnknown() This {
@@ -325,6 +345,12 @@ test "can compare Type equality" {
     try expect(!f1p.eql(f2p));
     try expect(f1p.eql(f1p));
     try expect(f2p.eql(f2p));
+
+    const a = Type{ .Array = Type.ArrayType{ .subtype = strp } };
+    const b = Type{ .Array = Type.ArrayType{ .subtype = strp } };
+    const c = Type{ .Array = Type.ArrayType{ .subtype = nump } };
+    try expect((&a).eql(&b));
+    try expect(!(&a).eql(&c));
 }
 
 test "can hash Types" {
@@ -349,6 +375,12 @@ test "can hash Types" {
     try expect(strp.hash() != f1p.hash());
     try expect(f1p.hash() == f1p.hash());
     try expect(f1p.hash() != f2p.hash());
+
+    const a = Type{ .Array = Type.ArrayType{ .subtype = strp } };
+    const b = Type{ .Array = Type.ArrayType{ .subtype = strp } };
+    const c = Type{ .Array = Type.ArrayType{ .subtype = nump } };
+    try expect((&a).hash() == (&b).hash());
+    try expect((&a).hash() != (&c).hash());
 }
 
 const AssignableTestCase = struct {

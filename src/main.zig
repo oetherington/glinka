@@ -53,7 +53,8 @@ pub fn main() !void {
 
     const config = Config{};
 
-    const driver = Driver(TsParser){};
+    var driver = Driver(TsParser).new(alloc);
+    defer driver.deinit();
 
     var backend = try JsBackend.new(alloc);
     defer backend.deinit();
@@ -61,9 +62,11 @@ pub fn main() !void {
     var compiler = Compiler.new(alloc, &config, &backend.backend);
     defer compiler.deinit();
 
-    try compiler.compile(driver, path);
+    try compiler.compile(&driver, path);
 
-    if (!compiler.hasErrors()) {
+    if (compiler.hasErrors()) {
+        try compiler.reportErrors();
+    } else {
         var res = try backend.toString();
         defer backend.freeString(res);
         std.log.info("Result: {s}", .{res});

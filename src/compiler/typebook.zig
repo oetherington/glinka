@@ -129,21 +129,23 @@ fn createOpMap(b: *TypeBook) void {
 
 pub const TypeBook = struct {
     const TypeMap = std.HashMap(
-        Type.Ptr,
+        Type,
         Type.Ptr,
         struct {
-            pub fn hash(self: @This(), value: Type.Ptr) u64 {
+            pub fn hash(self: @This(), value: Type) u64 {
                 _ = self;
                 return value.hash();
             }
 
-            pub fn eql(self: @This(), a: Type.Ptr, b: Type.Ptr) bool {
+            pub fn eql(self: @This(), a: Type, b: Type) bool {
                 _ = self;
-                return a.eql(b);
+                return a.eql(&b);
             }
         },
         std.hash_map.default_max_load_percentage,
     );
+
+    const TypeList = std.ArrayList(Type.Ptr);
 
     alloc: Allocator,
     opMap: OpMap,
@@ -157,9 +159,6 @@ pub const TypeBook = struct {
     stringTy: Type = Type.newString(),
     booleanTy: Type = Type.newBoolean(),
     objectTy: Type = Type.newObject(),
-    arrayTys: Type.ArrayType.Map,
-    functionTys: Type.FunctionType.Map,
-    unionTys: Type.UnionType.Map,
     tyMap: TypeMap,
 
     pub fn new(alloc: Allocator) *TypeBook {
@@ -167,9 +166,6 @@ pub const TypeBook = struct {
         self.* = TypeBook{
             .alloc = alloc,
             .opMap = undefined,
-            .arrayTys = Type.ArrayType.Map.new(alloc),
-            .functionTys = Type.FunctionType.Map.new(alloc),
-            .unionTys = Type.UnionType.Map.new(alloc),
             .tyMap = TypeMap.init(alloc),
         };
         createOpMap(self);
@@ -180,18 +176,17 @@ pub const TypeBook = struct {
         var it = self.tyMap.valueIterator();
 
         while (it.next()) |val| {
-            // TODO: Properly free the types
-            // const ty = val.*.*;
-            // std.debug.assert(std.meta.activeTag(ty) == .Function);
-            // self.map.allocator.free(ty.Function.args);
-            self.tyMap.allocator.destroy(val.*);
+            switch (val.*.*) {
+                .Function => |f| self.alloc.free(f.args),
+                .Union => |un| self.alloc.free(un.tys),
+                else => {},
+            }
+
+            self.alloc.destroy(val.*);
         }
 
         self.tyMap.deinit();
 
-        self.unionTys.deinit();
-        self.functionTys.deinit();
-        self.arrayTys.deinit();
         self.alloc.destroy(self);
     }
 
@@ -240,7 +235,15 @@ pub const TypeBook = struct {
     }
 
     pub fn getArray(self: *TypeBook, subtype: Type.Ptr) Type.Ptr {
-        return self.arrayTys.get(subtype);
+        const arr = Type{ .Array = Type.ArrayType{ .subtype = subtype } };
+
+        if (self.tyMap.get(arr)) |ty|
+            return ty;
+
+        var ty = allocate.create(self.alloc, Type);
+        ty.* = arr;
+        self.tyMap.put(arr, ty) catch allocate.reportAndExit();
+        return ty;
     }
 
     pub fn getFunction(
@@ -248,22 +251,72 @@ pub const TypeBook = struct {
         ret: Type.Ptr,
         args: []Type.Ptr,
     ) Type.Ptr {
-        return self.functionTys.get(ret, args);
+        var funcTy = Type{
+            .Function = Type.FunctionType{
+                .ret = ret,
+                .args = args,
+            },
+        };
+
+        if (self.tyMap.get(funcTy)) |ty|
+            return ty;
+
+        funcTy.Function.args = allocate.alloc(self.alloc, Type.Ptr, args.len);
+        std.mem.copy(Type.Ptr, funcTy.Function.args, args);
+
+        var ty = allocate.create(self.alloc, Type);
+        ty.* = funcTy;
+        self.tyMap.put(funcTy, ty) catch allocate.reportAndExit();
+        return ty;
     }
 
-    pub fn getUnion(self: *TypeBook, tys: []Type.Ptr) Type.Ptr {
-        return self.unionTys.get(tys);
+    fn flattenUnionTypes(out: *TypeList, in: []Type.Ptr) void {
+        for (in) |ty| {
+            switch (ty.*) {
+                .Union => |un| TypeBook.flattenUnionTypes(out, un.tys),
+                else => out.append(ty) catch allocate.reportAndExit(),
+            }
+        }
+    }
+
+    pub fn getUnion(self: *TypeBook, tys_: []Type.Ptr) Type.Ptr {
+        const Context = struct {
+            pub fn lessThan(_: @This(), lhs: Type.Ptr, rhs: Type.Ptr) bool {
+                return @ptrToInt(lhs) < @ptrToInt(rhs);
+            }
+        };
+
+        // TODO: Refactor this to avoid allocating
+        var flattened = TypeList.init(self.alloc);
+        flattened.ensureTotalCapacity(tys_.len) catch allocate.reportAndExit();
+        TypeBook.flattenUnionTypes(&flattened, tys_);
+
+        const tys = flattened.items;
+        std.sort.insertionSort(Type.Ptr, tys, Context{}, Context.lessThan);
+
+        const un = Type{ .Union = Type.UnionType{ .tys = tys } };
+
+        const existing = self.tyMap.get(un);
+        if (existing) |ty| {
+            flattened.deinit();
+            return ty;
+        }
+
+        var ty = allocate.create(self.alloc, Type);
+        ty.* = un;
+        self.tyMap.put(un, ty) catch allocate.reportAndExit();
+        return ty;
     }
 
     pub fn getAlias(self: *TypeBook, name: []const u8, ty: Type.Ptr) Type.Ptr {
         const alias = Type{ .Alias = Type.AliasType.new(name, ty) };
 
-        if (self.tyMap.get(&alias)) |t|
+        if (self.tyMap.get(alias)) |t|
             return t;
 
         var t = allocate.create(self.alloc, Type);
         t.* = alias;
-        self.tyMap.put(&alias, t) catch allocate.reportAndExit();
+        self.tyMap.put(alias, t) catch allocate.reportAndExit();
         return t;
     }
 
@@ -300,6 +353,11 @@ test "type book can create and retrieve array types" {
     const numArray = book.getArray(num);
     try expectEqual(Type.Type.Array, numArray.getType());
     try expectEqual(num, numArray.Array.subtype);
+
+    const numArray2 = book.getArray(num);
+    try expectEqual(Type.Type.Array, numArray2.getType());
+    try expectEqual(num, numArray2.Array.subtype);
+    try expectEqual(numArray, numArray2);
 
     const strArray = book.getArray(str);
     try expectEqual(Type.Type.Array, strArray.getType());

@@ -205,10 +205,7 @@ pub const Compiler = struct {
     }
 
     pub fn compile(self: *Compiler, driver: anytype, path: []const u8) !void {
-        var arena = Arena.init(self.alloc);
-        defer arena.deinit();
-
-        const file = try driver.parseFile(&arena, path);
+        const file = try driver.parseFile(path);
 
         const nd = switch (file.res) {
             .Success => |node| node,
@@ -223,9 +220,6 @@ pub const Compiler = struct {
         };
 
         try self.compileProgramNode(nd);
-
-        if (self.hasErrors())
-            try self.reportErrors();
     }
 };
 

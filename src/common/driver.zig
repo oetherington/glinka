@@ -30,25 +30,34 @@ pub fn Driver(comptime ParserImpl: type) type {
             res: ParseResult,
         };
 
+        arena: Arena,
+
+        pub fn new(alloc: Allocator) This {
+            return This{
+                .arena = Arena.init(alloc),
+            };
+        }
+
+        pub fn deinit(self: This) void {
+            self.arena.deinit();
+        }
+
         pub fn parseFile(
-            self: This,
-            arena: *Arena,
+            self: *This,
             path: []const u8,
         ) !ParsedFile {
-            _ = self;
-
             const cwd = std.fs.cwd();
 
             const code = try cwd.readFileAlloc(
-                arena.allocator(),
+                self.arena.allocator(),
                 path,
                 std.math.maxInt(usize),
             );
 
-            var parserImpl = ParserImpl.new(arena, code);
+            var parserImpl = ParserImpl.new(&self.arena, code);
             var parser = parserImpl.getParser();
 
-            var res = parser.getAst(arena);
+            var res = parser.getAst(&self.arena);
 
             return ParsedFile{
                 .code = code,
