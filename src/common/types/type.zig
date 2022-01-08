@@ -35,7 +35,7 @@ pub const Type = union(This.Type) {
     pub const FunctionType = @import("function_type.zig").FunctionType;
     pub const UnionType = @import("union_type.zig").UnionType;
     pub const AliasType = @import("alias_type.zig").AliasType;
-    pub const InterfaceType = @import("interface_type.zig");
+    pub const InterfaceType = @import("interface_type.zig").InterfaceType;
 
     pub const Type = enum {
         Unknown,
@@ -96,8 +96,8 @@ pub const Type = union(This.Type) {
             .Number,
             .String,
             .Boolean,
+            .Object,
             => @intCast(usize, @enumToInt(self.getType())) ^ 0xd16575db32f7806d,
-            .Object => @panic("TODO hash Object"),
             .Tuple => @panic("TODO hash Tuple"),
             .Array => |ar| ar.hash(),
             .Class => @panic("TODO hash Class"),
@@ -105,7 +105,7 @@ pub const Type = union(This.Type) {
             .Function => |f| f.hash(),
             .Union => |un| un.hash(),
             .Alias => |al| al.hash(),
-            .Interface => @panic("TODO hash Interface"),
+            .Interface => |in| in.hash(),
         };
     }
 
@@ -165,6 +165,10 @@ pub const Type = union(This.Type) {
         return This{ .Alias = alias };
     }
 
+    pub fn newInterface(in: InterfaceType) This {
+        return This{ .Interface = in };
+    }
+
     pub fn isAssignableTo(self: This.Ptr, target: This.Ptr) bool {
         if (self.getType() == .Undefined)
             return true;
@@ -220,14 +224,14 @@ pub const Type = union(This.Type) {
             .String => try writer.print("string", .{}),
             .Boolean => try writer.print("boolean", .{}),
             .Object => try writer.print("object", .{}),
-            .Tuple => try writer.print("tuple", .{}),
+            .Tuple => try writer.print("tuple", .{}), // TODO
             .Array => |arr| try arr.write(writer),
-            .Class => try writer.print("class", .{}),
-            .Enum => try writer.print("enum", .{}),
+            .Class => try writer.print("class", .{}), // TODO
+            .Enum => try writer.print("enum", .{}), // TODO
             .Function => |func| try func.write(writer),
             .Union => |un| try un.write(writer),
             .Alias => |al| try al.write(writer),
-            .Interface => try writer.print("interface", .{}),
+            .Interface => |in| try in.write(writer),
         }
     }
 
@@ -290,7 +294,7 @@ test "can create an object type" {
 
 test "can create an array type" {
     const sub = Type.newBoolean();
-    const ty = Type.newArray(Type.ArrayType{ .subtype = &sub });
+    const ty = Type.newArray(Type.ArrayType.new(&sub));
     try expectEqual(Type.Type.Array, ty.getType());
     try expectEqual(Type.Type.Boolean, ty.Array.subtype.getType());
 }
@@ -319,6 +323,23 @@ test "can create a function type" {
     try expectEqual(@intCast(usize, 2), ty.Function.args.len);
     try expectEqual(Type.Type.String, ty.Function.args[0].getType());
     try expectEqual(Type.Type.Number, ty.Function.args[1].getType());
+}
+
+test "can create an interface type" {
+    const number = Type.newNumber();
+    const boolean = Type.newBoolean();
+    const ty = Type.newInterface(
+        Type.InterfaceType.new(&[_]Type.InterfaceType.Member{
+            Type.InterfaceType.Member{ .name = "a", .ty = &number },
+            Type.InterfaceType.Member{ .name = "b", .ty = &boolean },
+        }),
+    );
+    try expectEqual(Type.Type.Interface, ty.getType());
+    try expectEqual(@intCast(usize, 2), ty.Interface.members.len);
+    try expectEqualStrings("a", ty.Interface.members[0].name);
+    try expectEqual(Type.Type.Number, ty.Interface.members[0].ty.getType());
+    try expectEqualStrings("b", ty.Interface.members[1].name);
+    try expectEqual(Type.Type.Boolean, ty.Interface.members[1].ty.getType());
 }
 
 test "can compare Type equality" {
@@ -665,4 +686,16 @@ test "can write a union type" {
     }).run();
 }
 
-// TODO: Add test for writing an interface type
+test "can write an interface type" {
+    const n = Type.newNumber();
+    const b = Type.newBoolean();
+    try (WriteTypeTestCase{
+        .ty = Type.newInterface(
+            Type.InterfaceType.new(&[_]Type.InterfaceType.Member{
+                Type.InterfaceType.Member{ .name = "a", .ty = &n },
+                Type.InterfaceType.Member{ .name = "b", .ty = &b },
+            }),
+        ),
+        .expected = "{ a: number, b: boolean, }",
+    }).run();
+}

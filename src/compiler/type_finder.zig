@@ -56,7 +56,9 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
             else
                 null;
         },
+        // TODO: Process function type literals
         .UnionType => |un| {
+            // TODO: Refactor this to avoid allocation
             const alloc = scope.getAllocator();
             const tys = allocate.alloc(alloc, Type.Ptr, un.items.len);
             defer alloc.free(tys);
@@ -70,7 +72,28 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
 
             return typebook.getUnion(tys);
         },
-        // TODO: Process function type literals
+        .InterfaceType => |obj| {
+            // TODO: Refactor this to avoid allocation
+            const alloc = scope.getAllocator();
+            const members = allocate.alloc(
+                alloc,
+                Type.InterfaceType.Member,
+                obj.items.len,
+            );
+            defer alloc.free(members);
+
+            for (obj.items) |member, index| {
+                if (findType(scope, typebook, member.ty)) |ty|
+                    members[index] = Type.InterfaceType.Member{
+                        .name = member.name,
+                        .ty = ty,
+                    }
+                else
+                    return null;
+            }
+
+            return typebook.getInterface(members);
+        },
         else => return null,
     }
 }

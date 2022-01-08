@@ -35,8 +35,10 @@ pub const NodeList = std.ArrayListUnmanaged(Node);
 const objectImp = @import("node_data/object.zig");
 pub const Object = objectImp.Object;
 pub const ObjectProperty = objectImp.ObjectProperty;
-pub const ObjectTypeMember = objectImp.ObjectTypeMember;
-pub const ObjectType = objectImp.ObjectType;
+
+const interface = @import("node_data/interface.zig");
+pub const InterfaceTypeMember = interface.InterfaceTypeMember;
+pub const InterfaceType = interface.InterfaceType;
 
 pub const Decl = @import("node_data/decl.zig").Decl;
 
@@ -93,7 +95,7 @@ pub const NodeType = enum {
     TypeName,
     UnionType,
     ArrayType,
-    ObjectType,
+    InterfaceType,
     Alias,
     Function,
     Block,
@@ -136,7 +138,7 @@ pub const NodeData = union(NodeType) {
     TypeName: []const u8,
     UnionType: NodeList,
     ArrayType: Node,
-    ObjectType: ObjectType,
+    InterfaceType: InterfaceType,
     Alias: Alias,
     Function: Function,
     Block: NodeList,
@@ -203,8 +205,8 @@ pub const NodeData = union(NodeType) {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 try nd.dumpIndented(writer, indent + 2);
             },
-            .ObjectType => |objTy| {
-                try putInd(writer, indent, "ObjectType\n", .{});
+            .InterfaceType => |objTy| {
+                try putInd(writer, indent, "InterfaceType\n", .{});
                 for (objTy.items) |member|
                     try member.dump(writer, indent + 2);
             },

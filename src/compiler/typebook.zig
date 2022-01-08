@@ -179,6 +179,7 @@ pub const TypeBook = struct {
             switch (val.*.*) {
                 .Function => |f| self.alloc.free(f.args),
                 .Union => |un| self.alloc.free(un.tys),
+                .Interface => |in| self.alloc.free(in.members),
                 else => {},
             }
 
@@ -188,6 +189,12 @@ pub const TypeBook = struct {
         self.tyMap.deinit();
 
         self.alloc.destroy(self);
+    }
+
+    pub fn combine(self: *TypeBook, a: Type.Ptr, b: Type.Ptr) Type.Ptr {
+        if (b.isAssignableTo(a))
+            return a;
+        return self.getUnion(&[_]Type.Ptr{ a, b });
     }
 
     pub fn getOpEntry(self: *TypeBook, ty: TokenType) ?OpEntry {
@@ -320,10 +327,30 @@ pub const TypeBook = struct {
         return t;
     }
 
-    pub fn combine(self: *TypeBook, a: Type.Ptr, b: Type.Ptr) Type.Ptr {
-        if (b.isAssignableTo(a))
-            return a;
-        return self.getUnion(&[_]Type.Ptr{ a, b });
+    pub fn getInterface(
+        self: *TypeBook,
+        members: []Type.InterfaceType.Member,
+    ) Type.Ptr {
+        var inTy = Type{ .Interface = Type.InterfaceType.new(members) };
+
+        if (self.tyMap.get(inTy)) |ty|
+            return ty;
+
+        inTy.Interface.members = allocate.alloc(
+            self.alloc,
+            Type.InterfaceType.Member,
+            members.len,
+        );
+        std.mem.copy(
+            Type.InterfaceType.Member,
+            inTy.Interface.members,
+            members,
+        );
+
+        var ty = allocate.create(self.alloc, Type);
+        ty.* = inTy;
+        self.tyMap.put(inTy, ty) catch allocate.reportAndExit();
+        return ty;
     }
 };
 

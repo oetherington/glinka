@@ -52,7 +52,7 @@ const ParseTypeTestCase = struct {
     }
 };
 
-fn parseObjectType(psr: *TsParser) ParseResult {
+fn parseInterfaceType(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrace);
 
     const alloc = psr.getAllocator();
@@ -60,35 +60,33 @@ fn parseObjectType(psr: *TsParser) ParseResult {
 
     _ = psr.lexer.next();
 
-    var res = node.ObjectType{};
+    var res = node.InterfaceType{};
 
     while (true) {
         // TODO: Should strings be valid here as well as identifiers?
         if (psr.lexer.token.ty != .Ident)
             return ParseResult.expected(
-                "name for object member",
+                "name for interface member",
                 psr.lexer.token,
             );
 
         const name = psr.lexer.token.data;
-        var ty: ?Node = null;
 
-        if (psr.lexer.next().ty == .Colon) {
-            _ = psr.lexer.next();
+        if (psr.lexer.next().ty != .Colon)
+            return ParseResult.expected(TokenType.Colon, psr.lexer.token);
 
-            const tyRes = parseTypeInternal(psr);
-            if (tyRes.isSuccess())
-                ty = tyRes.Success
-            else
-                return ParseResult.expected(
-                    "type for object member",
-                    psr.lexer.token,
-                );
-        }
+        _ = psr.lexer.next();
+
+        const ty = parseTypeInternal(psr);
+        if (!ty.isSuccess())
+            return ParseResult.expected(
+                "type for interface member",
+                psr.lexer.token,
+            );
 
         res.append(
             alloc,
-            node.ObjectTypeMember.new(name, ty),
+            node.InterfaceTypeMember.new(name, ty.Success),
         ) catch allocate.reportAndExit();
 
         switch (psr.lexer.token.ty) {
@@ -104,54 +102,51 @@ fn parseObjectType(psr: *TsParser) ParseResult {
         }
     }
 
-    return ParseResult.success(makeNode(alloc, csr, .ObjectType, res));
+    return ParseResult.success(makeNode(alloc, csr, .InterfaceType, res));
 }
 
-test "can parse object types" {
+test "can parse interface types" {
     try (ParseTypeTestCase{
-        .code = " { a: number, b, c: string } ",
+        .code = " { a: number, b: string } ",
         .check = (struct {
             fn check(res: ParseResult) anyerror!void {
                 try expect(res.isSuccess());
                 try expectEqual(Cursor.new(1, 2), res.Success.csr);
                 try expectEqual(
-                    NodeType.ObjectType,
+                    NodeType.InterfaceType,
                     res.Success.data.getType(),
                 );
 
-                const members = res.Success.data.ObjectType.items;
-                try expectEqual(@intCast(usize, 3), members.len);
+                const members = res.Success.data.InterfaceType.items;
+                try expectEqual(@intCast(usize, 2), members.len);
                 try expectEqualStrings("a", members[0].name);
-                try expect(members[0].ty != null);
-                try expectEqual(NodeType.TypeName, members[0].ty.?.getType());
-                try expectEqualStrings("number", members[0].ty.?.data.TypeName);
+                try expectEqual(NodeType.TypeName, members[0].ty.getType());
+                try expectEqualStrings("number", members[0].ty.data.TypeName);
                 try expectEqualStrings("b", members[1].name);
-                try expect(members[1].ty == null);
-                try expectEqualStrings("c", members[2].name);
-                try expect(members[2].ty != null);
-                try expectEqual(NodeType.TypeName, members[2].ty.?.getType());
-                try expectEqualStrings("string", members[2].ty.?.data.TypeName);
+                try expectEqual(NodeType.TypeName, members[1].ty.getType());
+                try expectEqualStrings("string", members[1].ty.data.TypeName);
             }
         }).check,
     }).run();
 }
 
-test "can parse object types with dangling comma" {
+test "can parse interface types with dangling comma" {
     try (ParseTypeTestCase{
-        .code = " { a, } ",
+        .code = " { a: number, } ",
         .check = (struct {
             fn check(res: ParseResult) anyerror!void {
                 try expect(res.isSuccess());
                 try expectEqual(Cursor.new(1, 2), res.Success.csr);
                 try expectEqual(
-                    NodeType.ObjectType,
+                    NodeType.InterfaceType,
                     res.Success.data.getType(),
                 );
 
-                const members = res.Success.data.ObjectType.items;
+                const members = res.Success.data.InterfaceType.items;
                 try expectEqual(@intCast(usize, 1), members.len);
                 try expectEqualStrings("a", members[0].name);
-                try expect(members[0].ty == null);
+                try expectEqual(NodeType.TypeName, members[0].ty.getType());
+                try expectEqualStrings("number", members[0].ty.data.TypeName);
             }
         }).check,
     }).run();
@@ -217,7 +212,7 @@ fn parseTypeName(psr: *TsParser) ParseResult {
             _ = psr.lexer.next();
             return res;
         },
-        .LBrace => return parseObjectType(psr),
+        .LBrace => return parseInterfaceType(psr),
         else => return ParseResult.noMatch(null),
     }
 }

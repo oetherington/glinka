@@ -35,6 +35,8 @@
    - [ ] Array<> generic
  - [x] Type aliases
  - [ ] Interfaces
+   - [ ] Inline with object literal syntax/type aliases
+   - [ ] Merged interfaces (behind a feature flag?)
  - [ ] Enums
    - [ ] Const enums
    - [ ] Ambient enums
@@ -51,6 +53,7 @@
    - [ ] `static`
    - [ ] Inheritance
  - [ ] Generics
+ - [ ] Recursive types
  - [ ] Modules/`import`/`export`
  - [ ] `declare`
  - [ ] `namespace`
