@@ -23,6 +23,7 @@ const assert = std.debug.assert;
 const Cursor = @import("../common/cursor.zig").Cursor;
 const Token = @import("../common/token.zig").Token;
 const lexOperator = @import("operator_lexer.zig").lexOperator;
+const lexNumber = @import("number_lexer.zig").lexNumber;
 
 const keywordMap = std.ComptimeStringMap(Token.Type, .{
     .{ "var", .Var },
@@ -159,28 +160,6 @@ pub const Lexer = struct {
         return self.token;
     }
 
-    // TODO Handle floats, scientific notation, etc.
-    fn number(self: *Lexer) Token {
-        assert(isNum(self.code[self.index]));
-
-        const start = self.index;
-        self.index += 1;
-
-        while (self.index < self.code.len and isNum(self.code[self.index])) {
-            self.index += 1;
-        }
-
-        self.token = Token.newData(
-            Token.Type.Int,
-            self.csr,
-            self.code[start..self.index],
-        );
-
-        self.csr.ch += @intCast(u32, self.index - start);
-
-        return self.token;
-    }
-
     fn string(self: *Lexer) Token {
         const delim = self.code[self.index];
         assert(delim == '\'' or delim == '"' or delim == '`');
@@ -253,7 +232,7 @@ pub const Lexer = struct {
                     self.csr.ch = 1;
                 },
                 'a'...'z', 'A'...'Z', '_' => return self.ident(),
-                '0'...'9' => return self.number(),
+                '0'...'9' => return lexNumber(self),
                 '\'', '"', '`' => return self.string(),
                 '{' => return self.atom(Token.Type.LBrace),
                 '}' => return self.atom(Token.Type.RBrace),

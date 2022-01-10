@@ -17,7 +17,7 @@
 
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
-const Cursor = @import("../common/cursor.zig").Cursor;
+const Cursor = @import("cursor.zig").Cursor;
 
 pub const Token = struct {
     pub const Type = enum {
@@ -28,6 +28,8 @@ pub const Token = struct {
         // Literal tokens
         Ident,
         Int,
+        BigInt,
+        Float,
         String,
         Template,
 
