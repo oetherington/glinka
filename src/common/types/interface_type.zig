@@ -57,6 +57,31 @@ pub const InterfaceType = struct {
 
         try writer.print("}}", .{});
     }
+
+    pub fn getNamedMember(
+        self: InterfaceType,
+        name: []const u8,
+    ) ?Member {
+        for (self.members) |member|
+            if (std.mem.eql(u8, member.name, name))
+                return member;
+
+        return null;
+    }
+
+    pub fn isAssignableTo(self: InterfaceType, target: InterfaceType) bool {
+        for (target.members) |member| {
+            const local = self.getNamedMember(member.name);
+            if (local) |local_| {
+                if (!local_.ty.isAssignableTo(member.ty))
+                    return false;
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    }
 };
 
 test "can check InterfaceType.Member equality" {
@@ -94,4 +119,59 @@ test "can hash an InterfaceType" {
     try std.testing.expectEqual(a.hash(), a.hash());
     try std.testing.expectEqual(a.hash(), b.hash());
     try std.testing.expect(a.hash() != c.hash());
+}
+
+test "can retrieve InterfaceType member by name" {
+    const num = Type.newNumber();
+    const str = Type.newString();
+
+    const in = Type.InterfaceType.new(&[_]Type.InterfaceType.Member{
+        Type.InterfaceType.Member{ .name = "a", .ty = &num },
+        Type.InterfaceType.Member{ .name = "b", .ty = &str },
+    });
+
+    const a = in.getNamedMember("a");
+    try std.testing.expect(a != null);
+    try std.testing.expectEqualStrings("a", a.?.name);
+    try std.testing.expectEqual(Type.Type.Number, a.?.ty.getType());
+
+    const b = in.getNamedMember("b");
+    try std.testing.expect(b != null);
+    try std.testing.expectEqualStrings("b", b.?.name);
+    try std.testing.expectEqual(Type.Type.String, b.?.ty.getType());
+
+    const c = in.getNamedMember("c");
+    try std.testing.expect(c == null);
+}
+
+test "can check if interface assignablility" {
+    const num = Type.newNumber();
+    const str = Type.newString();
+    const any = Type.newAny();
+
+    const a = Type.InterfaceType.new(&[_]Type.InterfaceType.Member{
+        Type.InterfaceType.Member{ .name = "a", .ty = &num },
+        Type.InterfaceType.Member{ .name = "b", .ty = &str },
+    });
+
+    const b = Type.InterfaceType.new(&[_]Type.InterfaceType.Member{
+        Type.InterfaceType.Member{ .name = "a", .ty = &num },
+        Type.InterfaceType.Member{ .name = "b", .ty = &str },
+        Type.InterfaceType.Member{ .name = "c", .ty = &any },
+    });
+
+    const c = Type.InterfaceType.new(&[_]Type.InterfaceType.Member{
+        Type.InterfaceType.Member{ .name = "a", .ty = &any },
+        Type.InterfaceType.Member{ .name = "b", .ty = &str },
+    });
+
+    try std.testing.expect(a.isAssignableTo(a));
+    try std.testing.expect(!a.isAssignableTo(b));
+    try std.testing.expect(a.isAssignableTo(c));
+    try std.testing.expect(b.isAssignableTo(a));
+    try std.testing.expect(b.isAssignableTo(b));
+    try std.testing.expect(b.isAssignableTo(c));
+    try std.testing.expect(!c.isAssignableTo(a));
+    try std.testing.expect(!c.isAssignableTo(b));
+    try std.testing.expect(c.isAssignableTo(c));
 }

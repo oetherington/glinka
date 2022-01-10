@@ -4,7 +4,7 @@
 
  - [x] Comments
  - [x] Int literals
- - [ ] Float literals/infinity/NaN
+ - [x] Float literals
  - [x] String/Template literals
  - [x] Boolean literals
  - [x] Null/undefined literals
@@ -35,12 +35,13 @@
    - [ ] Array<> generic
  - [x] Type aliases
  - [ ] Interfaces
-   - [ ] Inline with object literal syntax/type aliases
+   - [x] Inline with object literal syntax/type aliases
+   - [x] `interface` syntax
    - [ ] Merged interfaces (behind a feature flag?)
+ - [x] Object literals
  - [ ] Enums
    - [ ] Const enums
    - [ ] Ambient enums
- - [ ] Object literals
  - [ ] `delete`
  - [ ] Classes
    - [ ] `new`

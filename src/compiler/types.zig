@@ -16,10 +16,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const expectEqual = std.testing.expectEqual;
 const Compiler = @import("compiler.zig").Compiler;
 const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
+const Type = @import("../common/types/type.zig").Type;
 const GenericError = @import("errors/generic_error.zig").GenericError;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
@@ -46,5 +48,36 @@ pub fn processAlias(cmp: *Compiler, nd: Node) void {
 test "can compile a type alias declaration" {
     try (CompilerTestCase{
         .code = "type ATypeAlias = number | boolean;",
+    }).run();
+}
+
+pub fn processInterface(cmp: *Compiler, nd: Node) void {
+    std.debug.assert(nd.getType() == NodeType.InterfaceType);
+
+    const in = nd.data.InterfaceType;
+
+    const name = if (in.name) |nm|
+        nm
+    else
+        std.debug.panic("Invalid InterfaceType node (has no name)", .{});
+
+    const ty = cmp.findType(nd) orelse {
+        cmp.errors.append(CompileError.genericError(
+            GenericError.new(nd.csr, cmp.fmt(
+                "Interface type {s} is invalid",
+                .{name},
+            )),
+        )) catch allocate.reportAndExit();
+        return;
+    };
+
+    std.debug.assert(ty.getType() == .Interface);
+
+    cmp.scope.putType(name, ty);
+}
+
+test "can compile a type alias declaration" {
+    try (CompilerTestCase{
+        .code = "interface Inter { aString: string; aUnion: number | null; }",
     }).run();
 }

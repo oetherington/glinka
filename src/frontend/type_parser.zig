@@ -52,7 +52,7 @@ const ParseTypeTestCase = struct {
     }
 };
 
-fn parseInterfaceType(psr: *TsParser) ParseResult {
+pub fn parseInlineInterfaceType(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .LBrace);
 
     const alloc = psr.getAllocator();
@@ -60,7 +60,7 @@ fn parseInterfaceType(psr: *TsParser) ParseResult {
 
     _ = psr.lexer.next();
 
-    var res = node.InterfaceType{};
+    var res = node.InterfaceTypeMemberList{};
 
     while (true) {
         // TODO: Should strings be valid here as well as identifiers?
@@ -90,7 +90,14 @@ fn parseInterfaceType(psr: *TsParser) ParseResult {
         ) catch allocate.reportAndExit();
 
         switch (psr.lexer.token.ty) {
-            .Comma => if (psr.lexer.next().ty == .RBrace) break else continue,
+            .Comma, .Semi => {
+                if (psr.lexer.next().ty == .RBrace) {
+                    _ = psr.lexer.next();
+                    break;
+                } else {
+                    continue;
+                }
+            },
             .RBrace => {
                 _ = psr.lexer.next();
                 break;
@@ -102,10 +109,18 @@ fn parseInterfaceType(psr: *TsParser) ParseResult {
         }
     }
 
-    return ParseResult.success(makeNode(alloc, csr, .InterfaceType, res));
+    return ParseResult.success(makeNode(
+        alloc,
+        csr,
+        .InterfaceType,
+        node.InterfaceType{
+            .name = null,
+            .members = res,
+        },
+    ));
 }
 
-test "can parse interface types" {
+test "can parse inline interface types" {
     try (ParseTypeTestCase{
         .code = " { a: number, b: string } ",
         .check = (struct {
@@ -117,7 +132,9 @@ test "can parse interface types" {
                     res.Success.data.getType(),
                 );
 
-                const members = res.Success.data.InterfaceType.items;
+                try expect(res.Success.data.InterfaceType.name == null);
+
+                const members = res.Success.data.InterfaceType.members.items;
                 try expectEqual(@intCast(usize, 2), members.len);
                 try expectEqualStrings("a", members[0].name);
                 try expectEqual(NodeType.TypeName, members[0].ty.getType());
@@ -130,9 +147,9 @@ test "can parse interface types" {
     }).run();
 }
 
-test "can parse interface types with dangling comma" {
+test "can parse inline interface types with semicolons and trailing comma" {
     try (ParseTypeTestCase{
-        .code = " { a: number, } ",
+        .code = " { a: number; b: string, } ",
         .check = (struct {
             fn check(res: ParseResult) anyerror!void {
                 try expect(res.isSuccess());
@@ -142,11 +159,16 @@ test "can parse interface types with dangling comma" {
                     res.Success.data.getType(),
                 );
 
-                const members = res.Success.data.InterfaceType.items;
-                try expectEqual(@intCast(usize, 1), members.len);
+                try expect(res.Success.data.InterfaceType.name == null);
+
+                const members = res.Success.data.InterfaceType.members.items;
+                try expectEqual(@intCast(usize, 2), members.len);
                 try expectEqualStrings("a", members[0].name);
                 try expectEqual(NodeType.TypeName, members[0].ty.getType());
                 try expectEqualStrings("number", members[0].ty.data.TypeName);
+                try expectEqualStrings("b", members[1].name);
+                try expectEqual(NodeType.TypeName, members[1].ty.getType());
+                try expectEqualStrings("string", members[1].ty.data.TypeName);
             }
         }).check,
     }).run();
@@ -212,7 +234,7 @@ fn parseTypeName(psr: *TsParser) ParseResult {
             _ = psr.lexer.next();
             return res;
         },
-        .LBrace => return parseInterfaceType(psr),
+        .LBrace => return parseInlineInterfaceType(psr),
         else => return ParseResult.noMatch(null),
     }
 }

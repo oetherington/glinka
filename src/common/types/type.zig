@@ -196,6 +196,10 @@ pub const Type = union(This.Type) {
                 return true;
             },
             .Alias => |al| return al.ty.isAssignableTo(target),
+            .Interface => |in| {
+                if (target.getType() == .Interface)
+                    return in.isAssignableTo(target.Interface);
+            },
             else => {},
         }
 

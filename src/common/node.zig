@@ -38,6 +38,7 @@ pub const ObjectProperty = objectImp.ObjectProperty;
 
 const interface = @import("node_data/interface.zig");
 pub const InterfaceTypeMember = interface.InterfaceTypeMember;
+pub const InterfaceTypeMemberList = interface.InterfaceTypeMemberList;
 pub const InterfaceType = interface.InterfaceType;
 
 pub const Decl = @import("node_data/decl.zig").Decl;
@@ -214,8 +215,13 @@ pub const NodeData = union(NodeType) {
                 try nd.dumpIndented(writer, indent + 2);
             },
             .InterfaceType => |objTy| {
-                try putInd(writer, indent, "InterfaceType\n", .{});
-                for (objTy.items) |member|
+                try putInd(
+                    writer,
+                    indent,
+                    "InterfaceType {s}\n",
+                    .{if (objTy.name) |name| name else ""},
+                );
+                for (objTy.members.items) |member|
                     try member.dump(writer, indent + 2);
             },
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),

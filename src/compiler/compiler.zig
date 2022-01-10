@@ -22,7 +22,8 @@ const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
 const Config = @import("../common/config.zig").Config;
 const Cursor = @import("../common/cursor.zig").Cursor;
-const Node = @import("../common/node.zig").Node;
+const node = @import("../common/node.zig");
+const Node = node.Node;
 const Backend = @import("../common/backend.zig").Backend;
 const Scope = @import("scope.zig").Scope;
 const Type = @import("../common/types/type.zig").Type;
@@ -183,6 +184,7 @@ pub const Compiler = struct {
             .Function => function.processFunction(self, nd),
             .Return => function.processReturn(self, nd),
             .Alias => types.processAlias(self, nd),
+            .InterfaceType => types.processInterface(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},

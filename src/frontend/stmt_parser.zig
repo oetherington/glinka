@@ -35,6 +35,7 @@ const parseresult = @import("../common/parse_result.zig");
 const ParseResult = parseresult.ParseResult;
 const ParseError = @import("../common/parse_error.zig").ParseError;
 const allocate = @import("../common/allocate.zig");
+const typeParser = @import("type_parser.zig");
 
 const StmtTestCase = struct {
     code: []const u8,
@@ -1237,7 +1238,7 @@ fn parseAlias(psr: *TsParser) ParseResult {
 
     const name = psr.lexer.next();
     if (name.ty != .Ident)
-        return ParseResult.expected("type name", name);
+        return ParseResult.expected("name for type alias", name);
 
     _ = psr.lexer.next();
 
@@ -1269,15 +1270,64 @@ test "can parse type alias statement" {
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Alias, value.getType());
+
                 const alias = value.data.Alias;
                 try expectEqualStrings("IntOrString", alias.name);
                 try expectEqual(NodeType.UnionType, alias.value.getType());
+
                 const types = alias.value.data.UnionType.items;
                 try expectEqual(@intCast(usize, 2), types.len);
                 try expectEqual(NodeType.TypeName, types[0].getType());
                 try expectEqualStrings("int", types[0].data.TypeName);
                 try expectEqual(NodeType.TypeName, types[1].getType());
                 try expectEqualStrings("string", types[1].data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+fn parseInterface(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Interface);
+
+    const csr = psr.lexer.token.csr;
+
+    const name = psr.lexer.next();
+    if (name.ty != .Ident)
+        return ParseResult.expected("name for interface", name);
+
+    _ = psr.lexer.next();
+
+    var ty = switch (typeParser.parseInlineInterfaceType(psr)) {
+        .Success => |result| result,
+        else => |result| return result,
+    };
+
+    ty.csr = csr;
+    ty.data.InterfaceType.name = name.data;
+
+    return ParseResult.success(ty);
+}
+
+test "can parse interfacestatement" {
+    try (StmtTestCase{
+        .code = "interface AnInterface { a: number, b: string }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.InterfaceType, value.getType());
+
+                const in = value.data.InterfaceType;
+                try expectEqualStrings("AnInterface", in.name.?);
+                try expectEqual(@intCast(usize, 2), in.members.items.len);
+
+                const a = in.members.items[0];
+                try expectEqualStrings("a", a.name);
+                try expectEqual(NodeType.TypeName, a.ty.getType());
+                try expectEqualStrings("number", a.ty.data.TypeName);
+
+                const b = in.members.items[1];
+                try expectEqualStrings("b", b.name);
+                try expectEqual(NodeType.TypeName, b.ty.getType());
+                try expectEqualStrings("string", b.ty.data.TypeName);
             }
         }).check,
     }).run();
@@ -1303,6 +1353,7 @@ fn parseStmtInternal(psr: *TsParser) ParseResult {
         .Throw => parseThrow(psr),
         .Try => parseTry(psr),
         .Type => parseAlias(psr),
+        .Interface => parseInterface(psr),
         .EOF => ParseResult.success(makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,

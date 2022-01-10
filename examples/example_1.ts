@@ -119,3 +119,10 @@ const anUndefinedVariable: undefined = undefined;
 
 // Interface types and object literals
 let anObject: { a: number, b: string } = { a: 0, b: 'a string' };
+
+interface AnInterface {
+	maybeNum: number | null;
+	aString: string;
+}
+
+const anotherObject: AnInterface = { maybeNum: null, aString: "hello" };

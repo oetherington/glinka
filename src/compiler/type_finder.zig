@@ -78,11 +78,11 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
             const members = allocate.alloc(
                 alloc,
                 Type.InterfaceType.Member,
-                obj.items.len,
+                obj.members.items.len,
             );
             defer alloc.free(members);
 
-            for (obj.items) |member, index| {
+            for (obj.members.items) |member, index| {
                 if (findType(scope, typebook, member.ty)) |ty|
                     members[index] = Type.InterfaceType.Member{
                         .name = member.name,

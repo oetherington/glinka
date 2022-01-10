@@ -74,7 +74,12 @@ test "can compare InterfaceTypeMembers for equality" {
     try expect(c.eql(c));
 }
 
-pub const InterfaceType = std.ArrayListUnmanaged(InterfaceTypeMember);
+pub const InterfaceTypeMemberList = std.ArrayListUnmanaged(InterfaceTypeMember);
+
+pub const InterfaceType = struct {
+    name: ?[]const u8,
+    members: InterfaceTypeMemberList,
+};
 
 test "can dump an InterfaceType" {
     const node = makeNode(
@@ -86,12 +91,17 @@ test "can dump an InterfaceType" {
     defer std.testing.allocator.destroy(node);
 
     try (DumpTestCase(InterfaceType, .InterfaceType){
-        .value = InterfaceType{ .items = &[_]InterfaceTypeMember{
-            InterfaceTypeMember.new("a", node),
-            InterfaceTypeMember.new("b", node),
-        } },
+        .value = InterfaceType{
+            .name = "anInterface",
+            .members = .{
+                .items = &[_]InterfaceTypeMember{
+                    InterfaceTypeMember.new("a", node),
+                    InterfaceTypeMember.new("b", node),
+                },
+            },
+        },
         .expected = 
-        \\InterfaceType
+        \\InterfaceType anInterface
         \\  Member: a
         \\    TypeName Node (1:1)
         \\      TypeName: "string"
