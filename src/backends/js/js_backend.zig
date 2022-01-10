@@ -106,6 +106,7 @@ pub const JsBackend = struct {
             .Call,
             .Array,
             .ArrayAccess,
+            .Object,
             => {
                 try self.emitExpr(nd);
                 try self.out.print(";\n", .{});

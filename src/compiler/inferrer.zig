@@ -271,9 +271,39 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
 
             nd.ty = exprTy.Array.subtype;
         },
+        .Object => |obj| {
+            // TODO: Refactor this to avoid allocation
+            var members = allocate.alloc(
+                cmp.alloc,
+                Type.InterfaceType.Member,
+                obj.items.len,
+            );
+            defer cmp.alloc.free(members);
+
+            for (obj.items) |prop, index| {
+                const name = prop.getName();
+                switch (inferExprType(cmp, prop.value)) {
+                    .Success => |ty| members[index] = Type.InterfaceType.Member{
+                        .name = name,
+                        .ty = ty,
+                    },
+                    .Error => return InferResult.err(CompileError.genericError(
+                        GenericError.new(
+                            nd.csr,
+                            cmp.fmt(
+                                "Object property '{s}' has an invalid type",
+                                .{name},
+                            ),
+                        ),
+                    )),
+                }
+            }
+
+            nd.ty = cmp.typebook.getInterface(members);
+        },
         else => std.debug.panic(
             "Unhandled node type in inferExprType: {?}\n",
-            .{nd},
+            .{nd.getType()},
         ),
     }
 
@@ -751,5 +781,45 @@ test "can infer type of an array access" {
     }).run(.ArrayAccess, node.ArrayAccess{
         .expr = expr,
         .index = index,
+    });
+}
+
+test "can infer type of an object literal" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "'a'"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "'1'"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .String, "'b'"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .Int, "2"),
+    };
+
+    defer for (nodes) |nd|
+        std.testing.allocator.destroy(nd);
+
+    try (InferTestCase{
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+                _ = typebook;
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+
+                try expectEqual(Type.Type.Interface, res.Success.getType());
+                const members = res.Success.Interface.members;
+                try expectEqual(@intCast(usize, 2), members.len);
+                try expectEqualStrings("a", members[0].name);
+                try expectEqual(Type.Type.String, members[0].ty.getType());
+                try expectEqualStrings("b", members[1].name);
+                try expectEqual(Type.Type.Number, members[1].ty.getType());
+            }
+        }).check,
+    }).run(.Object, node.Object{
+        .items = &[_]node.ObjectProperty{
+            node.ObjectProperty.new(nodes[0], nodes[1]),
+            node.ObjectProperty.new(nodes[2], nodes[3]),
+        },
     });
 }

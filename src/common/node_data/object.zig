@@ -17,6 +17,7 @@
 
 const std = @import("std");
 const expect = std.testing.expect;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const genericEql = @import("../generic_eql.zig");
 const Cursor = @import("../cursor.zig").Cursor;
 const putInd = @import("indenter.zig").putInd;
@@ -36,6 +37,17 @@ pub const ObjectProperty = struct {
         };
     }
 
+    pub fn getName(self: ObjectProperty) []const u8 {
+        return switch (self.key.data) {
+            .Ident => |id| id,
+            .String => |str| str[1 .. str.len - 1],
+            else => std.debug.panic(
+                "Invalid ObjectProperty key type: {s}",
+                .{self.key.getType()},
+            ),
+        };
+    }
+
     pub fn dump(
         self: ObjectProperty,
         writer: anytype,
@@ -51,12 +63,29 @@ pub const ObjectProperty = struct {
     }
 };
 
+test "can retrieve ObjectProperty name" {
+    const nodes = [_]Node{
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .Ident, "anIdent"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "'aString'"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .Int, "0"),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    const anIdentKeyProp = ObjectProperty.new(nodes[0], nodes[2]);
+    const aStringKeyProp = ObjectProperty.new(nodes[1], nodes[2]);
+
+    try expectEqualStrings("anIdent", anIdentKeyProp.getName());
+    try expectEqualStrings("aString", aStringKeyProp.getName());
+}
+
 test "can compare ObjectProperties for equality" {
     const nodes = [_]Node{
-        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
-        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "1"),
-        makeNode(std.testing.allocator, Cursor.new(3, 1), .String, "b"),
-        makeNode(std.testing.allocator, Cursor.new(4, 1), .String, "2"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "'a'"),
+        makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "'1'"),
+        makeNode(std.testing.allocator, Cursor.new(3, 1), .String, "'b'"),
+        makeNode(std.testing.allocator, Cursor.new(4, 1), .String, "'2'"),
     };
 
     defer for (nodes) |node|
@@ -81,7 +110,7 @@ pub const Object = std.ArrayListUnmanaged(ObjectProperty);
 
 test "can dump an Object" {
     const nodes = [_]Node{
-        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "a"),
+        makeNode(std.testing.allocator, Cursor.new(1, 1), .String, "'a'"),
         makeNode(std.testing.allocator, Cursor.new(2, 1), .String, "1"),
     };
 
@@ -96,7 +125,7 @@ test "can dump an Object" {
         \\Object
         \\  Property
         \\    String Node (1:1)
-        \\      String: "a"
+        \\      String: "'a'"
         \\    String Node (2:1)
         \\      String: "1"
         \\

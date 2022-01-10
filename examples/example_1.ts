@@ -118,4 +118,4 @@ const aNullVariable: null = null;
 const anUndefinedVariable: undefined = undefined;
 
 // Interface types and object literals
-let anObject: { a: number, b: string };// = { a: 0, b: 'a string' };
+let anObject: { a: number, b: string } = { a: 0, b: 'a string' };
