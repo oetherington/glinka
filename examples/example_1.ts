@@ -2,11 +2,12 @@
 /* A C++-style comment */
 
 // Declarations
-var aNumber: number = 2;
 let aString: string = "string";
+var aNumber: number = 2;
+const aFloat: number = 2.3_273e-47;
 const aBool: boolean = !false;
 const aBinOp: number = 2 - 4;
-const addNums: number = 2 + 4;
+const addNums: number = 2 + 4.543;
 const concatStrings: string = "abc" + "def";
 const inferredType = "foobar";
 let uninitialized: number;

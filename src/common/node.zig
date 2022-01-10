@@ -77,6 +77,7 @@ pub const NodeType = enum {
     Program,
     Decl,
     Int,
+    Float,
     Ident,
     String,
     Template,
@@ -120,6 +121,7 @@ pub const NodeData = union(NodeType) {
     Program: NodeList,
     Decl: Decl,
     Int: []const u8,
+    Float: []const u8,
     Ident: []const u8,
     String: []const u8,
     Template: []const u8,
@@ -164,7 +166,13 @@ pub const NodeData = union(NodeType) {
     ) anyerror!void {
         switch (self) {
             .Decl => |decl| try decl.dump(writer, indent),
-            .Int, .TypeName, .Ident, .String, .Template => |s| try putInd(
+            .Int,
+            .Float,
+            .TypeName,
+            .Ident,
+            .String,
+            .Template,
+            => |s| try putInd(
                 writer,
                 indent,
                 "{s}: \"{s}\"\n",

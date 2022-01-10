@@ -83,6 +83,7 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
     try switch (value.data) {
         .Ident => |i| self.out.print("{s}", .{i}),
         .Int => |i| self.out.print("{s}", .{i}),
+        .Float => |f| self.out.print("{s}", .{f}),
         .String => |s| self.out.print("{s}", .{s}),
         .Template => |t| self.out.print("{s}", .{t}),
         .True => self.out.print("true", .{}),
@@ -163,6 +164,13 @@ test "JsBackend can emit int expression" {
     try (EmitTestCase{
         .inputNode = EmitTestCase.makeNode(.Int, "123"),
         .expectedOutput = "123;\n",
+    }).run();
+}
+
+test "JsBackend can emit float expression" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Int, "123.456"),
+        .expectedOutput = "123.456;\n",
     }).run();
 }
 

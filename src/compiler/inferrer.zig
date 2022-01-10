@@ -89,6 +89,7 @@ test "can create an error InferResult" {
 pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
     switch (nd.data) {
         .Int => nd.ty = cmp.typebook.getNumber(),
+        .Float => nd.ty = cmp.typebook.getNumber(),
         .String, .Template => nd.ty = cmp.typebook.getString(),
         .True, .False => nd.ty = cmp.typebook.getBoolean(),
         .Null => nd.ty = cmp.typebook.getNull(),
@@ -338,6 +339,12 @@ test "can infer type of int literal" {
     try (InferTestCase{
         .expectedTy = .Number,
     }).run(.Int, "1234");
+}
+
+test "can infer type of float literal" {
+    try (InferTestCase{
+        .expectedTy = .Number,
+    }).run(.Float, "1.234");
 }
 
 test "can infer type of string literals" {

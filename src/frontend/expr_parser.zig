@@ -370,6 +370,7 @@ fn parsePrimaryExpr(psr: *TsParser) ParseResult {
     const nd = switch (psr.lexer.token.ty) {
         .Ident => makeNode(alloc, csr, .Ident, psr.lexer.token.data),
         .Int => makeNode(alloc, csr, .Int, psr.lexer.token.data),
+        .Float => makeNode(alloc, csr, .Float, psr.lexer.token.data),
         .String => makeNode(alloc, csr, .String, psr.lexer.token.data),
         .Template => makeNode(alloc, csr, .Template, psr.lexer.token.data),
         .True => makeNode(alloc, csr, .True, {}),
@@ -411,6 +412,17 @@ test "can parse int primary expression" {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Int, value.getType());
                 try expectEqualStrings("123456", value.data.Int);
+            }
+        }).check,
+    }).run();
+}
+test "can parse float primary expression" {
+    try (ExprTestCase{
+        .expr = "9.34_273e-29",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.Float, value.getType());
+                try expectEqualStrings("9.34_273e-29", value.data.Float);
             }
         }).check,
     }).run();
