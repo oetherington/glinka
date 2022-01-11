@@ -129,3 +129,6 @@ interface AnInterface {
 }
 
 const anotherObject: AnInterface = { maybeNum: null, aString: "hello" };
+
+// Console
+console.log("Hello world");

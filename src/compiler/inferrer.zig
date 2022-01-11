@@ -271,6 +271,38 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
 
             nd.ty = exprTy.Array.subtype;
         },
+        .Dot => |dot| {
+            const expr = inferExprType(cmp, dot.expr);
+            switch (expr) {
+                .Success => |exprTy| {
+                    if (exprTy.getType() != .Interface)
+                        return InferResult.err(CompileError.genericError(
+                            GenericError.new(
+                                nd.csr,
+                                cmp.fmt(
+                                    "Using '.' operator on non-object value",
+                                    .{},
+                                ),
+                            ),
+                        ));
+
+                    const member = exprTy.Interface.getNamedMember(dot.ident);
+                    if (member == null)
+                        return InferResult.err(CompileError.genericError(
+                            GenericError.new(
+                                nd.csr,
+                                cmp.fmt(
+                                    "Object property {s} does not exist",
+                                    .{dot.ident},
+                                ),
+                            ),
+                        ));
+
+                    nd.ty = member.?.ty;
+                },
+                .Error => return expr,
+            }
+        },
         .Object => |obj| {
             // TODO: Refactor this to avoid allocation
             var members = allocate.alloc(
@@ -782,6 +814,39 @@ test "can infer type of an array access" {
         .expr = expr,
         .index = index,
     });
+}
+
+test "can infer type of a dot expression" {
+    const nd = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 1),
+        .Ident,
+        "console",
+    );
+    defer std.testing.allocator.destroy(nd);
+
+    try (InferTestCase{
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+
+                const ty = res.Success;
+                const consoleLogTy = typebook.getFunction(
+                    typebook.getVoid(),
+                    &[_]Type.Ptr{typebook.getAny()},
+                );
+
+                try expectEqual(Type.Type.Function, ty.getType());
+                try expectEqual(consoleLogTy, ty);
+            }
+        }).check,
+    }).run(.Dot, node.Dot{ .expr = nd, .ident = "log" });
 }
 
 test "can infer type of an object literal" {

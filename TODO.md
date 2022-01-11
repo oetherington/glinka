@@ -25,6 +25,7 @@
    - [x] Fake 'this' parameter
    - [ ] Check all code paths return correctly
    - [ ] Arrow functions
+   - [ ] Variadic functions
  - [x] Function calls
  - [x] Unions
  - [ ] Tuples

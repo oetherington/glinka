@@ -1,3 +1,4 @@
 zig-cache
 zig-out
 kcov-output
+node_modules

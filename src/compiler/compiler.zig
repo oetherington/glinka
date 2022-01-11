@@ -62,7 +62,7 @@ pub const Compiler = struct {
         config: *const Config,
         backend: *Backend,
     ) Compiler {
-        return Compiler{
+        var cmp = Compiler{
             .alloc = alloc,
             .config = config,
             .backend = backend,
@@ -71,6 +71,10 @@ pub const Compiler = struct {
             .errors = ErrorContext.new(alloc),
             .strings = StringList.init(alloc),
         };
+
+        cmp.loadGlobalDefinitions();
+
+        return cmp;
     }
 
     pub fn deinit(self: *Compiler) void {
@@ -85,6 +89,24 @@ pub const Compiler = struct {
             self.alloc.free(string);
 
         self.strings.deinit();
+    }
+
+    // TODO: This should eventually be read from more formal definition files
+    fn loadGlobalDefinitions(self: *Compiler) void {
+        // TODO: Update this when variadic functions are implemented
+        const consoleLogTy = self.typebook.getFunction(
+            self.typebook.getVoid(),
+            &[_]Type.Ptr{self.typebook.getAny()},
+        );
+        const consoleTy = self.typebook.getInterface(
+            &[_]Type.InterfaceType.Member{
+                Type.InterfaceType.Member{
+                    .name = "log",
+                    .ty = consoleLogTy,
+                },
+            },
+        );
+        self.scope.put("console", consoleTy, true, Cursor.new(0, 0));
     }
 
     pub fn pushScope(self: *Compiler) void {

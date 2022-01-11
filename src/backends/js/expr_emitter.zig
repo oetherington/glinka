@@ -92,6 +92,10 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
             try self.emitExpr(access.index);
             try self.out.print("]", .{});
         },
+        .Dot => |dot| {
+            try self.emitExpr(dot.expr);
+            try self.out.print(".{s}", .{dot.ident});
+        },
         .Object => |obj| {
             try self.out.print("{{ ", .{});
             for (obj.items) |prop| {
@@ -311,6 +315,24 @@ test "JsBackend can emit array access expression" {
             fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.ArrayAccess.expr);
                 alloc.destroy(nd.data.ArrayAccess.index);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit dot expression" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
+            .Dot,
+            node.Dot{
+                .expr = EmitTestCase.makeNode(.Ident, "anObject"),
+                .ident = "aProperty",
+            },
+        ),
+        .expectedOutput = "anObject.aProperty;\n",
+        .cleanup = (struct {
+            fn cleanup(alloc: Allocator, nd: Node) void {
+                alloc.destroy(nd.data.Dot.expr);
             }
         }).cleanup,
     }).run();

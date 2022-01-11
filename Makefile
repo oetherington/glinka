@@ -8,6 +8,8 @@ run:
 	@echo
 test:
 	@zig build test
+integration:
+	@npm run integration
 lint:
 	@zig fmt --check src/**/*.zig
 coverage:
