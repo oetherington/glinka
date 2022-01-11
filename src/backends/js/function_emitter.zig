@@ -23,14 +23,21 @@ const Backend = @import("../../common/backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
 const EmitTestCase = @import("emit_test_case.zig").EmitTestCase;
 
+fn argsHaveFakeThis(args: []const node.Function.Arg) bool {
+    return args.len > 0 and std.mem.eql(u8, "this", args[0].name);
+}
+
 pub fn emitFunc(self: *JsBackend, func: node.Function) Backend.Error!void {
     std.debug.assert(!func.isArrow); // TODO: Implement arrow functions
     std.debug.assert(func.body.getType() == .Block);
 
     try self.out.print("function {s}(", .{if (func.name) |name| name else ""});
 
+    const args = func.args.items;
+    const argOffset: usize = if (argsHaveFakeThis(args)) 1 else 0;
+
     var prefix: []const u8 = "";
-    for (func.args.items) |arg| {
+    for (func.args.items[argOffset..]) |arg| {
         try self.out.print("{s}{s}", .{ prefix, arg.name });
         prefix = ", ";
     }
@@ -40,7 +47,26 @@ pub fn emitFunc(self: *JsBackend, func: node.Function) Backend.Error!void {
     try self.emitNode(func.body);
 }
 
-test "JsBackend can emit function" {
+test "JsBackend can emit function without args" {
+    const alloc = std.testing.allocator;
+
+    var func = node.Function{
+        .isArrow = false,
+        .name = "aFunction",
+        .retTy = null,
+        .args = .{ .items = &[_]node.Function.Arg{} },
+        .body = EmitTestCase.makeNode(.Block, node.NodeList{}),
+    };
+
+    defer alloc.destroy(func.body);
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Function, func),
+        .expectedOutput = "function aFunction() {\n}\n",
+    }).run();
+}
+
+test "JsBackend can emit function with args" {
     const alloc = std.testing.allocator;
 
     var func = node.Function{
@@ -69,6 +95,38 @@ test "JsBackend can emit function" {
     try (EmitTestCase{
         .inputNode = EmitTestCase.makeNode(.Function, func),
         .expectedOutput = "function aFunction(a, b) {\n}\n",
+    }).run();
+}
+
+test "JsBackend can emit function with fake 'this' parameter" {
+    const alloc = std.testing.allocator;
+
+    var func = node.Function{
+        .isArrow = false,
+        .name = "aFunction",
+        .retTy = null,
+        .args = .{},
+        .body = EmitTestCase.makeNode(.Block, node.NodeList{}),
+    };
+
+    defer alloc.destroy(func.body);
+    defer func.args.deinit(alloc);
+
+    try func.args.append(alloc, .{
+        .csr = Cursor.new(0, 0),
+        .name = "this",
+        .ty = null,
+    });
+
+    try func.args.append(alloc, .{
+        .csr = Cursor.new(0, 0),
+        .name = "a",
+        .ty = null,
+    });
+
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(.Function, func),
+        .expectedOutput = "function aFunction(a) {\n}\n",
     }).run();
 }
 

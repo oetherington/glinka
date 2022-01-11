@@ -63,6 +63,9 @@ function adder(a: number, b: number) : number {
 const aResult = adder(4, 5);
 adder(3, 5);
 
+// Functions with fake this
+function subtracter(this: number, amount: number) {}
+
 // Unions
 let aUnion: string|number = "hello world";
 aUnion = 4;

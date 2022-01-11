@@ -377,7 +377,6 @@ fn parsePrimaryExpr(psr: *TsParser) ParseResult {
         .False => makeNode(alloc, csr, .False, {}),
         .Null => makeNode(alloc, csr, .Null, {}),
         .Undefined => makeNode(alloc, csr, .Undefined, {}),
-        .This => makeNode(alloc, csr, .This, {}),
         .LParen => return parseParenExpr(psr),
         .LBrack => return parseArrayLiteral(psr),
         .LBrace => return parseObjectLiteral(psr),
@@ -491,17 +490,6 @@ test "can parse 'undefined' primary expression" {
         .check = (struct {
             fn check(value: Node) anyerror!void {
                 try expectEqual(NodeType.Undefined, value.getType());
-            }
-        }).check,
-    }).run();
-}
-
-test "can parse 'this' primary expression" {
-    try (ExprTestCase{
-        .expr = "this",
-        .check = (struct {
-            fn check(value: Node) anyerror!void {
-                try expectEqual(NodeType.This, value.getType());
             }
         }).check,
     }).run();

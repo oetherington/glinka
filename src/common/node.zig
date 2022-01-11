@@ -89,7 +89,6 @@ pub const NodeType = enum {
     False,
     Null,
     Undefined,
-    This,
     PostfixOp,
     PrefixOp,
     BinaryOp,
@@ -133,7 +132,6 @@ pub const NodeData = union(NodeType) {
     False: void,
     Null: void,
     Undefined: void,
-    This: void,
     PostfixOp: UnaryOp,
     PrefixOp: UnaryOp,
     BinaryOp: BinaryOp,
@@ -189,7 +187,7 @@ pub const NodeData = union(NodeType) {
                 for (object.items) |item|
                     try item.dump(writer, indent + 2);
             },
-            .EOF, .True, .False, .Null, .Undefined, .This => try putInd(
+            .EOF, .True, .False, .Null, .Undefined => try putInd(
                 writer,
                 indent,
                 "{s}\n",

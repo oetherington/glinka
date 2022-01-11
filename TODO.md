@@ -22,8 +22,8 @@
  - [x] `try`/`catch`/`finally`
  - [x] Functions
    - [x] `return`
+   - [x] Fake 'this' parameter
    - [ ] Check all code paths return correctly
-   - [ ] Fake 'this' parameter
    - [ ] Arrow functions
  - [x] Function calls
  - [x] Unions
@@ -34,10 +34,9 @@
    - [x] Array accesses
    - [ ] Array<> generic
  - [x] Type aliases
- - [ ] Interfaces
+ - [x] Interfaces
    - [x] Inline with object literal syntax/type aliases
    - [x] `interface` syntax
-   - [ ] Merged interfaces (behind a feature flag?)
  - [x] Object literals
  - [ ] Enums
    - [ ] Const enums
@@ -77,3 +76,4 @@
 ### Bugs
 
  - [ ] `var` declarations currently have block scoping, not function scoping
+ - [ ] Multiple declarations of the same interface are not merged (maybe this should be hidden behind a feature flag?)

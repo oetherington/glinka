@@ -37,7 +37,6 @@ const keywordMap = std.ComptimeStringMap(Token.Type, .{
     .{ "declare", .Declare },
     .{ "new", .New },
     .{ "delete", .Delete },
-    .{ "this", .This },
     .{ "class", .Class },
     .{ "extends", .Extends },
     .{ "implements", .Implements },

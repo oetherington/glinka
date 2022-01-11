@@ -167,15 +167,32 @@ pub fn processFunction(cmp: *Compiler, nd: Node) void {
 
     cmp.scope.ctx = .Function;
 
-    const argTys = allocate.alloc(cmp.alloc, Type.Ptr, func.args.items.len);
+    const hasFakeThis = func.args.items.len > 0 and std.mem.eql(
+        u8,
+        func.args.items[0].name,
+        "this",
+    );
+
+    cmp.scope.put(
+        "this",
+        if (hasFakeThis)
+            getArgType(cmp, nd.csr, func.name, func.args.items[0])
+        else
+            cmp.typebook.getAny(),
+        true,
+        nd.csr,
+    );
+
+    const argOffset: usize = if (hasFakeThis) 1 else 0;
+    const argCount = func.args.items.len - argOffset;
+
+    const argTys = allocate.alloc(cmp.alloc, Type.Ptr, argCount);
     defer cmp.alloc.free(argTys);
 
-    for (func.args.items) |arg, index| {
+    for (func.args.items[argOffset..]) |arg, index| {
         argTys[index] = getArgType(cmp, nd.csr, func.name, arg);
         cmp.scope.put(arg.name, argTys[index], false, arg.csr);
     }
-
-    cmp.scope.put("this", cmp.typebook.getObject(), true, nd.csr);
 
     const funcTy = cmp.typebook.getFunction(retTy, argTys);
 
@@ -207,6 +224,28 @@ test "untyped function arguments trigger implicit any" {
                     err.getType(),
                 );
                 try self.expectEqualStrings("a", err.ImplicitAnyError.symbol);
+            }
+        }).check,
+    }).run();
+}
+
+test "functions can have a fake 'this' parameter" {
+    try (CompilerTestCase{
+        .code = "function aFunction(this: number, param: string) {}",
+        .check = (struct {
+            pub fn check(self: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try self.checkNoErrors(cmp);
+
+                const f = cmp.scope.get("aFunction");
+                try self.expect(f != null);
+
+                const ty = f.?.ty;
+                try self.expectEqual(Type.Type.Function, ty.getType());
+                try self.expectEqual(Type.Type.Void, ty.Function.ret.getType());
+
+                const args = ty.Function.args;
+                try self.expectEqual(@intCast(usize, 1), args.len);
+                try self.expectEqual(Type.Type.String, args[0].getType());
             }
         }).check,
     }).run();

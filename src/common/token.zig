@@ -107,7 +107,6 @@ pub const Token = struct {
         Declare,
         New,
         Delete,
-        This,
         Class,
         Extends,
         Implements,
