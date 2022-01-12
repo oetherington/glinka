@@ -1,3 +1,4 @@
+.PHONY: integration
 all:
 	@zig build
 release:

@@ -69,6 +69,8 @@
 
 ### Compiler Features
 
+ - [x] Read code from file
+ - [x] Read code from stdin
  - [ ] Read `tsconfig` files
  - [ ] GCC style command line interface
  - [ ] Strict flag

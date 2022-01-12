@@ -262,14 +262,20 @@ fn parseIf(psr: *TsParser) ParseResult {
         .elseBranch = null,
     };
 
+    var branchNum: usize = 0;
+
     while (true) {
         var isElse: bool = undefined;
         if (psr.lexer.token.ty == .Else) {
             isElse = true;
             _ = psr.lexer.next();
+        } else if (branchNum > 0) {
+            break;
         } else {
             isElse = false;
         }
+
+        branchNum += 1;
 
         const branch = parseIfBranch(psr);
         if (branch.getType() == .Branch) {

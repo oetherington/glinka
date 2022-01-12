@@ -30,10 +30,12 @@ pub fn Driver(comptime ParserImpl: type) type {
             res: ParseResult,
         };
 
+        alloc: Allocator,
         arena: Arena,
 
         pub fn new(alloc: Allocator) This {
             return This{
+                .alloc = alloc,
                 .arena = Arena.init(alloc),
             };
         }
@@ -42,17 +44,33 @@ pub fn Driver(comptime ParserImpl: type) type {
             self.arena.deinit();
         }
 
-        pub fn parseFile(
-            self: *This,
-            path: []const u8,
-        ) !ParsedFile {
-            const cwd = std.fs.cwd();
-
-            const code = try cwd.readFileAlloc(
+        fn readCodeFromFile(self: *This, path: []const u8) ![]u8 {
+            return try std.fs.cwd().readFileAlloc(
                 self.arena.allocator(),
                 path,
                 std.math.maxInt(usize),
             );
+        }
+
+        fn readCodeFromStdin(self: *This) ![]u8 {
+            const stdin = std.io.getStdIn();
+
+            var arrayList = std.ArrayList(u8).init(self.alloc);
+            defer arrayList.deinit();
+            const maxSize = std.math.maxInt(usize);
+            try stdin.reader().readAllArrayList(&arrayList, maxSize);
+
+            const arena = self.arena.allocator();
+            var out = try arena.alloc(u8, arrayList.items.len);
+            std.mem.copy(u8, out, arrayList.items);
+            return out;
+        }
+
+        pub fn parseFile(self: *This, path: []const u8) !ParsedFile {
+            const code = if (std.mem.eql(u8, path, "-"))
+                try self.readCodeFromStdin()
+            else
+                try self.readCodeFromFile(path);
 
             var parserImpl = ParserImpl.new(&self.arena, code);
             var parser = parserImpl.getParser();

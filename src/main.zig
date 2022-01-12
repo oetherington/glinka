@@ -25,7 +25,7 @@ const Compiler = @import("compiler/compiler.zig").Compiler;
 const Config = @import("common/config.zig").Config;
 const Driver = @import("common/driver.zig").Driver;
 
-pub fn main() !void {
+fn printVersion() !void {
     try std.io.getStdOut().writer().print(
         "Glinka - version {d}.{d}.{d}{s}{s}\n",
         .{
@@ -36,7 +36,14 @@ pub fn main() !void {
             if (version.build) |build| "-" ++ build else "",
         },
     );
+}
 
+fn printHelp() !void {
+    try printVersion();
+    try std.io.getStdOut().writer().print("TODO: Write help message", .{});
+}
+
+pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     var alloc = gpa.allocator();
@@ -44,11 +51,23 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(alloc);
     defer std.process.argsFree(alloc, args);
 
+    for (args) |arg| {
+        if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-v")) {
+            try printVersion();
+            return 0;
+        }
+
+        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            try printHelp();
+            return 0;
+        }
+    }
+
     const path = if (args.len == 2)
         args[1]
     else {
         try std.io.getStdErr().writer().print("No filename provided", .{});
-        return;
+        return 1;
     };
 
     const config = Config{};
@@ -66,9 +85,12 @@ pub fn main() !void {
 
     if (compiler.hasErrors()) {
         try compiler.reportErrors();
+        return 1;
     } else {
         var res = try backend.toString();
         defer backend.freeString(res);
-        std.log.info("Result: {s}", .{res});
+        try std.io.getStdOut().writer().print("{s}", .{res});
     }
+
+    return 0;
 }
