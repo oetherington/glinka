@@ -22,110 +22,7 @@ const Allocator = std.mem.Allocator;
 const Type = @import("../common/types/type.zig").Type;
 const TokenType = @import("../common/token.zig").Token.Type;
 const allocate = @import("../common/allocate.zig");
-
-const OpEntry = union(Variant) {
-    const Variant = enum {
-        Unary,
-        Binary,
-    };
-
-    // When output is null, the output type is the same as the input type
-    Unary: struct {
-        input: Type.Ptr,
-        output: ?Type.Ptr,
-    },
-    Binary: struct {
-        input: Type.Ptr,
-        output: ?Type.Ptr,
-    },
-
-    pub fn un(input: Type.Ptr, output: ?Type.Ptr) OpEntry {
-        return OpEntry{
-            .Unary = .{
-                .input = input,
-                .output = output,
-            },
-        };
-    }
-
-    pub fn bin(input: Type.Ptr, output: ?Type.Ptr) OpEntry {
-        return OpEntry{
-            .Binary = .{
-                .input = input,
-                .output = output,
-            },
-        };
-    }
-};
-
-const OpMap = [std.meta.fields(TokenType).len]?OpEntry;
-
-fn createOpMap(b: *TypeBook) void {
-    std.mem.set(?OpEntry, b.opMap[0..], null);
-
-    const h = (struct {
-        book: *TypeBook,
-
-        fn put(self: @This(), op: TokenType, entry: OpEntry) void {
-            self.book.opMap[@enumToInt(op)] = entry;
-        }
-    }){ .book = b };
-
-    h.put(.Inc, OpEntry.un(&b.numberTy, null));
-    h.put(.Dec, OpEntry.un(&b.numberTy, null));
-    h.put(.BitNot, OpEntry.un(&b.numberTy, null));
-
-    h.put(.LogicalNot, OpEntry.un(&b.anyTy, &b.booleanTy));
-
-    h.put(.Nullish, OpEntry.un(&b.anyTy, &b.anyTy)); // TODO: Fix output
-
-    h.put(.Assign, OpEntry.bin(&b.anyTy, null));
-    h.put(.NullishAssign, OpEntry.bin(&b.anyTy, &b.anyTy)); // TODO: Fix output
-
-    h.put(
-        .Add,
-        OpEntry.bin(b.getUnion(&.{ &b.numberTy, &b.stringTy }), null),
-    );
-
-    h.put(.Sub, OpEntry.bin(&b.numberTy, null));
-    h.put(.Mul, OpEntry.bin(&b.numberTy, null));
-    h.put(.Pow, OpEntry.bin(&b.numberTy, null));
-    h.put(.Div, OpEntry.bin(&b.numberTy, null));
-    h.put(.Mod, OpEntry.bin(&b.numberTy, null));
-    h.put(.AddAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.SubAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.MulAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.DivAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ModAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.PowAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitAndAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitOrAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitNotAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitXorAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftRightAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftRightUnsignedAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftLeftAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitAnd, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitOr, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitXor, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftRight, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftRightUnsigned, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftLeft, OpEntry.bin(&b.numberTy, null));
-
-    h.put(.CmpGreater, OpEntry.bin(&b.numberTy, &b.booleanTy));
-    h.put(.CmpGreaterEq, OpEntry.bin(&b.numberTy, &b.booleanTy));
-    h.put(.CmpLess, OpEntry.bin(&b.numberTy, &b.booleanTy));
-    h.put(.CmpLessEq, OpEntry.bin(&b.numberTy, &b.booleanTy));
-
-    h.put(.CmpEq, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.CmpStrictEq, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.CmpNotEq, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.CmpStrictNotEq, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.LogicalAnd, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.LogicalOr, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.LogicalAndAssign, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.LogicalOrAssign, OpEntry.bin(&b.anyTy, &b.booleanTy));
-}
+const opMap = @import("./op_map.zig");
 
 pub const TypeBook = struct {
     const TypeMap = std.HashMap(
@@ -148,7 +45,7 @@ pub const TypeBook = struct {
     const TypeList = std.ArrayList(Type.Ptr);
 
     alloc: Allocator,
-    opMap: OpMap,
+    opMap: opMap.OpMap,
     unknownTy: Type = Type.newUnknown(),
     anyTy: Type = Type.newAny(),
     voidTy: Type = Type.newVoid(),
@@ -168,7 +65,7 @@ pub const TypeBook = struct {
             .opMap = undefined,
             .tyMap = TypeMap.init(alloc),
         };
-        createOpMap(self);
+        opMap.populateOpMap(self);
         return self;
     }
 
@@ -197,7 +94,7 @@ pub const TypeBook = struct {
         return self.getUnion(&[_]Type.Ptr{ a, b });
     }
 
-    pub fn getOpEntry(self: *TypeBook, ty: TokenType) ?OpEntry {
+    pub fn getOpEntry(self: *TypeBook, ty: TokenType) ?opMap.OpEntry {
         return self.opMap[@enumToInt(ty)];
     }
 
