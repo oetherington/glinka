@@ -6,7 +6,9 @@ const ts = require("typescript");
 
 const testDir = __dirname + "/tests";
 const nodeExe = "node";
-const glinkaExe = __dirname + "/../zig-out/bin/glinka";
+const glinkaExe = process.platform === "win32"
+	? __dirname + "\\..\\zig-out\\bin\\glinka.exe"
+	: __dirname + "/../zig-out/bin/glinka";
 
 function getFiles() {
 	const result = [];
