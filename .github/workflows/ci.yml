@@ -101,7 +101,8 @@ jobs:
           name: glinka-${{ matrix.os }}-${{ github.sha }}
           path: zig-out/bin
       - name: Make Glinka binary executable
-        run: sudo chmod +x zig-out/bin/glinka*
+        shell: bash
+        run: if [ "$RUNNER_OS" != "Windows" ]; then sudo chmod +x zig-out/bin/glinka; fi
       - name: Install npm packages
         run: npm install --production=false
       - name: Run integration tests
