@@ -133,6 +133,26 @@ pub const Scope = struct {
             return parent.isInContext(ctx);
         return false;
     }
+
+    fn dumpInternal(self: *Scope, indent: usize) void {
+        var iter = self.symbolMap.iterator();
+        while (iter.next()) |sym| {
+            var i: usize = 0;
+            while (i < indent) : (i += 1) {
+                std.debug.print(" ", .{});
+            }
+
+            std.debug.print("{s}: ", .{sym.key_ptr.*});
+            sym.value_ptr.ty.dump();
+        }
+
+        if (self.parent) |parent|
+            parent.dumpInternal(indent + 2);
+    }
+
+    pub fn dump(self: *Scope) void {
+        self.dumpInternal(0);
+    }
 };
 
 test "can insert symbols into and retrieve symbols from scope" {

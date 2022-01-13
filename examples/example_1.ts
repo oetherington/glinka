@@ -132,3 +132,7 @@ const anotherObject: AnInterface = { maybeNum: null, aString: "hello" };
 
 // Console
 console.log("Hello world");
+
+// Delete
+const anotherObject = { a: 0, b: 1 };
+// delete anotherObject.b;

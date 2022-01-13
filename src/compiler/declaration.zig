@@ -93,6 +93,7 @@ pub fn processDecl(cmp: *Compiler, nd: Node) void {
         cmp.errors.append(CompileError.redefinitionError(
             RedefinitionError.new(decl.name, previous.csr, nd.csr),
         )) catch allocate.reportAndExit();
+        return;
     }
 
     if (decl.value) |_|
@@ -188,5 +189,45 @@ test "can compile a 'let' declaration with an inferred type" {
 test "can compile a 'var' declaration with an inferred type" {
     try (CompilerTestCase{
         .code = "var aVariable = false;",
+    }).run();
+}
+
+test "declarations cannot be redefined in the same scope" {
+    try (CompilerTestCase{
+        .code = "let a = 3; let a = 4;",
+        .check = (struct {
+            fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+
+                const err = cmp.getError(0);
+                try case.expectEqual(
+                    CompileError.Type.RedefinitionError,
+                    err.getType(),
+                );
+                try case.expectEqualStrings("a", err.RedefinitionError.name);
+                try case.expectEqual(
+                    @intCast(u32, 1),
+                    err.RedefinitionError.firstDefined.ln,
+                );
+                try case.expectEqual(
+                    @intCast(u32, 1),
+                    err.RedefinitionError.firstDefined.ch,
+                );
+                try case.expectEqual(
+                    @intCast(u32, 1),
+                    err.RedefinitionError.secondDefined.ln,
+                );
+                try case.expectEqual(
+                    @intCast(u32, 12),
+                    err.RedefinitionError.secondDefined.ch,
+                );
+            }
+        }).check,
+    }).run();
+}
+
+test "declarations can be redefined in different scopes" {
+    try (CompilerTestCase{
+        .code = "let a = 3; { let a = 4; }",
     }).run();
 }

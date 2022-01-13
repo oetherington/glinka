@@ -24,6 +24,7 @@
    - [x] `return`
    - [x] Fake 'this' parameter
    - [ ] Check all code paths return correctly
+   - [ ] Inferred return types
    - [ ] Arrow functions
    - [ ] Variadic functions
  - [x] Function calls
@@ -39,10 +40,11 @@
    - [x] Inline with object literal syntax/type aliases
    - [x] `interface` syntax
  - [x] Object literals
+ - [x] Object member accesses
  - [ ] Enums
    - [ ] Const enums
    - [ ] Ambient enums
- - [ ] `delete`
+ - [x] `delete`
  - [ ] Classes
    - [ ] `new`
    - [ ] Member variables
