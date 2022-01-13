@@ -100,7 +100,7 @@ jobs:
         with:
           name: glinka-${{ matrix.os }}-${{ github.sha }}
           path: zig-out/bin
-      - name: Make binary executable
+      - name: Make Glinka binary executable
         run: sudo chmod +x zig-out/bin/glinka*
       - name: Install npm packages
         run: npm install --production=false

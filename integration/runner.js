@@ -31,7 +31,6 @@ async function runCommand(code, command) {
 	const child = child_process.exec(`${command} -`, (err, stdout, stderr) =>
 		resolve({ err, stdout, stderr }));
 
-	console.log(code);
 	child.stdin.write(code);
 	child.stdin.end();
 
