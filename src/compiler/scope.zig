@@ -55,13 +55,14 @@ pub const Scope = struct {
     parent: ?*Scope,
     typeMap: TypeMap,
     symbolMap: SymbolMap,
-    ctx: ?Context = null,
+    ctx: ?Context,
 
     pub fn new(alloc: Allocator, parent: ?*Scope) *Scope {
         var self = alloc.create(Scope) catch allocate.reportAndExit();
         self.parent = parent;
         self.typeMap = TypeMap.init(alloc);
         self.symbolMap = SymbolMap.init(alloc);
+        self.ctx = null;
         return self;
     }
 

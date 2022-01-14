@@ -33,7 +33,7 @@ jobs:
           cd integration/tests
           for file in *.ts
           do
-            valgrind --error-exitcode=1 ../../zig-out/bin/glinka $file
+            valgrind  --leak-check=full --track-origins=yes --show-leak-kinds=all --error-exitcode=1 ../../zig-out/bin/glinka $file
           done
   unit-tests:
     strategy:
