@@ -134,5 +134,5 @@ const anotherObject: AnInterface = { maybeNum: null, aString: "hello" };
 console.log("Hello world");
 
 // Delete
-const anotherObject = { a: 0, b: 1 };
-// delete anotherObject.b;
+const yetAnotherObject = { a: 0, b: 1 };
+delete yetAnotherObject.b;

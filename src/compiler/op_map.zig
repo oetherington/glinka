@@ -74,6 +74,8 @@ pub fn populateOpMap(b: *TypeBook) void {
 
     h.put(.LogicalNot, OpEntry.un(&b.anyTy, &b.booleanTy));
 
+    h.put(.Delete, OpEntry.un(&b.anyTy, &b.booleanTy));
+
     h.put(.Nullish, OpEntry.un(&b.anyTy, &b.anyTy)); // TODO: Fix output
 
     h.put(.Assign, OpEntry.bin(&b.anyTy, null));

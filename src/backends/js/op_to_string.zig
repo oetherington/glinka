@@ -68,6 +68,7 @@ pub fn opToString(op: TokenType) error{InvalidOp}![]const u8 {
         .ShiftRightUnsignedAssign => ">>>=",
         .ShiftLeft => "<<",
         .ShiftLeftAssign => "<<=",
+        .Delete => "delete ",
         else => error.InvalidOp,
     };
 }
@@ -126,6 +127,7 @@ test "JSBackend can convert operators to strings" {
     try TestCase.run(.ShiftRightUnsignedAssign, ">>>=");
     try TestCase.run(.ShiftLeft, "<<");
     try TestCase.run(.ShiftLeftAssign, "<<=");
+    try TestCase.run(.Delete, "delete ");
 }
 
 test "JSBackend throws an error for invalid operators" {
