@@ -12,6 +12,29 @@ jobs:
           version: master
       - name: Run linter
         run: make lint
+  memory-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Setup Zig compiler
+        uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: master
+      - name: Install packages
+        run: sudo apt-get install -y valgrind
+      - name: Build Glinka debug binary
+        run: |
+          sed -i 's/exe\.install/exe.linkLibC();exe.install/' build.zig
+          sed -i 's/gpa.allocator()/std.heap.c_allocator/' src/main.zig
+          make debug
+      - name: Run memory check
+        run: |
+          cd integration/tests
+          for file in *.ts
+          do
+            valgrind --error-exitcode=1 ../../zig-out/bin/glinka $file
+          done
   unit-tests:
     strategy:
       matrix:

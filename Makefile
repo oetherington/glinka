@@ -1,11 +1,12 @@
 .PHONY: integration
-all:
+all: debug
+debug:
 	@zig build
 release:
 	@zig build -Drelease-fast=true
-run: integration
 test:
 	@zig build test
+run: integration
 integration:
 	@npm run integration
 lint:
