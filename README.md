@@ -1,6 +1,7 @@
 # Glinka
 
-[![CI Workflow Status](https://github.com/oetherington/glinka/actions/workflows/ci.yml/badge.svg)](https://github.com/oetherington/glinka/actions) [![Code Coverage](https://img.shields.io/badge/coverage-%3E90%25-informational)](https://www.etherington.io/glinka-code-coverage/)
+[![CI Workflow Status](https://github.com/oetherington/glinka/actions/workflows/ci.yml/badge.svg)](https://github.com/oetherington/glinka/actions)
+[![Code Coverage](https://img.shields.io/badge/coverage-%3E90%25-informational)](https://www.etherington.io/glinka-code-coverage/)
 [![NPM](https://nodei.co/npm/glinka.png?mini=true)](https://npmjs.org/package/glinka)
 
 Glinka is a Typescript compiler written in Zig designed for speed. Please note
@@ -24,9 +25,13 @@ Create a debug build: `make`.
 
 Create a production build: `make release`.
 
-Run the tests: `make test`.
+Run unit tests: `make test`.
 
-Create a coverage report (requires `kcov` to be installed): `make coverage`.
+Create a unit test coverage report (requires `kcov` to be installed):
+`make coverage`.
+
+Run integration tests (you must run `npm install` before the first time):
+`make integration`.
 
 ### Contributing
 
