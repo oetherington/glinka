@@ -7,7 +7,7 @@
 Glinka is a Typescript compiler written in Zig designed for speed. Please note
 that it is still a work in progress and large portions of the language are not
 yet implemented. For a general overview of what's already available you can look
-in the `examples` directory and at the `TODO` file.
+in the `integration/tests` directory and at the `TODO` file.
 
 ### Building
 

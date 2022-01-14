@@ -3,10 +3,7 @@ all:
 	@zig build
 release:
 	@zig build -Drelease-fast=true
-run:
-	@echo
-	@zig build run -- examples/example_1.ts
-	@echo
+run: integration
 test:
 	@zig build test
 integration:
