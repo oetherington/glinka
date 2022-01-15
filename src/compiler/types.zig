@@ -76,8 +76,21 @@ pub fn processInterface(cmp: *Compiler, nd: Node) void {
     cmp.scope.putType(name, ty);
 }
 
-test "can compile a type alias declaration" {
+test "can compile an interface declaration" {
     try (CompilerTestCase{
         .code = "interface Inter { aString: string; aUnion: number | null; }",
+    }).run();
+}
+
+pub fn processClass(cmp: *Compiler, nd: Node) void {
+    std.debug.assert(nd.getType() == NodeType.ClassType);
+
+    // TODO
+    _ = cmp;
+}
+
+test "can compile a class declaration" {
+    try (CompilerTestCase{
+        .code = "class MyClass {}",
     }).run();
 }

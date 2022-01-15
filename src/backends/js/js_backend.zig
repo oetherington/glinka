@@ -31,6 +31,7 @@ const condEmitter = @import("cond_emitter.zig");
 const loopEmitter = @import("loop_emitter.zig");
 const throwEmitter = @import("throw_emitter.zig");
 const functionEmitter = @import("function_emitter.zig");
+const classEmitter = @import("class_emitter.zig");
 
 pub const JsBackend = struct {
     const WriteCtx = WriteContext(.{});
@@ -127,6 +128,7 @@ pub const JsBackend = struct {
             .Return => try functionEmitter.emitReturn(self, nd.data.Return),
             .Alias => {},
             .InterfaceType => {},
+            .ClassType => try classEmitter.emitClass(self, nd.data.ClassType),
             else => std.debug.panic(
                 "Unhandled node type in JsBackend.processNode: {?}\n",
                 .{nd.getType()},

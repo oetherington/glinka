@@ -46,3 +46,8 @@ const anotherObject: AnInterface = { maybeNum: null, aString: "hello" };
 // Delete
 const yetAnotherObject = { a: 0, b: 1 };
 delete yetAnotherObject.b;
+
+// Class
+class MyClass {}
+
+class MyOtherClass extends MyClass {}

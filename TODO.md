@@ -39,13 +39,14 @@
  - [x] Interfaces
    - [x] Inline with object literal syntax/type aliases
    - [x] `interface` syntax
+   - `extends` for interfaces
  - [x] Object literals
  - [x] Object member accesses
  - [ ] Enums
    - [ ] Const enums
    - [ ] Ambient enums
  - [x] `delete`
- - [ ] Classes
+ - [x] Classes
    - [ ] `new`
    - [ ] Member variables
    - [ ] Member functions
@@ -54,7 +55,7 @@
    - [ ] `destructor`
    - [ ] `readonly`
    - [ ] `static`
-   - [ ] Inheritance
+   - [ ] `extends` for classes
  - [ ] Generics
  - [ ] Recursive types
  - [ ] Modules/`import`/`export`

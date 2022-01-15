@@ -41,6 +41,14 @@ pub const InterfaceTypeMember = interface.InterfaceTypeMember;
 pub const InterfaceTypeMemberList = interface.InterfaceTypeMemberList;
 pub const InterfaceType = interface.InterfaceType;
 
+const class = @import("node_data/class.zig");
+pub const Visibility = class.Visibility;
+pub const ClassTypeMethod = class.ClassTypeMethod;
+pub const ClassTypeMember = class.ClassTypeMember;
+pub const ClassTypeMethodList = class.ClassTypeMethodList;
+pub const ClassTypeMemberList = class.ClassTypeMemberList;
+pub const ClassType = class.ClassType;
+
 pub const Decl = @import("node_data/decl.zig").Decl;
 
 pub const UnaryOp = @import("node_data/unary_op.zig").UnaryOp;
@@ -97,6 +105,7 @@ pub const NodeType = enum {
     UnionType,
     ArrayType,
     InterfaceType,
+    ClassType,
     Alias,
     Function,
     Block,
@@ -140,6 +149,7 @@ pub const NodeData = union(NodeType) {
     UnionType: NodeList,
     ArrayType: Node,
     InterfaceType: InterfaceType,
+    ClassType: ClassType,
     Alias: Alias,
     Function: Function,
     Block: NodeList,
@@ -222,6 +232,7 @@ pub const NodeData = union(NodeType) {
                 for (objTy.members.items) |member|
                     try member.dump(writer, indent + 2);
             },
+            .ClassType => |clsTy| try clsTy.dump(writer, indent),
             .BinaryOp => |binaryOp| try binaryOp.dump(writer, indent),
             .Ternary => |ternary| try ternary.dump(writer, indent),
             .Alias => |alias| try alias.dump(writer, indent),

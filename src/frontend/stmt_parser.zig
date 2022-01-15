@@ -1314,7 +1314,7 @@ fn parseInterface(psr: *TsParser) ParseResult {
     return ParseResult.success(ty);
 }
 
-test "can parse interfacestatement" {
+test "can parse interface statement" {
     try (StmtTestCase{
         .code = "interface AnInterface { a: number, b: string }",
         .check = (struct {
@@ -1334,6 +1334,78 @@ test "can parse interfacestatement" {
                 try expectEqualStrings("b", b.name);
                 try expectEqual(NodeType.TypeName, b.ty.getType());
                 try expectEqualStrings("string", b.ty.data.TypeName);
+            }
+        }).check,
+    }).run();
+}
+
+fn parseClass(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Class);
+
+    const csr = psr.lexer.token.csr;
+
+    const name = psr.lexer.next();
+    if (name.ty != .Ident)
+        return ParseResult.expected("name for class", name);
+
+    var extends: ?[]const u8 = null;
+
+    if (psr.lexer.next().ty == .Extends) {
+        _ = psr.lexer.next();
+        if (psr.lexer.token.ty != .Ident) {
+            return ParseResult.expected(
+                "name of class to extend",
+                psr.lexer.token,
+            );
+        }
+        extends = psr.lexer.token.data;
+        _ = psr.lexer.next();
+    }
+
+    if (psr.lexer.token.ty != .LBrace)
+        return ParseResult.expected("opening '{' in class", psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    if (psr.lexer.token.ty != .RBrace)
+        return ParseResult.expected("closing '}' after class", psr.lexer.token);
+
+    _ = psr.lexer.next();
+
+    return ParseResult.success(makeNode(
+        psr.getAllocator(),
+        csr,
+        .ClassType,
+        node.ClassType.new(name.data, extends),
+    ));
+}
+
+test "can parse empty class statement" {
+    try (StmtTestCase{
+        .code = "class MyClass {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.ClassType, value.getType());
+
+                const cls = value.data.ClassType;
+                try expectEqualStrings("MyClass", cls.name);
+                try expect(cls.extends == null);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse empty class statement with 'extends'" {
+    try (StmtTestCase{
+        .code = "class MyClass extends SomeOtherClass {}",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.ClassType, value.getType());
+
+                const cls = value.data.ClassType;
+                try expectEqualStrings("MyClass", cls.name);
+                try expect(cls.extends != null);
+                try expectEqualStrings("SomeOtherClass", cls.extends.?);
             }
         }).check,
     }).run();
@@ -1360,6 +1432,7 @@ fn parseStmtInternal(psr: *TsParser) ParseResult {
         .Try => parseTry(psr),
         .Type => parseAlias(psr),
         .Interface => parseInterface(psr),
+        .Class => parseClass(psr),
         .EOF => ParseResult.success(makeNode(
             psr.getAllocator(),
             psr.lexer.token.csr,

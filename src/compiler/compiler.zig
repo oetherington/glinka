@@ -207,6 +207,7 @@ pub const Compiler = struct {
             .Return => function.processReturn(self, nd),
             .Alias => types.processAlias(self, nd),
             .InterfaceType => types.processInterface(self, nd),
+            .ClassType => types.processClass(self, nd),
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},
