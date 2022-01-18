@@ -23,6 +23,7 @@ const putInd = @import("indenter.zig").putInd;
 const DumpTestCase = @import("dump_test_case.zig").DumpTestCase;
 const nodeImp = @import("../node.zig");
 const Node = nodeImp.Node;
+const NodeList = nodeImp.NodeList;
 const makeNode = nodeImp.makeNode;
 
 pub const Visibility = enum {
@@ -31,28 +32,79 @@ pub const Visibility = enum {
     Private,
 };
 
-pub const ClassTypeMethod = struct {};
-pub const ClassTypeMember = struct {};
+pub const ClassTypeMember = struct {
+    isStatic: bool,
+    isReadOnly: bool,
+    visibility: Visibility,
+    name: []const u8,
+    ty: ?Node,
+    value: ?Node,
 
-pub const ClassTypeMethodList = std.ArrayListUnmanaged(ClassTypeMethod);
+    pub fn dump(self: ClassTypeMember, writer: anytype, indent: usize) !void {
+        try putInd(writer, indent, "ClassTypeMember '{s}' (", .{self.name});
+        if (self.isStatic)
+            try writer.print("Static ", .{});
+        if (self.isReadOnly)
+            try writer.print("ReadOnly ", .{});
+        try writer.print("{s})\n", .{@tagName(self.visibility)});
+        if (self.ty) |ty|
+            try ty.dumpIndented(writer, indent + 2);
+        if (self.value) |value|
+            try value.dumpIndented(writer, indent + 2);
+    }
+};
+
+test "can dump a ClassTypeMember" {
+    const nodes = [_]Node{
+        makeNode(
+            std.testing.allocator,
+            Cursor.new(1, 1),
+            .TypeName,
+            "number",
+        ),
+        makeNode(
+            std.testing.allocator,
+            Cursor.new(1, 1),
+            .Int,
+            "3",
+        ),
+    };
+
+    defer for (nodes) |node|
+        std.testing.allocator.destroy(node);
+
+    try (DumpTestCase(ClassTypeMember, .ClassTypeMember){
+        .value = ClassTypeMember{
+            .isStatic = true,
+            .isReadOnly = true,
+            .visibility = .Public,
+            .name = "SomeClassTypeMember",
+            .ty = nodes[0],
+            .value = nodes[1],
+        },
+        .expected = 
+        \\ClassTypeMember 'SomeClassTypeMember' (Static ReadOnly Public)
+        \\  TypeName Node (1:1)
+        \\    TypeName: "number"
+        \\  Int Node (1:1)
+        \\    Int: "3"
+        \\
+        ,
+    }).run();
+}
+
 pub const ClassTypeMemberList = std.ArrayListUnmanaged(ClassTypeMember);
 
 pub const ClassType = struct {
     name: []const u8,
     extends: ?[]const u8,
-    constructor: ?ClassTypeMethod,
-    destructor: ?ClassTypeMethod,
-    methods: ClassTypeMethodList,
-    members: ClassTypeMemberList,
+    members: NodeList,
 
     pub fn new(name: []const u8, extends: ?[]const u8) ClassType {
         return ClassType{
             .name = name,
             .extends = extends,
-            .constructor = null,
-            .destructor = null,
-            .methods = ClassTypeMethodList{ .items = &[_]ClassTypeMethod{} },
-            .members = ClassTypeMemberList{ .items = &[_]ClassTypeMember{} },
+            .members = NodeList{},
         };
     }
 

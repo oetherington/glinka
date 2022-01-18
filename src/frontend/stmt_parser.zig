@@ -1339,6 +1339,78 @@ test "can parse interface statement" {
     }).run();
 }
 
+fn parseClassMember(psr: *TsParser) ParseResult {
+    const csr = psr.lexer.token.csr;
+
+    var visibility = node.Visibility.Public;
+    var isStatic = false;
+    var isReadOnly = false;
+
+    modifiers: while (true) {
+        switch (psr.lexer.token.ty) {
+            .Public => visibility = .Public,
+            .Protected => visibility = .Protected,
+            .Private => visibility = .Private,
+            .Static => isStatic = true,
+            .ReadOnly => isReadOnly = true,
+            else => break :modifiers,
+        }
+
+        _ = psr.lexer.next();
+    }
+
+    if (psr.lexer.token.ty != .Ident)
+        return ParseResult.expected("a class member", psr.lexer.token);
+
+    const name = psr.lexer.token.data;
+
+    _ = psr.lexer.next();
+
+    var ty: ?Node = null;
+    if (psr.lexer.token.ty == .Colon) {
+        _ = psr.lexer.next();
+        const tyRes = psr.parseType();
+        switch (tyRes) {
+            .Success => |success| ty = success,
+            .Error => return tyRes,
+            .NoMatch => return ParseResult.expected(
+                "a type for class member after ':'",
+                psr.lexer.token,
+            ),
+        }
+    }
+
+    var value: ?Node = null;
+    if (psr.lexer.token.ty == .Assign) {
+        _ = psr.lexer.next();
+        const exprRes = psr.parseExpr();
+        switch (exprRes) {
+            .Success => |success| value = success,
+            .Error => return exprRes,
+            .NoMatch => return ParseResult.expected(
+                "a value for class member after '='",
+                psr.lexer.token,
+            ),
+        }
+    }
+
+    eatSemi(psr);
+
+    return ParseResult.success(makeNode(
+        psr.getAllocator(),
+        csr,
+        .ClassTypeMember,
+        node.ClassTypeMember{
+            .isStatic = isStatic,
+            .isReadOnly = isReadOnly,
+            .visibility = visibility,
+            .name = name,
+            .ty = ty,
+            .value = value,
+        },
+    ));
+}
+
 fn parseClass(psr: *TsParser) ParseResult {
     std.debug.assert(psr.lexer.token.ty == .Class);
 
@@ -1367,17 +1439,31 @@ fn parseClass(psr: *TsParser) ParseResult {
 
     _ = psr.lexer.next();
 
+    var class = makeNode(
+        psr.getAllocator(),
+        csr,
+        .ClassType,
+        node.ClassType.new(name.data, extends),
+    );
+
+    members: while (psr.lexer.token.ty != .RBrace) {
+        const res = parseClassMember(psr);
+        switch (res) {
+            .Success => |member| class.data.ClassType.members.append(
+                psr.getAllocator(),
+                member,
+            ) catch allocate.reportAndExit(),
+            .Error => return res,
+            .NoMatch => break :members,
+        }
+    }
+
     if (psr.lexer.token.ty != .RBrace)
         return ParseResult.expected("closing '}' after class", psr.lexer.token);
 
     _ = psr.lexer.next();
 
-    return ParseResult.success(makeNode(
-        psr.getAllocator(),
-        csr,
-        .ClassType,
-        node.ClassType.new(name.data, extends),
-    ));
+    return ParseResult.success(class);
 }
 
 test "can parse empty class statement" {
@@ -1406,6 +1492,36 @@ test "can parse empty class statement with 'extends'" {
                 try expectEqualStrings("MyClass", cls.name);
                 try expect(cls.extends != null);
                 try expectEqualStrings("SomeOtherClass", cls.extends.?);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse a class with a property" {
+    try (StmtTestCase{
+        .code = "class MyClass { static readonly public a: number = 0; }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.ClassType, value.getType());
+
+                const cls = value.data.ClassType;
+                try expectEqualStrings("MyClass", cls.name);
+                try expect(cls.extends == null);
+
+                const members = cls.members.items;
+                try expectEqual(@intCast(usize, 1), members.len);
+
+                const member = members[0].data.ClassTypeMember;
+                try expectEqual(true, member.isStatic);
+                try expectEqual(true, member.isReadOnly);
+                try expectEqual(node.Visibility.Public, member.visibility);
+                try expectEqualStrings("a", member.name);
+                try expect(member.ty != null);
+                try expectEqual(NodeType.TypeName, member.ty.?.getType());
+                try expectEqualStrings("number", member.ty.?.data.TypeName);
+                try expect(member.value != null);
+                try expectEqual(NodeType.Int, member.value.?.getType());
+                try expectEqualStrings("0", member.value.?.data.Int);
             }
         }).check,
     }).run();

@@ -48,6 +48,8 @@ const yetAnotherObject = { a: 0, b: 1 };
 delete yetAnotherObject.b;
 
 // Class
-class MyClass {}
+class MyClass {
+	static readonly protected aValue: number = 123456;
+}
 
 class MyOtherClass extends MyClass {}

@@ -8,6 +8,7 @@
  - [x] String/Template literals
  - [x] Boolean literals
  - [x] Null/undefined literals
+ - [ ] Regex literals
  - [x] Prefix/postfix operators
  - [x] Binary operators
  - [x] Ternary expressions
@@ -50,12 +51,16 @@
    - [ ] `new`
    - [ ] Member variables
    - [ ] Member functions
-   - [ ] `public`/`protected`/`private`
-   - [ ] `constructor`
-   - [ ] `destructor`
    - [ ] `readonly`
    - [ ] `static`
+   - [ ] `public`/`protected`/`private`
+   - [ ] ECMAscript private fields with '#'
+   - [ ] Parameter properties
+   - [ ] `constructor`
+   - [ ] `destructor`
+   - [ ] Accessors with `get`/`set`
    - [ ] `extends` for classes
+   - [ ] `abstract class`
  - [ ] Generics
  - [ ] Recursive types
  - [ ] Modules/`import`/`export`
