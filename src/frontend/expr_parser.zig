@@ -691,8 +691,55 @@ test "can parse function call with arguments" {
     }).run();
 }
 
-fn parsePostfixExpr(psr: *TsParser) ParseResult {
+fn parseNewExpr(psr: *TsParser) ParseResult {
+    if (psr.lexer.token.ty != .New)
+        return parseMemberExpr(psr);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
     const res = parseMemberExpr(psr);
+    return switch (res) {
+        .Success => |nd| ParseResult.success(makeNode(
+            psr.getAllocator(),
+            csr,
+            .New,
+            nd,
+        )),
+        .Error => res,
+        .NoMatch => ParseResult.expected(
+            "expression after 'new'",
+            psr.lexer.token,
+        ),
+    };
+}
+
+test "can parse new expressions" {
+    try (ExprTestCase{
+        .expr = "new Ty(a, 0, false)",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.New, value.getType());
+
+                const new = value.data.New;
+                try expectEqual(NodeType.Call, new.getType());
+                try expectEqualStrings("Ty", new.data.Call.expr.data.Ident);
+
+                const args = new.data.Call.args.items;
+                try expectEqual(@intCast(usize, 3), args.len);
+                try expectEqual(NodeType.Ident, args[0].getType());
+                try expectEqualStrings("a", args[0].data.Ident);
+                try expectEqual(NodeType.Int, args[1].getType());
+                try expectEqualStrings("0", args[1].data.Int);
+                try expectEqual(NodeType.False, args[2].getType());
+            }
+        }).check,
+    }).run();
+}
+
+fn parsePostfixExpr(psr: *TsParser) ParseResult {
+    const res = parseNewExpr(psr);
     if (!res.isSuccess())
         return res;
 

@@ -49,7 +49,7 @@ delete yetAnotherObject.b;
 
 // Class
 class MyClass {
-	static readonly protected aValue: number = 123456;
+	static protected readonly aValue: number = 123456;
 }
 
 class MyOtherClass extends MyClass {}
