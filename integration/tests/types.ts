@@ -57,3 +57,7 @@ class MyOtherClass extends MyClass {}
 // typeof as an expression
 const typeOfAUnion: string = typeof aUnion;
 console.log(typeOfAUnion);
+
+// typeof as a type
+const aString = "some string";
+const anotherString: typeof aString = "some other string";

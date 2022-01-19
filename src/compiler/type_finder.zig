@@ -23,6 +23,9 @@ const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
 const makeNode = node.makeNode;
+const Compiler = @import("compiler.zig").Compiler;
+const NopBackend = @import("compiler_test_case.zig").NopBackend;
+const Config = @import("../common/config.zig").Config;
 const Scope = @import("scope.zig").Scope;
 const TypeBook = @import("typebook.zig").TypeBook;
 const Type = @import("../common/types/type.zig").Type;
@@ -41,40 +44,40 @@ const builtinMap = std.ComptimeStringMap(
     },
 );
 
-pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
+pub fn findType(cmp: *Compiler, nd: Node) ?Type.Ptr {
     switch (nd.data) {
         .TypeName => |name| {
             return if (builtinMap.get(name)) |func|
-                func(typebook)
+                func(cmp.typebook)
             else
-                scope.getType(name);
+                cmp.scope.getType(name);
         },
         .ArrayType => |arr| {
-            const subtype = findType(scope, typebook, arr);
+            const subtype = findType(cmp, arr);
             return if (subtype) |st|
-                typebook.getArray(st)
+                cmp.typebook.getArray(st)
             else
                 null;
         },
         // TODO: Process function type literals
         .UnionType => |un| {
             // TODO: Refactor this to avoid allocation
-            const alloc = scope.getAllocator();
+            const alloc = cmp.alloc;
             const tys = allocate.alloc(alloc, Type.Ptr, un.items.len);
             defer alloc.free(tys);
 
             for (un.items) |item, index| {
-                if (findType(scope, typebook, item)) |ty|
+                if (findType(cmp, item)) |ty|
                     tys[index] = ty
                 else
                     return null;
             }
 
-            return typebook.getUnion(tys);
+            return cmp.typebook.getUnion(tys);
         },
         .InterfaceType => |obj| {
             // TODO: Refactor this to avoid allocation
-            const alloc = scope.getAllocator();
+            const alloc = cmp.alloc;
             const members = allocate.alloc(
                 alloc,
                 Type.InterfaceType.Member,
@@ -83,7 +86,7 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
             defer alloc.free(members);
 
             for (obj.members.items) |member, index| {
-                if (findType(scope, typebook, member.ty)) |ty|
+                if (findType(cmp, member.ty)) |ty|
                     members[index] = Type.InterfaceType.Member{
                         .name = member.name,
                         .ty = ty,
@@ -92,8 +95,9 @@ pub fn findType(scope: *Scope, typebook: *TypeBook, nd: Node) ?Type.Ptr {
                     return null;
             }
 
-            return typebook.getInterface(members);
+            return cmp.typebook.getInterface(members);
         },
+        .TypeOf => |expr| return cmp.inferExprType(expr),
         else => return null,
     }
 }
@@ -102,21 +106,24 @@ const FindTypeTestCase = struct {
     inputNode: Node,
     setup: ?fn (scope: *Scope, typebook: *TypeBook) anyerror!void,
     check: fn (ty: ?Type.Ptr) anyerror!void,
+    cleanup: ?fn (cmp: *Compiler, nd: Node) anyerror!void,
 
     pub fn run(self: FindTypeTestCase) !void {
-        const scope = Scope.new(std.testing.allocator, null);
-        defer scope.deinit();
-
-        var typebook = TypeBook.new(std.testing.allocator);
-        defer typebook.deinit();
+        const cfg = Config{};
+        var backend = NopBackend.new();
+        var cmp = Compiler.new(std.testing.allocator, &cfg, &backend.backend);
+        defer cmp.deinit();
 
         defer std.testing.allocator.destroy(self.inputNode);
 
         if (self.setup) |setup|
-            try setup(scope, typebook);
+            try setup(cmp.scope, cmp.typebook);
 
-        const ty = findType(scope, typebook, self.inputNode);
+        const ty = findType(&cmp, self.inputNode);
         try self.check(ty);
+
+        if (self.cleanup) |cleanup|
+            try cleanup(&cmp, self.inputNode);
     }
 };
 
@@ -135,6 +142,7 @@ test "can lookup builtin types" {
                 try expectEqual(Type.Type.Number, ty.?.getType());
             }
         }).check,
+        .cleanup = null,
     }).run();
 }
 
@@ -157,6 +165,7 @@ test "can lookup custom named types" {
                 try expectEqual(Type.Type.Boolean, ty.?.getType());
             }
         }).check,
+        .cleanup = null,
     }).run();
 }
 
@@ -176,6 +185,7 @@ test "can lookup array types" {
                 try expectEqual(Type.Type.String, ty.?.Array.subtype.getType());
             }
         }).check,
+        .cleanup = null,
     }).run();
 }
 
@@ -206,5 +216,44 @@ test "can lookup union types" {
                 try expectEqual(Type.Type.String, tys[1].getType());
             }
         }).check,
+        .cleanup = null,
+    }).run();
+}
+
+test "can lookup types using typeof" {
+    try (FindTypeTestCase{
+        .inputNode = makeNode(
+            std.testing.allocator,
+            Cursor.new(11, 4),
+            .TypeOf,
+            makeNode(
+                std.testing.allocator,
+                Cursor.new(11, 12),
+                .Ident,
+                "aVar",
+            ),
+        ),
+        .setup = (struct {
+            pub fn setup(scope: *Scope, typebook: *TypeBook) anyerror!void {
+                scope.put(
+                    "aVar",
+                    typebook.getNumber(),
+                    false,
+                    Cursor.new(1, 1),
+                );
+            }
+        }).setup,
+        .check = (struct {
+            fn check(ty: ?Type.Ptr) anyerror!void {
+                try expect(ty != null);
+                try expectEqual(Type.Type.Number, ty.?.getType());
+            }
+        }).check,
+        .cleanup = (struct {
+            fn cleanup(cmp: *Compiler, nd: Node) anyerror!void {
+                _ = cmp;
+                std.testing.allocator.destroy(nd.data.TypeOf);
+            }
+        }).cleanup,
     }).run();
 }

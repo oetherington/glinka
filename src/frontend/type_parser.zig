@@ -181,25 +181,78 @@ fn parseTypeOf(psr: *TsParser) ParseResult {
 
     _ = psr.lexer.next();
 
-    const res = psr.parseExpr();
-    return switch (res) {
-        .Success => |nd| ParseResult.success(makeNode(
-            psr.getAllocator(),
-            csr,
-            NodeType.TypeOf,
-            nd,
-        )),
-        .Error => res,
-        .NoMatch => ParseResult.expected(
-            "expression after 'typeof'",
-            psr.lexer.token,
-        ),
-    };
+    if (psr.lexer.token.ty != .Ident)
+        return ParseResult.errMessage(
+            psr.lexer.token.csr,
+            "'typeof' may only be applied to identifiers or their properties (in this context)",
+        );
+
+    var nd = makeNode(
+        psr.getAllocator(),
+        csr,
+        .Ident,
+        psr.lexer.token.data,
+    );
+
+    _ = psr.lexer.next();
+
+    while (true) {
+        switch (psr.lexer.token.ty) {
+            .Dot => {
+                const ident = psr.lexer.next();
+                if (ident.ty != .Ident)
+                    return ParseResult.expected(
+                        TokenType.Ident,
+                        psr.lexer.token,
+                    );
+                nd = makeNode(
+                    psr.getAllocator(),
+                    psr.lexer.token.csr,
+                    .Dot,
+                    node.Dot{ .expr = nd, .ident = ident.data },
+                );
+                _ = psr.lexer.next();
+            },
+            .LBrack => {
+                _ = psr.lexer.next();
+                const expr = psr.parseExpr();
+                switch (expr) {
+                    .Success => |e| {
+                        nd = makeNode(
+                            psr.getAllocator(),
+                            psr.lexer.token.csr,
+                            .ArrayAccess,
+                            node.ArrayAccess{ .expr = nd, .index = e },
+                        );
+                        if (psr.lexer.token.ty != .RBrack)
+                            return ParseResult.expected(
+                                TokenType.RBrack,
+                                psr.lexer.token,
+                            );
+                        _ = psr.lexer.next();
+                    },
+                    .Error => return expr,
+                    .NoMatch => return ParseResult.expected(
+                        "object property access in 'typeof' expression",
+                        psr.lexer.token,
+                    ),
+                }
+            },
+            else => break,
+        }
+    }
+
+    return ParseResult.success(makeNode(
+        psr.getAllocator(),
+        csr,
+        NodeType.TypeOf,
+        nd,
+    ));
 }
 
 test "can parse typeof (in a type context)" {
     try (ParseTypeTestCase{
-        .code = " typeof a ",
+        .code = " typeof a.b['c'] ",
         .check = (struct {
             fn check(res: ParseResult) anyerror!void {
                 try expect(res.isSuccess());
@@ -207,8 +260,17 @@ test "can parse typeof (in a type context)" {
                 try expectEqual(NodeType.TypeOf, res.Success.data.getType());
 
                 const expr = res.Success.data.TypeOf;
-                try expectEqual(NodeType.Ident, expr.getType());
-                try expectEqualStrings("a", expr.data.Ident);
+                try expectEqual(NodeType.ArrayAccess, expr.getType());
+
+                const access = expr.data.ArrayAccess;
+                try expectEqual(NodeType.Dot, access.expr.getType());
+                try expectEqual(NodeType.String, access.index.getType());
+                try expectEqualStrings("'c'", access.index.data.String);
+
+                const dot = access.expr.data.Dot;
+                try expectEqual(NodeType.Ident, dot.expr.getType());
+                try expectEqualStrings("a", dot.expr.data.Ident);
+                try expectEqualStrings("b", dot.ident);
             }
         }).check,
     }).run();

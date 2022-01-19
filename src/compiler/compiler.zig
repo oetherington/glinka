@@ -160,8 +160,7 @@ pub const Compiler = struct {
     }
 
     pub fn inferExprType(self: *Compiler, nd: Node) ?Type.Ptr {
-        const valTy = inferrer.inferExprType(self, nd);
-        switch (valTy) {
+        switch (inferrer.inferExprType(self, nd)) {
             .Success => |ty| {
                 nd.ty = ty;
                 return ty;
@@ -174,7 +173,7 @@ pub const Compiler = struct {
     }
 
     pub fn findType(self: *Compiler, nd: Node) ?Type.Ptr {
-        return typeFinder.findType(self.scope, self.typebook, nd);
+        return typeFinder.findType(self, nd);
     }
 
     pub fn processNode(self: *Compiler, nd: Node) void {
