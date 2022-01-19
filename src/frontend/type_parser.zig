@@ -174,6 +174,46 @@ test "can parse inline interface types with semicolons and trailing comma" {
     }).run();
 }
 
+fn parseTypeOf(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .TypeOf);
+
+    const csr = psr.lexer.token.csr;
+
+    _ = psr.lexer.next();
+
+    const res = psr.parseExpr();
+    return switch (res) {
+        .Success => |nd| ParseResult.success(makeNode(
+            psr.getAllocator(),
+            csr,
+            NodeType.TypeOf,
+            nd,
+        )),
+        .Error => res,
+        .NoMatch => ParseResult.expected(
+            "expression after 'typeof'",
+            psr.lexer.token,
+        ),
+    };
+}
+
+test "can parse typeof (in a type context)" {
+    try (ParseTypeTestCase{
+        .code = " typeof a ",
+        .check = (struct {
+            fn check(res: ParseResult) anyerror!void {
+                try expect(res.isSuccess());
+                try expectEqual(Cursor.new(1, 2), res.Success.csr);
+                try expectEqual(NodeType.TypeOf, res.Success.data.getType());
+
+                const expr = res.Success.data.TypeOf;
+                try expectEqual(NodeType.Ident, expr.getType());
+                try expectEqualStrings("a", expr.data.Ident);
+            }
+        }).check,
+    }).run();
+}
+
 fn parseTypeName(psr: *TsParser) ParseResult {
     switch (psr.lexer.token.ty) {
         .Ident => {
@@ -235,6 +275,7 @@ fn parseTypeName(psr: *TsParser) ParseResult {
             return res;
         },
         .LBrace => return parseInlineInterfaceType(psr),
+        .TypeOf => return parseTypeOf(psr),
         else => return ParseResult.noMatch(null),
     }
 }

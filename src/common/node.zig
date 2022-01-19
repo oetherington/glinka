@@ -123,6 +123,7 @@ pub const NodeType = enum {
     ArrayAccess,
     Call,
     New,
+    TypeOf,
 };
 
 pub const NodeData = union(NodeType) {
@@ -169,6 +170,7 @@ pub const NodeData = union(NodeType) {
     ArrayAccess: ArrayAccess,
     Call: Call,
     New: Node,
+    TypeOf: Node,
 
     pub fn dump(
         self: NodeData,
@@ -220,7 +222,7 @@ pub const NodeData = union(NodeType) {
                 "{s} \"{s}\"\n",
                 .{ @tagName(self), if (label) |l| l else "" },
             ),
-            .ArrayType, .Throw, .New => |nd| {
+            .ArrayType, .Throw, .New, .TypeOf => |nd| {
                 try putInd(writer, indent, "{s}\n", .{@tagName(self)});
                 try nd.dumpIndented(writer, indent + 2);
             },
