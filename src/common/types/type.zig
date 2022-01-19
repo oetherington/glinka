@@ -30,7 +30,7 @@ pub const Type = union(This.Type) {
 
     pub const TupleType = @import("tuple_type.zig");
     pub const ArrayType = @import("array_type.zig").ArrayType;
-    pub const ClassType = @import("class_type.zig");
+    pub const ClassType = @import("class_type.zig").ClassType;
     pub const EnumType = @import("enum_type.zig");
     pub const FunctionType = @import("function_type.zig").FunctionType;
     pub const UnionType = @import("union_type.zig").UnionType;
@@ -100,7 +100,7 @@ pub const Type = union(This.Type) {
             => @intCast(usize, @enumToInt(self.getType())) ^ 0xd16575db32f7806d,
             .Tuple => @panic("TODO hash Tuple"),
             .Array => |ar| ar.hash(),
-            .Class => @panic("TODO hash Class"),
+            .Class => |cls| cls.hash(),
             .Enum => @panic("TODO hash Enum"),
             .Function => |f| f.hash(),
             .Union => |un| un.hash(),
@@ -151,6 +151,10 @@ pub const Type = union(This.Type) {
 
     pub fn newArray(arr: ArrayType) This {
         return This{ .Array = arr };
+    }
+
+    pub fn newClass(cls: ClassType) This {
+        return This{ .Class = cls };
     }
 
     pub fn newFunction(func: FunctionType) This {
@@ -230,7 +234,7 @@ pub const Type = union(This.Type) {
             .Object => try writer.print("object", .{}),
             .Tuple => try writer.print("tuple", .{}), // TODO
             .Array => |arr| try arr.write(writer),
-            .Class => try writer.print("class", .{}), // TODO
+            .Class => |cls| try cls.write(writer),
             .Enum => try writer.print("enum", .{}), // TODO
             .Function => |func| try func.write(writer),
             .Union => |un| try un.write(writer),
@@ -657,7 +661,16 @@ test "can write a nested array type" {
     }).run();
 }
 
-// TODO: Add test for writing a class type
+test "can write a class type" {
+    try (WriteTypeTestCase{
+        .ty = Type.newClass(Type.ClassType.new(
+            null,
+            "MyClass",
+            &[_]Type.ClassType.Member{},
+        )),
+        .expected = "class MyClass",
+    }).run();
+}
 
 // TODO: Add test for writing an enum type
 

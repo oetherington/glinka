@@ -21,16 +21,11 @@ const genericEql = @import("../generic_eql.zig");
 const Cursor = @import("../cursor.zig").Cursor;
 const putInd = @import("indenter.zig").putInd;
 const DumpTestCase = @import("dump_test_case.zig").DumpTestCase;
+const Visibility = @import("../visibility.zig").Visibility;
 const nodeImp = @import("../node.zig");
 const Node = nodeImp.Node;
 const NodeList = nodeImp.NodeList;
 const makeNode = nodeImp.makeNode;
-
-pub const Visibility = enum {
-    Public,
-    Protected,
-    Private,
-};
 
 pub const ClassTypeMember = struct {
     isStatic: bool,

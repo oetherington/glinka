@@ -41,8 +41,9 @@ pub const InterfaceTypeMember = interface.InterfaceTypeMember;
 pub const InterfaceTypeMemberList = interface.InterfaceTypeMemberList;
 pub const InterfaceType = interface.InterfaceType;
 
+pub const Visibility = @import("visibility.zig").Visibility;
+
 const class = @import("node_data/class.zig");
-pub const Visibility = class.Visibility;
 pub const ClassTypeMember = class.ClassTypeMember;
 pub const ClassTypeMemberList = class.ClassTypeMemberList;
 pub const ClassType = class.ClassType;

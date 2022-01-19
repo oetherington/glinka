@@ -85,8 +85,11 @@ test "can compile an interface declaration" {
 pub fn processClass(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == NodeType.ClassType);
 
+    const cls = nd.data.ClassType;
+
     // TODO
     _ = cmp;
+    _ = cls;
 }
 
 test "can compile a class declaration" {
