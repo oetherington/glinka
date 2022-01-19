@@ -81,6 +81,8 @@ pub fn populateOpMap(b: *TypeBook) void {
     h.put(.Assign, OpEntry.bin(&b.anyTy, null));
     h.put(.NullishAssign, OpEntry.bin(&b.anyTy, &b.anyTy)); // TODO: Fix output
 
+    h.put(.TypeOf, OpEntry.un(&b.anyTy, &b.stringTy));
+
     h.put(
         .Add,
         OpEntry.bin(b.getUnion(&.{ &b.numberTy, &b.stringTy }), null),

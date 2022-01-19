@@ -53,3 +53,7 @@ class MyClass {
 }
 
 class MyOtherClass extends MyClass {}
+
+// typeof as an expression
+const typeOfAUnion: string = typeof aUnion;
+console.log(typeOfAUnion);
