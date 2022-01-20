@@ -11,13 +11,6 @@ in the `integration/tests` directory and at the `TODO` file.
 
 ### Building
 
- > :warning: **Important note for Windows users**: You must clone the
-   repository with git's `autocrlf` setting disabled. You can do this globally
-   by running `git config --global core.autocrlf false` before cloning, or just
-   for glinka by cloning with `git clone --config core.autocrlf=false`. See
-   [this issue](https://github.com/ziglang/zig/issues/9257) for more
-   information.
-
 You will need the [Zig compiler](https://ziglang.org/download/) to build
 Glinka. Glinka is kept up-to-date with the HEAD of the Zig master branch.
 
