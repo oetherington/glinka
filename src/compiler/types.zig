@@ -85,11 +85,22 @@ test "can compile an interface declaration" {
 pub fn processClass(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == NodeType.ClassType);
 
-    const cls = nd.data.ClassType;
+    const clsNd = nd.data.ClassType;
+
+    const super: ?Type.Ptr = if (clsNd.extends) |_|
+        null // TODO: Lookup superclass by name
+    else
+        null;
+
+    var members = std.ArrayList(Type.ClassType.Member).init(cmp.alloc);
+    _ = members;
+
+    // const cls = Type.ClassType.new(super, clsNd.name, members.items);
 
     // TODO
     _ = cmp;
-    _ = cls;
+    _ = clsNd;
+    _ = super;
 }
 
 test "can compile a class declaration" {
