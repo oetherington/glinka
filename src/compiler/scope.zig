@@ -126,6 +126,16 @@ pub const Scope = struct {
         return self.typeMap.get(name);
     }
 
+    pub fn getTypeMut(self: *Scope, name: []const u8) ?Type.MutPtr {
+        // Осторожно! This is only used to enable type hoisting
+        const res = @intToPtr(?Type.MutPtr, @ptrToInt(self.typeMap.get(name)));
+        if (res) |ty|
+            return ty;
+        if (self.parent) |parent|
+            return parent.getTypeMut(name);
+        return null;
+    }
+
     pub fn isInContext(self: *Scope, ctx: Context) bool {
         // TODO: self.ctx == ctx seems to crash the zig compiler
         if (self.ctx != null and self.ctx.? == ctx)

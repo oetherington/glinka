@@ -44,6 +44,8 @@ console.log(anUndefinedVariable);
 let anObject: { a: number, b: string } = { a: 0, b: 'a string' };
 console.log(anObject);
 
+type RecursiveObject = { a: RecursiveObject };
+
 interface AnInterface {
 	maybeNum: number | null;
 	aString: string;

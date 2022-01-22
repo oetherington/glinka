@@ -32,7 +32,7 @@ pub const AliasType = struct {
     }
 
     pub fn hash(self: AliasType) usize {
-        return std.hash.Wyhash.hash(0, self.name) ^ @ptrToInt(self.ty);
+        return std.hash.Wyhash.hash(0, self.name);
     }
 
     pub fn write(self: AliasType, writer: anytype) !void {
@@ -53,7 +53,7 @@ test "can hash AliasType" {
     const e = AliasType.new("c", &string);
 
     try expect(a.hash() == b.hash());
-    try expect(a.hash() != c.hash());
+    try expect(a.hash() == c.hash());
     try expect(a.hash() != d.hash());
     try expect(a.hash() != e.hash());
 }

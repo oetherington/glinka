@@ -27,6 +27,9 @@ pub const Type = union(This.Type) {
     const This = @This();
 
     pub const Ptr = *const This;
+    pub const MutPtr = *This;
+
+    pub const hoistedSentinel = @intToPtr(Ptr, 8);
 
     pub const TupleType = @import("tuple_type.zig");
     pub const ArrayType = @import("array_type.zig").ArrayType;
@@ -107,6 +110,10 @@ pub const Type = union(This.Type) {
             .Alias => |al| al.hash(),
             .Interface => |in| in.hash(),
         };
+    }
+
+    pub fn isHoistedSentinel(self: Ptr) bool {
+        return self == hoistedSentinel;
     }
 
     pub fn newUnknown() This {
@@ -249,6 +256,11 @@ pub const Type = union(This.Type) {
         writer.print("\n", .{}) catch unreachable;
     }
 };
+
+test "can detect hoisted sentinel" {
+    try expect(Type.hoistedSentinel.isHoistedSentinel());
+    try expect(!Type.newUnknown().isHoistedSentinel());
+}
 
 test "can create an unknown type" {
     const ty = Type.newUnknown();

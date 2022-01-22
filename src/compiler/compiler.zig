@@ -204,9 +204,9 @@ pub const Compiler = struct {
             .Try => throw.processTry(self, nd),
             .Function => function.processFunction(self, nd),
             .Return => function.processReturn(self, nd),
-            .Alias => types.processAlias(self, nd),
-            .InterfaceType => types.processInterface(self, nd),
-            .ClassType => types.processClass(self, nd),
+            .Alias => {},
+            .InterfaceType => {},
+            .ClassType => {},
             else => std.debug.panic(
                 "Unhandled node type in Compiler.processNode: {?}\n",
                 .{nd.getType()},
@@ -214,17 +214,49 @@ pub const Compiler = struct {
         }
     }
 
-    pub fn compileProgramNode(self: *Compiler, nd: Node) !void {
-        std.debug.assert(nd.getType() == .Program);
+    fn runTypeHoistingPass(self: *Compiler, nd: Node) !void {
+        for (nd.data.Program.items) |child| {
+            switch (child.data) {
+                .Alias => types.hoistAlias(self, child),
+                .InterfaceType => types.hoistInterface(self, child),
+                .ClassType => types.hoistClass(self, child),
+                else => continue,
+            }
+        }
+    }
 
-        try self.backend.prolog();
+    fn runTypeProcessingPass(self: *Compiler, nd: Node) !void {
+        for (nd.data.Program.items) |child| {
+            switch (child.data) {
+                .Alias => types.processAlias(self, child),
+                .InterfaceType => types.processInterface(self, child),
+                .ClassType => types.processClass(self, child),
+                else => continue,
+            }
+        }
+    }
 
+    fn runGlobalHoistingPass(self: *Compiler, nd: Node) !void {
+        // TODO
+        _ = self;
+        _ = nd;
+    }
+
+    fn runCompilePass(self: *Compiler, nd: Node) !void {
         for (nd.data.Program.items) |child| {
             self.processNode(child);
             if (!self.hasErrors())
                 try self.backend.processNode(child);
         }
+    }
 
+    pub fn compileProgramNode(self: *Compiler, nd: Node) !void {
+        std.debug.assert(nd.getType() == .Program);
+        try self.backend.prolog();
+        try self.runTypeHoistingPass(nd);
+        try self.runGlobalHoistingPass(nd);
+        try self.runTypeProcessingPass(nd);
+        try self.runCompilePass(nd);
         try self.backend.epilog();
     }
 
