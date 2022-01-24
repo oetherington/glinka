@@ -212,26 +212,21 @@ pub const TypeBook = struct {
         return ty;
     }
 
-    pub fn prepareAlias(self: *TypeBook, name: []const u8) Type.Ptr {
-        const alias = Type{
-            .Alias = Type.AliasType.new(name, Type.hoistedSentinel),
-        };
-        std.debug.assert(self.tyMap.get(alias) == null);
-
-        var t = allocate.create(self.alloc, Type);
-        t.* = alias;
-        self.tyMap.put(alias, t) catch allocate.reportAndExit();
-        return t;
+    pub fn putAlias(self: *TypeBook, aliasTy: Type.Ptr) void {
+        std.debug.assert(aliasTy.getType() == .Alias);
+        self.tyMap.put(aliasTy.*, aliasTy) catch allocate.reportAndExit();
     }
 
     pub fn getAlias(self: *TypeBook, name: []const u8, ty: Type.Ptr) Type.Ptr {
         const alias = Type{ .Alias = Type.AliasType.new(name, ty) };
         if (self.tyMap.get(alias)) |t|
             return t;
-        std.debug.panic(
-            "Called getAlias on '{s}' without calling prepareAlias first",
-            .{name},
-        );
+        std.debug.panic("Alias '{s}' has not been prepared", .{name});
+    }
+
+    pub fn putInterface(self: *TypeBook, inTy: Type.Ptr) void {
+        std.debug.assert(inTy.getType() == .Interface);
+        self.tyMap.put(inTy.*, inTy) catch allocate.reportAndExit();
     }
 
     pub fn getInterface(

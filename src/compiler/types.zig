@@ -44,7 +44,10 @@ pub fn hoistAlias(cmp: *Compiler, nd: Node) void {
         return;
     }
 
-    cmp.scope.putType(name, cmp.typebook.prepareAlias(name));
+    var t = allocate.create(cmp.alloc, Type);
+    t.* = Type{ .Alias = Type.AliasType.new(name, Type.hoistedSentinel) };
+
+    cmp.scope.putType(name, t);
 }
 
 pub fn processAlias(cmp: *Compiler, nd: Node) void {
@@ -63,8 +66,10 @@ pub fn processAlias(cmp: *Compiler, nd: Node) void {
     };
 
     if (cmp.scope.getTypeMut(name)) |aliasTy| {
+        std.debug.assert(aliasTy.getType() == .Alias);
         std.debug.assert(aliasTy.Alias.ty.isHoistedSentinel());
         aliasTy.Alias.ty = ty;
+        cmp.typebook.putAlias(aliasTy);
     } else {
         std.debug.panic("Alias type '{s}' has not been prepared!", .{name});
     }
@@ -77,9 +82,28 @@ test "can compile a type alias declaration" {
 }
 
 pub fn hoistInterface(cmp: *Compiler, nd: Node) void {
-    // TODO
-    _ = cmp;
-    _ = nd;
+    std.debug.assert(nd.getType() == NodeType.InterfaceType);
+
+    const in = nd.data.InterfaceType;
+
+    const name = if (in.name) |nm|
+        nm
+    else
+        std.debug.panic("Invalid InterfaceType node (has no name)", .{});
+
+    if (cmp.scope.getType(name)) |ty| {
+        _ = ty;
+        return;
+    }
+
+    var ty = allocate.create(cmp.alloc, Type);
+    ty.* = Type{
+        .Interface = Type.InterfaceType.new(
+            &[_]Type.InterfaceType.Member{},
+        ),
+    };
+
+    cmp.scope.putType(name, ty);
 }
 
 pub fn processInterface(cmp: *Compiler, nd: Node) void {
@@ -92,19 +116,37 @@ pub fn processInterface(cmp: *Compiler, nd: Node) void {
     else
         std.debug.panic("Invalid InterfaceType node (has no name)", .{});
 
-    const ty = cmp.findType(nd) orelse {
-        cmp.errors.append(CompileError.genericError(
-            GenericError.new(nd.csr, cmp.fmt(
-                "Interface type {s} is invalid",
-                .{name},
-            )),
-        )) catch allocate.reportAndExit();
-        return;
-    };
+    const members = allocate.alloc(
+        cmp.alloc,
+        Type.InterfaceType.Member,
+        in.members.items.len,
+    );
 
-    std.debug.assert(ty.getType() == .Interface);
+    for (in.members.items) |member, index| {
+        if (cmp.findType(member.ty)) |ty| {
+            members[index] = Type.InterfaceType.Member{
+                .name = member.name,
+                .ty = ty,
+            };
+        } else {
+            cmp.errors.append(CompileError.genericError(
+                GenericError.new(nd.csr, cmp.fmt(
+                    "Member '{s}' of interface '{s}' has an invalid type",
+                    .{ member.name, name },
+                )),
+            )) catch allocate.reportAndExit();
+            return;
+        }
+    }
 
-    cmp.scope.putType(name, ty);
+    if (cmp.scope.getTypeMut(name)) |inTy| {
+        std.debug.assert(inTy.getType() == .Interface);
+        std.debug.assert(inTy.Interface.members.len == 0);
+        inTy.Interface.members = members;
+        cmp.typebook.putInterface(inTy);
+    } else {
+        std.debug.panic("Interface type '{s}' has not been prepared!", .{name});
+    }
 }
 
 test "can compile an interface declaration" {
