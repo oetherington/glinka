@@ -45,7 +45,6 @@ pub const Visibility = @import("visibility.zig").Visibility;
 
 const class = @import("node_data/class.zig");
 pub const ClassTypeMember = class.ClassTypeMember;
-pub const ClassTypeMemberList = class.ClassTypeMemberList;
 pub const ClassType = class.ClassType;
 
 pub const Decl = @import("node_data/decl.zig").Decl;

@@ -77,6 +77,7 @@ pub const TypeBook = struct {
                 .Function => |f| self.alloc.free(f.args),
                 .Union => |un| self.alloc.free(un.tys),
                 .Interface => |in| self.alloc.free(in.members),
+                .Class => |cls| self.alloc.free(cls.members),
                 else => {},
             }
 
@@ -253,6 +254,11 @@ pub const TypeBook = struct {
         ty.* = inTy;
         self.tyMap.put(inTy, ty) catch allocate.reportAndExit();
         return ty;
+    }
+
+    pub fn putClass(self: *TypeBook, clsTy: Type.Ptr) void {
+        std.debug.assert(clsTy.getType() == .Class);
+        self.tyMap.put(clsTy.*, clsTy) catch allocate.reportAndExit();
     }
 };
 

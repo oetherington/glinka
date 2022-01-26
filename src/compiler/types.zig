@@ -18,6 +18,7 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 const Compiler = @import("compiler.zig").Compiler;
+const Cursor = @import("../common/cursor.zig").Cursor;
 const node = @import("../common/node.zig");
 const Node = node.Node;
 const NodeType = node.NodeType;
@@ -156,9 +157,89 @@ test "can compile an interface declaration" {
 }
 
 pub fn hoistClass(cmp: *Compiler, nd: Node) void {
-    // TODO
-    _ = cmp;
-    _ = nd;
+    std.debug.assert(nd.getType() == NodeType.ClassType);
+
+    const clsNd = nd.data.ClassType;
+    const name = clsNd.name;
+
+    if (cmp.scope.getType(name)) |ty| {
+        _ = ty;
+        cmp.errors.append(CompileError.genericError(
+            GenericError.new(nd.csr, cmp.fmt(
+                "Redefinition of type {s}",
+                .{name},
+            )),
+        )) catch allocate.reportAndExit();
+        return;
+    }
+
+    var t = allocate.create(cmp.alloc, Type);
+    t.* = Type{
+        .Class = Type.ClassType.new(
+            null,
+            clsNd.name,
+            &[_]Type.ClassType.Member{},
+        ),
+    };
+
+    cmp.scope.putType(name, t);
+}
+
+fn resolveSuperType(
+    cmp: *Compiler,
+    csr: Cursor,
+    extends: ?[]const u8,
+) ?Type.Ptr {
+    if (extends) |clsName| {
+        var nd = node.NodeImpl{
+            .csr = csr,
+            .data = node.NodeData{ .TypeName = clsName },
+            .ty = null,
+        };
+
+        if (cmp.findType(&nd)) |ty| {
+            if (ty.getType() == .Class) {
+                return ty;
+            } else {
+                cmp.errors.append(CompileError.genericError(
+                    GenericError.new(csr, cmp.fmt(
+                        "Superclass '{s}' is not a class",
+                        .{clsName},
+                    )),
+                )) catch allocate.reportAndExit();
+            }
+        } else {
+            cmp.errors.append(CompileError.genericError(
+                GenericError.new(csr, cmp.fmt(
+                    "Superclass '{s}' is not in scope",
+                    .{clsName},
+                )),
+            )) catch allocate.reportAndExit();
+        }
+    }
+
+    return null;
+}
+
+fn resolveMemberType(
+    cmp: *Compiler,
+    className: []const u8,
+    member: node.ClassTypeMember,
+) Type.Ptr {
+    if (member.ty) |tyNode| {
+        if (cmp.findType(tyNode)) |ty| {
+            return ty;
+        } else {
+            cmp.errors.append(CompileError.genericError(
+                GenericError.new(tyNode.csr, cmp.fmt(
+                    "Cannot resolve type for member '{s}' of class '{s}'",
+                    .{ member.name, className },
+                )),
+            )) catch allocate.reportAndExit();
+        }
+    }
+
+    return cmp.typebook.getAny();
 }
 
 pub fn processClass(cmp: *Compiler, nd: Node) void {
@@ -166,24 +247,96 @@ pub fn processClass(cmp: *Compiler, nd: Node) void {
 
     const clsNd = nd.data.ClassType;
 
-    const super: ?Type.Ptr = if (clsNd.extends) |_|
-        null // TODO: Lookup superclass by name
+    var clsT = if (cmp.scope.getTypeMut(clsNd.name)) |clsTy|
+        clsTy
     else
-        null;
+        std.debug.panic("Class '{s}' has not been prepared", .{clsNd.name});
 
-    var members = std.ArrayList(Type.ClassType.Member).init(cmp.alloc);
-    _ = members;
+    std.debug.assert(clsT.getType() == .Class);
 
-    // const cls = Type.ClassType.new(super, clsNd.name, members.items);
+    var cls = &clsT.Class;
 
-    // TODO
-    _ = cmp;
-    _ = clsNd;
-    _ = super;
+    cls.super = resolveSuperType(cmp, nd.csr, clsNd.extends);
+
+    cls.members = allocate.alloc(
+        cmp.alloc,
+        Type.ClassType.Member,
+        clsNd.members.items.len,
+    );
+
+    for (clsNd.members.items) |memberNd, index| {
+        std.debug.assert(memberNd.getType() == .ClassTypeMember);
+        const member = memberNd.data.ClassTypeMember;
+
+        cls.members[index] = Type.ClassType.Member{
+            .name = member.name,
+            .ty = resolveMemberType(cmp, cls.name, member),
+            .visibility = member.visibility,
+        };
+    }
+
+    cmp.typebook.putClass(clsT);
 }
 
-test "can compile a class declaration" {
+test "can compile an empty class declaration" {
     try (CompilerTestCase{
-        .code = "class MyClass {}",
+        .code = "class A {}",
+    }).run();
+}
+
+test "can compile a class declaration with a superclass" {
+    try (CompilerTestCase{
+        .code = "class A {} class B extends A { private a: number; }",
+    }).run();
+}
+
+test "superclass must be defined" {
+    try (CompilerTestCase{
+        .code = "class B extends A { private a: number; }",
+        .check = (struct {
+            pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+                const err = cmp.getError(0);
+                try case.expectEqual(err.getType(), .GenericError);
+                try case.expectEqualStrings(
+                    "Superclass 'A' is not in scope",
+                    err.GenericError.msg,
+                );
+            }
+        }).check,
+    }).run();
+}
+
+test "superclass must be a class" {
+    try (CompilerTestCase{
+        .code = "class B extends number { private a: number; }",
+        .check = (struct {
+            pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+                const err = cmp.getError(0);
+                try case.expectEqual(err.getType(), .GenericError);
+                try case.expectEqualStrings(
+                    "Superclass 'number' is not a class",
+                    err.GenericError.msg,
+                );
+            }
+        }).check,
+    }).run();
+}
+
+test "class member types must be valid" {
+    try (CompilerTestCase{
+        .code = "class A { private a: SomeType; }",
+        .check = (struct {
+            pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+                const err = cmp.getError(0);
+                try case.expectEqual(err.getType(), .GenericError);
+                try case.expectEqualStrings(
+                    "Cannot resolve type for member 'a' of class 'A'",
+                    err.GenericError.msg,
+                );
+            }
+        }).check,
     }).run();
 }

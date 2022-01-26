@@ -22,6 +22,7 @@ const Visibility = @import("../visibility.zig").Visibility;
 
 pub const ClassType = struct {
     pub const Member = struct {
+        // TODO: static, readonly, initialization values
         name: []const u8,
         ty: Type.Ptr,
         visibility: Visibility,

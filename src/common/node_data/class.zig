@@ -88,8 +88,6 @@ test "can dump a ClassTypeMember" {
     }).run();
 }
 
-pub const ClassTypeMemberList = std.ArrayListUnmanaged(ClassTypeMember);
-
 pub const ClassType = struct {
     name: []const u8,
     extends: ?[]const u8,

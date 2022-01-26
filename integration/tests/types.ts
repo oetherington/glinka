@@ -63,10 +63,12 @@ class MyClass {
 	static protected readonly aValue: number = 123456;
 }
 
-class MyOtherClass extends MyClass {}
+class MyOtherClass extends MyClass {
+	private recursiveChild: MyOtherClass;
+}
 
-// TODO: Refactor JS backend to convert classes into functions
-// console.log(MyOtherClass);
+console.log(MyClass);
+console.log(MyOtherClass);
 
 // typeof as an expression
 const typeOfAUnion: string = typeof aUnion;

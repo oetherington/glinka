@@ -49,7 +49,7 @@
  - [x] `delete`
  - [x] Classes
    - [ ] `new`
-   - [ ] Member variables
+   - [x] Member variables
    - [ ] Member functions
    - [ ] `readonly`
    - [ ] `static`
@@ -61,6 +61,7 @@
    - [ ] Accessors with `get`/`set`
    - [ ] `extends` for classes
    - [ ] `abstract class`
+   - [ ] `implements`
  - [ ] Generics
  - [ ] Recursive types
  - [ ] Modules/`import`/`export`
