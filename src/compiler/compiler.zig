@@ -97,6 +97,7 @@ pub const Compiler = struct {
         const consoleLogTy = self.typebook.getFunction(
             self.typebook.getVoid(),
             &[_]Type.Ptr{self.typebook.getAny()},
+            false,
         );
         const consoleTy = self.typebook.getInterface(
             &[_]Type.InterfaceType.Member{
@@ -160,7 +161,7 @@ pub const Compiler = struct {
     }
 
     pub fn inferExprType(self: *Compiler, nd: Node) ?Type.Ptr {
-        switch (inferrer.inferExprType(self, nd)) {
+        switch (inferrer.inferExprType(self, nd, .None)) {
             .Success => |ty| {
                 nd.ty = ty;
                 return ty;

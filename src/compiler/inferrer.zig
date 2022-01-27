@@ -86,7 +86,12 @@ test "can create an error InferResult" {
     try expectEqualStrings(symbol, e.symbol);
 }
 
-pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
+const InferContext = enum {
+    None,
+    New,
+};
+
+pub fn inferExprType(cmp: *Compiler, nd: Node, ctx: InferContext) InferResult {
     switch (nd.data) {
         .Int => nd.ty = cmp.typebook.getNumber(),
         .Float => nd.ty = cmp.typebook.getNumber(),
@@ -99,7 +104,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
         else
             cmp.typebook.getUndefined(),
         .PrefixOp, .PostfixOp => |op| {
-            const expr = switch (inferExprType(cmp, op.expr)) {
+            const expr = switch (inferExprType(cmp, op.expr, .None)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
@@ -118,12 +123,12 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             nd.ty = if (entry.?.Unary.output) |out| out else expr;
         },
         .BinaryOp => |op| {
-            const left = switch (inferExprType(cmp, op.left)) {
+            const left = switch (inferExprType(cmp, op.left, .None)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const right = switch (inferExprType(cmp, op.right)) {
+            const right = switch (inferExprType(cmp, op.right, .None)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
@@ -148,17 +153,17 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             nd.ty = if (entry.?.Binary.output) |out| out else left;
         },
         .Ternary => |trn| {
-            _ = switch (inferExprType(cmp, trn.cond)) {
+            _ = switch (inferExprType(cmp, trn.cond, .None)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const ifT = switch (inferExprType(cmp, trn.ifTrue)) {
+            const ifT = switch (inferExprType(cmp, trn.ifTrue, .None)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
 
-            const ifF = switch (inferExprType(cmp, trn.ifFalse)) {
+            const ifF = switch (inferExprType(cmp, trn.ifFalse, .None)) {
                 .Success => |res| res,
                 .Error => |err| return InferResult.err(err),
             };
@@ -169,7 +174,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
                 cmp.typebook.getUnion(&.{ ifT, ifF });
         },
         .Call => |call| {
-            const func = inferExprType(cmp, call.expr);
+            const func = inferExprType(cmp, call.expr, .None);
             if (func.getType() != .Success)
                 return func;
 
@@ -190,6 +195,25 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
 
             const funcTy = func.Success.Function;
 
+            if (funcTy.isConstructable and ctx != .New) {
+                return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        call.expr.csr,
+                        "Value is not callable. Did you mean to include 'new'?",
+                    ),
+                ));
+            }
+
+            if (!funcTy.isConstructable and ctx == .New) {
+                // TODO: Check for errorOnImplicitAny in config
+                return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        call.expr.csr,
+                        "'new' expression, whose target lacks a construct signature, implicitly has an 'any' type",
+                    ),
+                ));
+            }
+
             if (funcTy.args.len != call.args.items.len) {
                 return InferResult.err(CompileError.genericError(
                     GenericError.new(
@@ -203,7 +227,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             }
 
             for (call.args.items) |arg, index| {
-                const res = inferExprType(cmp, arg);
+                const res = inferExprType(cmp, arg, .None);
                 if (res.getType() != .Success)
                     return res;
 
@@ -222,14 +246,14 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             if (arr.items.len == 0) {
                 nd.ty = cmp.typebook.getArray(cmp.typebook.getUnknown());
             } else {
-                var res = inferExprType(cmp, arr.items[0]);
+                var res = inferExprType(cmp, arr.items[0], .None);
                 if (res.getType() != .Success)
                     return res;
 
                 var subtype = res.Success;
 
                 for (arr.items[1..]) |item| {
-                    res = inferExprType(cmp, item);
+                    res = inferExprType(cmp, item, .None);
                     if (res.getType() != .Success)
                         return res;
 
@@ -240,7 +264,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             }
         },
         .ArrayAccess => |access| {
-            const expr = inferExprType(cmp, access.expr);
+            const expr = inferExprType(cmp, access.expr, .None);
             if (expr.getType() != .Success)
                 return expr;
 
@@ -254,7 +278,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
                 ));
             }
 
-            const index = inferExprType(cmp, access.index);
+            const index = inferExprType(cmp, access.index, .None);
             if (index.getType() != .Success)
                 return index;
 
@@ -272,7 +296,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             nd.ty = exprTy.Array.subtype;
         },
         .Dot => |dot| {
-            const expr = inferExprType(cmp, dot.expr);
+            const expr = inferExprType(cmp, dot.expr, .None);
             switch (expr) {
                 .Success => |exprTy| {
                     if (exprTy.getType() != .Interface)
@@ -314,7 +338,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
 
             for (obj.items) |prop, index| {
                 const name = prop.getName();
-                switch (inferExprType(cmp, prop.value)) {
+                switch (inferExprType(cmp, prop.value, .None)) {
                     .Success => |ty| members[index] = Type.InterfaceType.Member{
                         .name = name,
                         .ty = ty,
@@ -332,6 +356,30 @@ pub fn inferExprType(cmp: *Compiler, nd: Node) InferResult {
             }
 
             nd.ty = cmp.typebook.getInterface(members);
+        },
+        .New => |new| {
+            const res = inferExprType(cmp, new, .New);
+            if (res.getType() != .Success)
+                return res;
+
+            const ty = res.Success;
+
+            if (new.getType() == .Call) {
+                // We already checked the expression is constructable is the
+                // call to inferExprType above
+                nd.ty = ty;
+            } else {
+                if (ty.getType() != .Function or !ty.Function.isConstructable) {
+                    return InferResult.err(CompileError.genericError(
+                        GenericError.new(
+                            nd.csr,
+                            "Expression type is not constructable",
+                        ),
+                    ));
+                }
+
+                nd.ty = ty.Function.ret;
+            }
         },
         else => std.debug.panic(
             "Unhandled node type in inferExprType: {?}\n",
@@ -380,7 +428,7 @@ const InferTestCase = struct {
         );
         defer std.testing.allocator.destroy(nd);
 
-        const res = inferExprType(&compiler, nd);
+        const res = inferExprType(&compiler, nd, .None);
 
         if (res.getType() != .Success and self.expectedTy != null)
             try res.Error.report(std.io.getStdErr().writer());
@@ -537,7 +585,11 @@ test "can infer type of function call with no arguments" {
             ) anyerror!void {
                 scope.put(
                     "aFunction",
-                    typebook.getFunction(typebook.getBoolean(), &[_]Type.Ptr{}),
+                    typebook.getFunction(
+                        typebook.getBoolean(),
+                        &[_]Type.Ptr{},
+                        false,
+                    ),
                     true,
                     Cursor.new(0, 0),
                 );
@@ -580,6 +632,7 @@ test "can infer type of function call with arguments" {
                             typebook.getNumber(),
                             typebook.getString(),
                         },
+                        false,
                     ),
                     true,
                     Cursor.new(0, 0),
@@ -619,6 +672,7 @@ test "an error is thrown when calling a function with a wrong argument count" {
                             typebook.getNumber(),
                             typebook.getString(),
                         },
+                        false,
                     ),
                     true,
                     Cursor.new(0, 0),
@@ -671,9 +725,11 @@ test "an error is thrown if function arguments have incorrect types" {
             ) anyerror!void {
                 scope.put(
                     "aFunction",
-                    typebook.getFunction(typebook.getBoolean(), &[_]Type.Ptr{
-                        typebook.getString(),
-                    }),
+                    typebook.getFunction(
+                        typebook.getBoolean(),
+                        &[_]Type.Ptr{typebook.getString()},
+                        false,
+                    ),
                     true,
                     Cursor.new(0, 0),
                 );
@@ -840,6 +896,7 @@ test "can infer type of a dot expression" {
                 const consoleLogTy = typebook.getFunction(
                     typebook.getVoid(),
                     &[_]Type.Ptr{typebook.getAny()},
+                    false,
                 );
 
                 try expectEqual(Type.Type.Function, ty.getType());
@@ -887,4 +944,63 @@ test "can infer type of an object literal" {
             node.ObjectProperty.new(nodes[2], nodes[3]),
         },
     });
+}
+
+test "can infer type of a new expression with an Ident" {
+    const nd = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 1),
+        .Ident,
+        "MyClass",
+    );
+    defer std.testing.allocator.destroy(nd);
+
+    try (InferTestCase{
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                var ty = allocate.create(std.testing.allocator, Type);
+                ty.* = Type{
+                    .Class = Type.ClassType.new(
+                        null,
+                        "MyClass",
+                        &[_]Type.ClassType.Member{},
+                    ),
+                };
+
+                typebook.putClass(ty);
+                scope.putType("MyClass", ty);
+                scope.put(
+                    "MyClass",
+                    typebook.getFunction(ty, &[_]Type.Ptr{}, true),
+                    true,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+                _ = typebook;
+
+                try expectEqual(InferResult.Variant.Success, res.getType());
+
+                // const ty = res.Success;
+                // const consoleLogTy = typebook.getFunction(
+                // typebook.getVoid(),
+                // &[_]Type.Ptr{typebook.getAny()},
+                // false,
+                // );
+
+                // try expectEqual(Type.Type.Function, ty.getType());
+                // try expectEqual(consoleLogTy, ty);
+            }
+        }).check,
+    }).run(.New, nd);
 }

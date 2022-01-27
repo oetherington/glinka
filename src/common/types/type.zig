@@ -334,10 +334,11 @@ test "can create a union type" {
 test "can create a function type" {
     const str = Type.newString();
     const num = Type.newNumber();
-    const ty = Type.newFunction(Type.FunctionType{
-        .ret = &str,
-        .args = &[_]Type.Ptr{ &str, &num },
-    });
+    const ty = Type.newFunction(Type.FunctionType.new(
+        &str,
+        &[_]Type.Ptr{ &str, &num },
+        false,
+    ));
     try expectEqual(Type.Type.Function, ty.getType());
     try expectEqual(Type.Type.String, ty.Function.ret.getType());
     try expectEqual(@intCast(usize, 2), ty.Function.args.len);
@@ -365,14 +366,16 @@ test "can create an interface type" {
 test "can compare Type equality" {
     const str = Type.newString();
     const num = Type.newNumber();
-    const f1 = Type.newFunction(Type.FunctionType{
-        .ret = &str,
-        .args = &[_]Type.Ptr{ &str, &num },
-    });
-    const f2 = Type.newFunction(Type.FunctionType{
-        .ret = &num,
-        .args = &[_]Type.Ptr{ &str, &num },
-    });
+    const f1 = Type.newFunction(Type.FunctionType.new(
+        &str,
+        &[_]Type.Ptr{ &str, &num },
+        false,
+    ));
+    const f2 = Type.newFunction(Type.FunctionType.new(
+        &num,
+        &[_]Type.Ptr{ &str, &num },
+        false,
+    ));
 
     const strp = &str;
     const nump = &num;
@@ -397,14 +400,16 @@ test "can compare Type equality" {
 test "can hash Types" {
     const str = Type.newString();
     const num = Type.newNumber();
-    const f1 = Type.newFunction(Type.FunctionType{
-        .ret = &str,
-        .args = &[_]Type.Ptr{ &str, &num },
-    });
-    const f2 = Type.newFunction(Type.FunctionType{
-        .ret = &num,
-        .args = &[_]Type.Ptr{ &str, &num },
-    });
+    const f1 = Type.newFunction(Type.FunctionType.new(
+        &str,
+        &[_]Type.Ptr{ &str, &num },
+        false,
+    ));
+    const f2 = Type.newFunction(Type.FunctionType.new(
+        &num,
+        &[_]Type.Ptr{ &str, &num },
+        false,
+    ));
 
     const strp = &str;
     const nump = &num;
@@ -690,10 +695,11 @@ test "can write a function type" {
     const n = Type.newNumber();
     const s = Type.newString();
     try (WriteTypeTestCase{
-        .ty = Type.newFunction(Type.FunctionType{
-            .ret = &n,
-            .args = &[_]Type.Ptr{ &n, &s },
-        }),
+        .ty = Type.newFunction(Type.FunctionType.new(
+            &n,
+            &[_]Type.Ptr{ &n, &s },
+            false,
+        )),
         .expected = "function(number, string) : number",
     }).run();
 }

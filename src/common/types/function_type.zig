@@ -21,11 +21,17 @@ const Type = @import("type.zig").Type;
 pub const FunctionType = struct {
     ret: Type.Ptr,
     args: []Type.Ptr,
+    isConstructable: bool,
 
-    pub fn new(ret: Type.Ptr, args: []Type.Ptr) FunctionType {
+    pub fn new(
+        ret: Type.Ptr,
+        args: []Type.Ptr,
+        isConstructable: bool,
+    ) FunctionType {
         return FunctionType{
             .ret = ret,
             .args = args,
+            .isConstructable = isConstructable,
         };
     }
 
@@ -35,7 +41,7 @@ pub const FunctionType = struct {
         for (self.args) |arg, index|
             result ^= arg.hash() >> @intCast(u6, index + 1);
 
-        return result;
+        return if (self.isConstructable) ~result else result;
     }
 
     pub fn write(self: FunctionType, writer: anytype) !void {
@@ -58,9 +64,11 @@ test "can hash a FunctionType" {
     const num = Type.newNumber();
     const str = Type.newString();
 
-    const a = FunctionType.new(&num, &[_]Type.Ptr{&str});
-    const b = FunctionType.new(&str, &[_]Type.Ptr{&num});
+    const a = FunctionType.new(&num, &[_]Type.Ptr{&str}, false);
+    const b = FunctionType.new(&str, &[_]Type.Ptr{&num}, false);
+    const c = FunctionType.new(&num, &[_]Type.Ptr{&str}, true);
 
     try std.testing.expectEqual(a.hash(), a.hash());
     try std.testing.expect(a.hash() != b.hash());
+    try std.testing.expect(a.hash() != c.hash());
 }

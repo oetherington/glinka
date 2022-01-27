@@ -194,7 +194,8 @@ pub fn processFunction(cmp: *Compiler, nd: Node) void {
         cmp.scope.put(arg.name, argTys[index], false, arg.csr);
     }
 
-    const funcTy = cmp.typebook.getFunction(retTy, argTys);
+    // TODO: Check for construct signature?
+    const funcTy = cmp.typebook.getFunction(retTy, argTys, false);
 
     if (nameIsValid)
         if (func.name) |name|

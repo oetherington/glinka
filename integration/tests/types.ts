@@ -70,6 +70,13 @@ class MyOtherClass extends MyClass {
 console.log(MyClass);
 console.log(MyOtherClass);
 
+const instance0: MyClass = new MyClass;
+console.log(instance0);
+const instance1 = new MyOtherClass;
+console.log(instance1);
+const instance2 = new MyOtherClass();
+console.log(instance2);
+
 // typeof as an expression
 const typeOfAUnion: string = typeof aUnion;
 console.log(typeOfAUnion);

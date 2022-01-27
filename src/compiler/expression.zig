@@ -131,6 +131,7 @@ test "can compile function call expressions" {
                         cmp.typebook.getString(),
                         cmp.typebook.getNumber(),
                     },
+                    false,
                 );
 
                 cmp.scope.put("aFunction", ty, true, Cursor.new(0, 0));

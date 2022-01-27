@@ -24,6 +24,7 @@ const Node = node.Node;
 const NodeType = node.NodeType;
 const Type = @import("../common/types/type.zig").Type;
 const GenericError = @import("errors/generic_error.zig").GenericError;
+const RedefinitionError = @import("errors/redefinition_error.zig").RedefinitionError;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const CompilerTestCase = @import("compiler_test_case.zig").CompilerTestCase;
 const allocate = @import("../common/allocate.zig");
@@ -79,6 +80,12 @@ pub fn processAlias(cmp: *Compiler, nd: Node) void {
 test "can compile a type alias declaration" {
     try (CompilerTestCase{
         .code = "type ATypeAlias = number | boolean;",
+    }).run();
+}
+
+test "aliases don't share scope with variables" {
+    try (CompilerTestCase{
+        .code = "type AnAlias = number; const AnAlias = 0;",
     }).run();
 }
 
@@ -156,6 +163,12 @@ test "can compile an interface declaration" {
     }).run();
 }
 
+test "interfaces don't share scope with variables" {
+    try (CompilerTestCase{
+        .code = "interface AnInterface { a: number; } const AnInterface = 0;",
+    }).run();
+}
+
 pub fn hoistClass(cmp: *Compiler, nd: Node) void {
     std.debug.assert(nd.getType() == NodeType.ClassType);
 
@@ -223,6 +236,7 @@ fn resolveSuperType(
 
 fn resolveMemberType(
     cmp: *Compiler,
+    csr: Cursor,
     className: []const u8,
     member: node.ClassTypeMember,
 ) Type.Ptr {
@@ -236,10 +250,11 @@ fn resolveMemberType(
                     .{ member.name, className },
                 )),
             )) catch allocate.reportAndExit();
+            return cmp.typebook.getAny();
         }
     }
 
-    return cmp.typebook.getAny();
+    return cmp.implicitAny(csr, member.name);
 }
 
 pub fn processClass(cmp: *Compiler, nd: Node) void {
@@ -270,12 +285,23 @@ pub fn processClass(cmp: *Compiler, nd: Node) void {
 
         cls.members[index] = Type.ClassType.Member{
             .name = member.name,
-            .ty = resolveMemberType(cmp, cls.name, member),
+            .ty = resolveMemberType(cmp, memberNd.csr, cls.name, member),
             .visibility = member.visibility,
         };
     }
 
     cmp.typebook.putClass(clsT);
+
+    if (cmp.scope.getLocal(clsNd.name)) |previous| {
+        cmp.errors.append(CompileError.redefinitionError(
+            RedefinitionError.new(clsNd.name, previous.csr, nd.csr),
+        )) catch allocate.reportAndExit();
+        return;
+    }
+
+    // TODO: This should take the arguments to the constructor
+    const constructorTy = cmp.typebook.getFunction(clsT, &[_]Type.Ptr{}, true);
+    cmp.scope.put(clsNd.name, constructorTy, true, nd.csr);
 }
 
 test "can compile an empty class declaration" {
@@ -329,12 +355,35 @@ test "class member types must be valid" {
         .code = "class A { private a: SomeType; }",
         .check = (struct {
             pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try cmp.reportErrors();
                 try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
                 const err = cmp.getError(0);
                 try case.expectEqual(err.getType(), .GenericError);
                 try case.expectEqualStrings(
                     "Cannot resolve type for member 'a' of class 'A'",
                     err.GenericError.msg,
+                );
+            }
+        }).check,
+    }).run();
+}
+
+test "classes share scope with variables" {
+    try (CompilerTestCase{
+        .code = "class A {} const A = 0;",
+        .check = (struct {
+            pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+                const err = cmp.getError(0);
+                try case.expectEqual(err.getType(), .RedefinitionError);
+                try case.expectEqualStrings("A", err.RedefinitionError.name);
+                try case.expectEqual(
+                    Cursor.new(1, 1),
+                    err.RedefinitionError.firstDefined,
+                );
+                try case.expectEqual(
+                    Cursor.new(1, 12),
+                    err.RedefinitionError.secondDefined,
                 );
             }
         }).check,

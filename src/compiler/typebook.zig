@@ -155,12 +155,10 @@ pub const TypeBook = struct {
         self: *TypeBook,
         ret: Type.Ptr,
         args: []Type.Ptr,
+        isConstructable: bool,
     ) Type.Ptr {
         var funcTy = Type{
-            .Function = Type.FunctionType{
-                .ret = ret,
-                .args = args,
-            },
+            .Function = Type.FunctionType.new(ret, args, isConstructable),
         };
 
         if (self.tyMap.get(funcTy)) |ty|
@@ -337,7 +335,7 @@ test "type book can create and retrieve function types" {
     const s: *const Type = &book.stringTy;
     const b: *const Type = &book.booleanTy;
 
-    const func = book.getFunction(n, &[_]Type.Ptr{ s, b });
+    const func = book.getFunction(n, &[_]Type.Ptr{ s, b }, false);
 
     try expectEqual(Type.Type.Function, func.getType());
     try expectEqual(n, func.Function.ret);
@@ -345,7 +343,7 @@ test "type book can create and retrieve function types" {
     try expectEqual(s, func.Function.args[0]);
     try expectEqual(b, func.Function.args[1]);
 
-    const func2 = book.getFunction(n, &[_]Type.Ptr{ s, b });
+    const func2 = book.getFunction(n, &[_]Type.Ptr{ s, b }, false);
 
     try expectEqual(func, func2);
 }

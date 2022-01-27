@@ -63,7 +63,6 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
             try self.out.print(")", .{});
         },
         .Call => |call| {
-            try self.out.print("(", .{});
             try self.emitExpr(call.expr);
             try self.out.print("(", .{});
 
@@ -74,7 +73,7 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
                 prefix = ", ";
             }
 
-            try self.out.print("))", .{});
+            try self.out.print(")", .{});
         },
         .Array => |arr| {
             try self.out.print("[ ", .{});
@@ -105,6 +104,10 @@ pub fn emitExpr(self: JsBackend, value: Node) Backend.Error!void {
                 try self.out.print(", ", .{});
             }
             try self.out.print("}}", .{});
+        },
+        .New => |new| {
+            try self.out.print("new ", .{});
+            try self.emitExpr(new);
         },
         else => std.debug.panic(
             "Invalid Node type in emitExpr: {?}",
@@ -267,7 +270,7 @@ test "JsBackend can emit function call expression" {
                 },
             },
         ),
-        .expectedOutput = "(aFunction(4, 'a'));\n",
+        .expectedOutput = "aFunction(4, 'a');\n",
         .cleanup = (struct {
             fn cleanup(alloc: Allocator, nd: Node) void {
                 alloc.destroy(nd.data.Call.expr);
@@ -362,6 +365,21 @@ test "JsBackend can emit object literal expression" {
                 alloc.destroy(nd.data.Object.items[0].value);
                 alloc.destroy(nd.data.Object.items[1].key);
                 alloc.destroy(nd.data.Object.items[1].value);
+            }
+        }).cleanup,
+    }).run();
+}
+
+test "JsBackend can emit new expression" {
+    try (EmitTestCase{
+        .inputNode = EmitTestCase.makeNode(
+            .New,
+            EmitTestCase.makeNode(.Ident, "MyClass"),
+        ),
+        .expectedOutput = "new MyClass;\n",
+        .cleanup = (struct {
+            fn cleanup(alloc: Allocator, nd: Node) void {
+                alloc.destroy(nd.data.New);
             }
         }).cleanup,
     }).run();

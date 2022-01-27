@@ -139,6 +139,7 @@ pub const JsBackend = struct {
             .ArrayAccess,
             .Dot,
             .Object,
+            .New,
             => {
                 try self.emitExpr(nd);
                 try self.out.print(";\n", .{});

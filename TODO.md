@@ -28,6 +28,7 @@
    - [ ] Inferred return types
    - [ ] Arrow functions
    - [ ] Variadic functions
+   - [ ] As lambda expressions
  - [x] Function calls
  - [x] Unions
  - [ ] Tuples
@@ -40,7 +41,9 @@
  - [x] Interfaces
    - [x] Inline with object literal syntax/type aliases
    - [x] `interface` syntax
-   - `extends` for interfaces
+   - [ ] `extends` for interfaces
+   - [ ] Construct signatures for interfaces
+   - [ ] Short function syntax
  - [x] Object literals
  - [x] Object member accesses
  - [ ] Enums
@@ -48,7 +51,7 @@
    - [ ] Ambient enums
  - [x] `delete`
  - [x] Classes
-   - [ ] `new`
+   - [x] `new`
    - [x] Member variables
    - [ ] Member functions
    - [ ] `readonly`
