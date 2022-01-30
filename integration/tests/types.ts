@@ -77,6 +77,9 @@ console.log(instance1);
 const instance2 = new MyOtherClass();
 console.log(instance2);
 
+const aClassMember = instance0.aValue;
+console.log(aClassMember);
+
 // typeof as an expression
 const typeOfAUnion: string = typeof aUnion;
 console.log(typeOfAUnion);

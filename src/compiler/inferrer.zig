@@ -299,7 +299,36 @@ pub fn inferExprType(cmp: *Compiler, nd: Node, ctx: InferContext) InferResult {
             const expr = inferExprType(cmp, dot.expr, .None);
             switch (expr) {
                 .Success => |exprTy| {
-                    if (exprTy.getType() != .Interface)
+                    if (exprTy.getType() == .Interface) {
+                        const mem = exprTy.Interface.getNamedMember(dot.ident);
+                        if (mem == null)
+                            return InferResult.err(CompileError.genericError(
+                                GenericError.new(
+                                    nd.csr,
+                                    cmp.fmt(
+                                        "Object property {s} does not exist",
+                                        .{dot.ident},
+                                    ),
+                                ),
+                            ));
+
+                        nd.ty = mem.?.ty;
+                    } else if (exprTy.getType() == .Class) {
+                        const mem = exprTy.Class.getNamedMember(dot.ident);
+                        if (mem == null)
+                            return InferResult.err(CompileError.genericError(
+                                GenericError.new(
+                                    nd.csr,
+                                    cmp.fmt(
+                                        "Class {s} has no member called {s}",
+                                        .{ exprTy.Class.name, dot.ident },
+                                    ),
+                                ),
+                            ));
+
+                        // TODO: Check member visibility
+                        nd.ty = mem.?.ty;
+                    } else {
                         return InferResult.err(CompileError.genericError(
                             GenericError.new(
                                 nd.csr,
@@ -309,20 +338,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node, ctx: InferContext) InferResult {
                                 ),
                             ),
                         ));
-
-                    const member = exprTy.Interface.getNamedMember(dot.ident);
-                    if (member == null)
-                        return InferResult.err(CompileError.genericError(
-                            GenericError.new(
-                                nd.csr,
-                                cmp.fmt(
-                                    "Object property {s} does not exist",
-                                    .{dot.ident},
-                                ),
-                            ),
-                        ));
-
-                    nd.ty = member.?.ty;
+                    }
                 },
                 .Error => return expr,
             }
@@ -401,6 +417,12 @@ const InferTestCase = struct {
         scope: *Scope,
         typebook: *TypeBook,
     ) anyerror!void = null,
+
+    fn expectSuccess(res: InferResult) !void {
+        if (res.getType() != .Success)
+            try res.Error.report(std.io.getStdErr().writer());
+        try expectEqual(InferResult.Success, res.getType());
+    }
 
     pub fn run(
         self: InferTestCase,
@@ -785,7 +807,7 @@ test "can infer type of a homogeneous array" {
                 _ = scope;
                 _ = typebook;
 
-                try expectEqual(InferResult.Variant.Success, res.getType());
+                try InferTestCase.expectSuccess(res);
 
                 const arr = res.Success;
                 try expectEqual(Type.Type.Array, arr.getType());
@@ -816,7 +838,7 @@ test "can infer type of an inhomogeneous array" {
                 _ = scope;
                 _ = typebook;
 
-                try expectEqual(InferResult.Variant.Success, res.getType());
+                try InferTestCase.expectSuccess(res);
 
                 const arr = res.Success;
                 try expectEqual(Type.Type.Array, arr.getType());
@@ -872,7 +894,7 @@ test "can infer type of an array access" {
     });
 }
 
-test "can infer type of a dot expression" {
+test "can infer type of a dot expression with an object" {
     const nd = makeNode(
         std.testing.allocator,
         Cursor.new(1, 1),
@@ -890,7 +912,7 @@ test "can infer type of a dot expression" {
             ) anyerror!void {
                 _ = scope;
 
-                try expectEqual(InferResult.Variant.Success, res.getType());
+                try InferTestCase.expectSuccess(res);
 
                 const ty = res.Success;
                 const consoleLogTy = typebook.getFunction(
@@ -904,6 +926,64 @@ test "can infer type of a dot expression" {
             }
         }).check,
     }).run(.Dot, node.Dot{ .expr = nd, .ident = "log" });
+}
+
+test "can infer type of a dot expression with a class" {
+    const nd = makeNode(
+        std.testing.allocator,
+        Cursor.new(1, 1),
+        .Ident,
+        "myInstance",
+    );
+    defer std.testing.allocator.destroy(nd);
+
+    try (InferTestCase{
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                var members = allocate.alloc(
+                    std.testing.allocator,
+                    Type.ClassType.Member,
+                    1,
+                );
+                members[0] = Type.ClassType.Member{
+                    .name = "member",
+                    .ty = typebook.getNumber(),
+                    .visibility = .Public,
+                };
+
+                var ty = allocate.create(std.testing.allocator, Type);
+                ty.* = Type{
+                    .Class = Type.ClassType.new(null, "MyClass", members),
+                };
+
+                typebook.putClass(ty);
+                scope.putType("MyClass", ty);
+                scope.put(
+                    "MyClass",
+                    typebook.getFunction(ty, &[_]Type.Ptr{}, true),
+                    true,
+                    Cursor.new(0, 0),
+                );
+
+                scope.put("myInstance", ty, true, Cursor.new(0, 0));
+            }
+        }).setup,
+        .check = (struct {
+            fn check(
+                scope: *Scope,
+                typebook: *TypeBook,
+                res: InferResult,
+            ) anyerror!void {
+                _ = scope;
+
+                try InferTestCase.expectSuccess(res);
+                try expectEqual(typebook.getNumber(), res.Success);
+            }
+        }).check,
+    }).run(.Dot, node.Dot{ .expr = nd, .ident = "member" });
 }
 
 test "can infer type of an object literal" {
@@ -927,7 +1007,7 @@ test "can infer type of an object literal" {
                 _ = scope;
                 _ = typebook;
 
-                try expectEqual(InferResult.Variant.Success, res.getType());
+                try InferTestCase.expectSuccess(res);
 
                 try expectEqual(Type.Type.Interface, res.Success.getType());
                 const members = res.Success.Interface.members;
@@ -986,20 +1066,15 @@ test "can infer type of a new expression with an Ident" {
                 typebook: *TypeBook,
                 res: InferResult,
             ) anyerror!void {
-                _ = scope;
                 _ = typebook;
 
-                try expectEqual(InferResult.Variant.Success, res.getType());
+                try InferTestCase.expectSuccess(res);
 
-                // const ty = res.Success;
-                // const consoleLogTy = typebook.getFunction(
-                // typebook.getVoid(),
-                // &[_]Type.Ptr{typebook.getAny()},
-                // false,
-                // );
+                const ty = res.Success;
+                const classTy = scope.getType("MyClass").?;
 
-                // try expectEqual(Type.Type.Function, ty.getType());
-                // try expectEqual(consoleLogTy, ty);
+                try expectEqual(Type.Type.Class, ty.getType());
+                try expectEqual(classTy, ty);
             }
         }).check,
     }).run(.New, nd);
