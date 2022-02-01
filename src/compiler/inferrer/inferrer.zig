@@ -37,6 +37,7 @@ const InferResult = @import("infer_result.zig").InferResult;
 const InferContext = @import("infer_context.zig").InferContext;
 const InferTestCase = @import("infer_test_case.zig").InferTestCase;
 const inferPrimaryExprType = @import("primary.zig").inferPrimaryExprType;
+const inferIdentType = @import("ident.zig").inferIdentType;
 const inferUnaryOpType = @import("unary_op.zig").inferUnaryOpType;
 const inferBinaryOpType = @import("binary_op.zig").inferBinaryOpType;
 const inferTernaryType = @import("ternary.zig").inferTernaryType;
@@ -60,13 +61,7 @@ pub fn inferExprType(cmp: *Compiler, nd: Node, ctx: InferContext) InferResult {
         => inferPrimaryExprType(nd, cmp.typebook.getBoolean()),
         .Null => inferPrimaryExprType(nd, cmp.typebook.getNull()),
         .Undefined => inferPrimaryExprType(nd, cmp.typebook.getUndefined()),
-        .Ident => |ident| inferPrimaryExprType(
-            nd,
-            if (cmp.scope.get(ident)) |sym|
-                sym.ty
-            else
-                cmp.typebook.getUndefined(),
-        ),
+        .Ident => |ident| inferIdentType(cmp, nd, ident),
         .PrefixOp,
         .PostfixOp,
         => |op| inferUnaryOpType(cmp, nd, ctx, op),

@@ -15,62 +15,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-const std = @import("std");
 const Cursor = @import("../../common/cursor.zig").Cursor;
+const Compiler = @import("../compiler.zig").Compiler;
 const Scope = @import("../scope.zig").Scope;
 const TypeBook = @import("../typebook.zig").TypeBook;
 const node = @import("../../common/node.zig");
-const Type = @import("../../common/types/type.zig").Type;
 const InferResult = @import("infer_result.zig").InferResult;
 const InferTestCase = @import("infer_test_case.zig").InferTestCase;
 
-pub fn inferPrimaryExprType(nd: node.Node, ty: Type.Ptr) InferResult {
-    nd.ty = ty;
-    return InferResult.success(ty);
+pub fn inferIdentType(
+    cmp: *Compiler,
+    nd: node.Node,
+    ident: []const u8,
+) InferResult {
+    nd.ty = if (cmp.scope.get(ident)) |sym|
+        sym.ty
+    else
+        cmp.typebook.getUndefined();
+
+    return InferResult.success(nd.ty.?);
 }
 
-test "can infer type of int literal" {
-    try (InferTestCase{
-        .expectedTy = .Number,
-    }).run(.Int, "1234");
-}
-
-test "can infer type of float literal" {
-    try (InferTestCase{
-        .expectedTy = .Number,
-    }).run(.Float, "1.234");
-}
-
-test "can infer type of string literals" {
+test "can infer type of an identifier" {
     try (InferTestCase{
         .expectedTy = .String,
-    }).run(.String, "'a string'");
-}
-
-test "can infer type of template literals" {
-    try (InferTestCase{
-        .expectedTy = .String,
-    }).run(.Template, "`a template`");
-}
-
-test "can infer type of booleans" {
-    try (InferTestCase{
-        .expectedTy = .Boolean,
-    }).run(.True, {});
-
-    try (InferTestCase{
-        .expectedTy = .Boolean,
-    }).run(.False, {});
-}
-
-test "can infer type of 'null'" {
-    try (InferTestCase{
-        .expectedTy = .Null,
-    }).run(.Null, {});
-}
-
-test "can infer type of 'undefined'" {
-    try (InferTestCase{
-        .expectedTy = .Undefined,
-    }).run(.Undefined, {});
+        .setup = (struct {
+            fn setup(
+                scope: *Scope,
+                typebook: *TypeBook,
+            ) anyerror!void {
+                scope.put(
+                    "aVariable",
+                    typebook.getString(),
+                    false,
+                    Cursor.new(0, 0),
+                );
+            }
+        }).setup,
+    }).run(.Ident, "aVariable");
 }
