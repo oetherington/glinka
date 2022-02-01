@@ -33,12 +33,11 @@ const allocate = @import("../../common/allocate.zig");
 pub fn inferDotType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     dot: node.Dot,
 ) InferResult {
-    _ = ctx; // TODO
-
-    const expr = inferExprType(cmp, dot.expr, .None);
+    const subCtx = InferContext.none(ctx);
+    const expr = inferExprType(cmp, dot.expr, &subCtx);
     switch (expr) {
         .Success => |exprTy| {
             if (exprTy.getType() == .Interface) {

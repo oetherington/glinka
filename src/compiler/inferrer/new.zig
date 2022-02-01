@@ -33,12 +33,12 @@ const allocate = @import("../../common/allocate.zig");
 pub fn inferNewType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     new: node.Node,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.new(ctx);
 
-    const res = inferExprType(cmp, new, .New);
+    const res = inferExprType(cmp, new, &subCtx);
     if (res.getType() != .Success)
         return res;
 

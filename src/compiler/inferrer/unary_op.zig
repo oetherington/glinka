@@ -29,12 +29,12 @@ const inferExprType = @import("inferrer.zig").inferExprType;
 pub fn inferUnaryOpType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     op: node.UnaryOp,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.none(ctx);
 
-    const expr = switch (inferExprType(cmp, op.expr, .None)) {
+    const expr = switch (inferExprType(cmp, op.expr, &subCtx)) {
         .Success => |res| res,
         .Error => |err| return InferResult.err(err),
     };

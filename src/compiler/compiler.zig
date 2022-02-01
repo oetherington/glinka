@@ -34,6 +34,7 @@ const ImplicitAnyError = implicitAnyError.ImplicitAnyError;
 const CompileError = @import("errors/compile_error.zig").CompileError;
 const ErrorContext = @import("errors/error_context.zig").ErrorContext;
 const inferrer = @import("inferrer/inferrer.zig");
+const InferContext = @import("inferrer/infer_context.zig").InferContext;
 const typeFinder = @import("type_finder.zig");
 const expression = @import("expression.zig");
 const block = @import("block.zig");
@@ -161,7 +162,8 @@ pub const Compiler = struct {
     }
 
     pub fn inferExprType(self: *Compiler, nd: Node) ?Type.Ptr {
-        switch (inferrer.inferExprType(self, nd, .None)) {
+        const ctx = InferContext.none(null);
+        switch (inferrer.inferExprType(self, nd, &ctx)) {
             .Success => |ty| {
                 nd.ty = ty;
                 return ty;

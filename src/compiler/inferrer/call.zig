@@ -33,12 +33,12 @@ const inferExprType = @import("inferrer.zig").inferExprType;
 pub fn inferCallType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     call: node.Call,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.none(ctx);
 
-    const func = inferExprType(cmp, call.expr, .None);
+    const func = inferExprType(cmp, call.expr, &subCtx);
     if (func.getType() != .Success)
         return func;
 
@@ -58,8 +58,9 @@ pub fn inferCallType(
     }
 
     const funcTy = func.Success.Function;
+    const ctxIsConstructible = ctx.isConstructible();
 
-    if (funcTy.isConstructable and ctx != .New) {
+    if (funcTy.isConstructable and !ctxIsConstructible) {
         return InferResult.err(CompileError.genericError(
             GenericError.new(
                 call.expr.csr,
@@ -68,7 +69,7 @@ pub fn inferCallType(
         ));
     }
 
-    if (!funcTy.isConstructable and ctx == .New) {
+    if (!funcTy.isConstructable and ctxIsConstructible) {
         // TODO: Check for errorOnImplicitAny in config
         return InferResult.err(CompileError.genericError(
             GenericError.new(
@@ -91,7 +92,7 @@ pub fn inferCallType(
     }
 
     for (call.args.items) |arg, index| {
-        const res = inferExprType(cmp, arg, .None);
+        const res = inferExprType(cmp, arg, &subCtx);
         if (res.getType() != .Success)
             return res;
 

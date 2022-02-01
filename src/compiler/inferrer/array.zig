@@ -31,22 +31,22 @@ const inferExprType = @import("inferrer.zig").inferExprType;
 pub fn inferArrayType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     arr: node.NodeList,
 ) InferResult {
-    _ = ctx; // TODO
-
     if (arr.items.len == 0) {
         nd.ty = cmp.typebook.getArray(cmp.typebook.getUnknown());
     } else {
-        var res = inferExprType(cmp, arr.items[0], .None);
+        const subCtx = InferContext.none(ctx);
+
+        var res = inferExprType(cmp, arr.items[0], &subCtx);
         if (res.getType() != .Success)
             return res;
 
         var subtype = res.Success;
 
         for (arr.items[1..]) |item| {
-            res = inferExprType(cmp, item, .None);
+            res = inferExprType(cmp, item, &subCtx);
             if (res.getType() != .Success)
                 return res;
 

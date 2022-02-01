@@ -29,22 +29,22 @@ const inferExprType = @import("inferrer.zig").inferExprType;
 pub fn inferTernaryType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     trn: node.Ternary,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.none(ctx);
 
-    _ = switch (inferExprType(cmp, trn.cond, .None)) {
+    _ = switch (inferExprType(cmp, trn.cond, &subCtx)) {
         .Success => |res| res,
         .Error => |err| return InferResult.err(err),
     };
 
-    const ifT = switch (inferExprType(cmp, trn.ifTrue, .None)) {
+    const ifT = switch (inferExprType(cmp, trn.ifTrue, &subCtx)) {
         .Success => |res| res,
         .Error => |err| return InferResult.err(err),
     };
 
-    const ifF = switch (inferExprType(cmp, trn.ifFalse, .None)) {
+    const ifF = switch (inferExprType(cmp, trn.ifFalse, &subCtx)) {
         .Success => |res| res,
         .Error => |err| return InferResult.err(err),
     };

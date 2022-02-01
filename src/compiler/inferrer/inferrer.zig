@@ -49,7 +49,11 @@ const inferObjectType = @import("object.zig").inferObjectType;
 const inferNewType = @import("new.zig").inferNewType;
 const allocate = @import("../../common/allocate.zig");
 
-pub fn inferExprType(cmp: *Compiler, nd: Node, ctx: InferContext) InferResult {
+pub fn inferExprType(
+    cmp: *Compiler,
+    nd: Node,
+    ctx: *const InferContext,
+) InferResult {
     return switch (nd.data) {
         .Int => inferPrimaryExprType(nd, cmp.typebook.getNumber()),
         .Float => inferPrimaryExprType(nd, cmp.typebook.getNumber()),

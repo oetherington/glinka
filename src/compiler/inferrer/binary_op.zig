@@ -30,17 +30,17 @@ const inferExprType = @import("inferrer.zig").inferExprType;
 pub fn inferBinaryOpType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     op: node.BinaryOp,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.none(ctx);
 
-    const left = switch (inferExprType(cmp, op.left, .None)) {
+    const left = switch (inferExprType(cmp, op.left, &subCtx)) {
         .Success => |res| res,
         .Error => |err| return InferResult.err(err),
     };
 
-    const right = switch (inferExprType(cmp, op.right, .None)) {
+    const right = switch (inferExprType(cmp, op.right, &subCtx)) {
         .Success => |res| res,
         .Error => |err| return InferResult.err(err),
     };

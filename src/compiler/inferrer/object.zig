@@ -33,10 +33,10 @@ const allocate = @import("../../common/allocate.zig");
 pub fn inferObjectType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     obj: node.Object,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.none(ctx);
 
     // TODO: Refactor this to avoid allocation
     var members = allocate.alloc(
@@ -48,7 +48,7 @@ pub fn inferObjectType(
 
     for (obj.items) |prop, index| {
         const name = prop.getName();
-        switch (inferExprType(cmp, prop.value, .None)) {
+        switch (inferExprType(cmp, prop.value, &subCtx)) {
             .Success => |ty| members[index] = Type.InterfaceType.Member{
                 .name = name,
                 .ty = ty,

@@ -33,12 +33,12 @@ const inferExprType = @import("inferrer.zig").inferExprType;
 pub fn inferArrayAccessType(
     cmp: *Compiler,
     nd: node.Node,
-    ctx: InferContext,
+    ctx: *const InferContext,
     access: node.ArrayAccess,
 ) InferResult {
-    _ = ctx; // TODO
+    const subCtx = InferContext.none(ctx);
 
-    const expr = inferExprType(cmp, access.expr, .None);
+    const expr = inferExprType(cmp, access.expr, &subCtx);
     if (expr.getType() != .Success)
         return expr;
 
@@ -52,7 +52,7 @@ pub fn inferArrayAccessType(
         ));
     }
 
-    const index = inferExprType(cmp, access.index, .None);
+    const index = inferExprType(cmp, access.index, &subCtx);
     if (index.getType() != .Success)
         return index;
 

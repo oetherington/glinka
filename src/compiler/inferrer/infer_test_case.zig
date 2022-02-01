@@ -30,6 +30,7 @@ const makeNode = node.makeNode;
 const Scope = @import("../scope.zig").Scope;
 const TypeBook = @import("../typebook.zig").TypeBook;
 const InferResult = @import("infer_result.zig").InferResult;
+const InferContext = @import("infer_context.zig").InferContext;
 const inferExprType = @import("inferrer.zig").inferExprType;
 
 pub const InferTestCase = struct {
@@ -76,7 +77,8 @@ pub const InferTestCase = struct {
         );
         defer std.testing.allocator.destroy(nd);
 
-        const res = inferExprType(&compiler, nd, .None);
+        const ctx = InferContext.none(null);
+        const res = inferExprType(&compiler, nd, &ctx);
 
         if (res.getType() != .Success and self.expectedTy != null)
             try res.Error.report(std.io.getStdErr().writer());
