@@ -54,6 +54,8 @@ pub fn inferBinaryOpType(
     const entry = cmp.typebook.getOpEntry(op.op);
 
     // We assume it's binary, otherwise the Node wouldn't have parsed
+    std.debug.assert(entry == null or entry.?.getType() == .Binary);
+
     if (entry == null or !left.isAssignableTo(entry.?.Binary.input)) {
         return InferResult.err(CompileError.opError(OpError.new(
             nd.csr,

@@ -36,6 +36,10 @@ pub const OpEntry = union(Variant) {
         output: ?Type.Ptr,
     },
 
+    pub fn getType(self: OpEntry) Variant {
+        return @as(Variant, self);
+    }
+
     pub fn un(input: Type.Ptr, output: ?Type.Ptr) OpEntry {
         return OpEntry{
             .Unary = .{

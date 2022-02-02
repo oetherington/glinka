@@ -42,6 +42,8 @@ pub fn inferUnaryOpType(
     const entry = cmp.typebook.getOpEntry(op.op);
 
     // We assume it's unary, otherwise the Node wouldn't have parsed
+    std.debug.assert(entry == null or entry.?.getType() == .Unary);
+
     if (entry == null or !expr.isAssignableTo(entry.?.Unary.input)) {
         return InferResult.err(CompileError.opError(OpError.new(
             nd.csr,
