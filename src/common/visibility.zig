@@ -15,8 +15,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
 pub const Visibility = enum {
     Public,
     Protected,
     Private,
+
+    pub fn toString(self: Visibility) []const u8 {
+        return switch (self) {
+            .Public => "public",
+            .Protected => "protected",
+            .Private => "private",
+        };
+    }
 };
+
+test "can convert visibility to string" {
+    try std.testing.expectEqualStrings(
+        "public",
+        Visibility.Public.toString(),
+    );
+    try std.testing.expectEqualStrings(
+        "protected",
+        Visibility.Protected.toString(),
+    );
+    try std.testing.expectEqualStrings(
+        "private",
+        Visibility.Private.toString(),
+    );
+}

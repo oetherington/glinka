@@ -41,8 +41,7 @@ pub const ClassType = struct {
         name: []const u8,
         members: []Member,
     ) ClassType {
-        if (super) |spr|
-            std.debug.assert(spr.getType() == .Class);
+        std.debug.assert(super == null or super.?.getType() == .Class);
 
         return ClassType{
             .super = super,
@@ -72,7 +71,6 @@ pub const ClassType = struct {
         try writer.print("class {s}", .{self.name});
     }
 
-    // TODO: Account for private and protected members
     pub fn getNamedMember(
         self: ClassType,
         name: []const u8,
@@ -85,6 +83,21 @@ pub const ClassType = struct {
             return super.Class.getNamedMember(name);
 
         return null;
+    }
+
+    pub fn isSubclassOf(self: ClassType, super: Type.Ptr) bool {
+        if (super.getType() != .Class)
+            return false;
+
+        var s = self.super;
+        while (s) |ss| {
+            std.debug.assert(ss.getType() == .Class);
+            if (super == ss)
+                return true;
+            s = ss.Class.super;
+        }
+
+        return false;
     }
 };
 
@@ -187,4 +200,27 @@ test "can retrieve ClassType member by name" {
 
     const c = c0.getNamedMember("c");
     try std.testing.expect(c == null);
+}
+
+test "can detect if a class is a subclass of another class" {
+    const c0 = Type.newClass(
+        Type.ClassType.new(null, "A", &[_]Type.ClassType.Member{}),
+    );
+    const c1 = Type.newClass(
+        Type.ClassType.new(null, "B", &[_]Type.ClassType.Member{}),
+    );
+    const c2 = Type.newClass(
+        Type.ClassType.new(&c0, "C", &[_]Type.ClassType.Member{}),
+    );
+    const c3 = Type.newClass(
+        Type.ClassType.new(&c2, "D", &[_]Type.ClassType.Member{}),
+    );
+
+    try std.testing.expect(!c0.Class.isSubclassOf(&c1));
+    try std.testing.expect(!c1.Class.isSubclassOf(&c0));
+    try std.testing.expect(!c0.Class.isSubclassOf(&c2));
+    try std.testing.expect(c2.Class.isSubclassOf(&c0));
+    try std.testing.expect(!c0.Class.isSubclassOf(&c3));
+    try std.testing.expect(c3.Class.isSubclassOf(&c2));
+    try std.testing.expect(c3.Class.isSubclassOf(&c0));
 }

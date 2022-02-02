@@ -41,34 +41,44 @@ pub fn inferDotType(
     switch (expr) {
         .Success => |exprTy| {
             if (exprTy.getType() == .Interface) {
-                const mem = exprTy.Interface.getNamedMember(dot.ident);
-                if (mem == null)
-                    return InferResult.err(CompileError.genericError(
-                        GenericError.new(
-                            nd.csr,
-                            cmp.fmt(
-                                "Object property {s} does not exist",
-                                .{dot.ident},
-                            ),
+                const mem = exprTy.Interface.getNamedMember(
+                    dot.ident,
+                ) orelse return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        nd.csr,
+                        cmp.fmt(
+                            "Object property {s} does not exist",
+                            .{dot.ident},
                         ),
-                    ));
+                    ),
+                ));
 
-                nd.ty = mem.?.ty;
+                nd.ty = mem.ty;
             } else if (exprTy.getType() == .Class) {
-                const mem = exprTy.Class.getNamedMember(dot.ident);
-                if (mem == null)
+                const mem = exprTy.Class.getNamedMember(
+                    dot.ident,
+                ) orelse return InferResult.err(CompileError.genericError(
+                    GenericError.new(
+                        nd.csr,
+                        cmp.fmt(
+                            "Class {s} has no member called {s}",
+                            .{ exprTy.Class.name, dot.ident },
+                        ),
+                    ),
+                ));
+
+                if (!ctx.hasAccessTo(exprTy, mem.visibility))
                     return InferResult.err(CompileError.genericError(
                         GenericError.new(
                             nd.csr,
                             cmp.fmt(
-                                "Class {s} has no member called {s}",
-                                .{ exprTy.Class.name, dot.ident },
+                                "Class member '{s}' is {s}",
+                                .{ mem.name, mem.visibility.toString() },
                             ),
                         ),
                     ));
 
-                // TODO: Check member visibility
-                nd.ty = mem.?.ty;
+                nd.ty = mem.ty;
             } else {
                 return InferResult.err(CompileError.genericError(
                     GenericError.new(

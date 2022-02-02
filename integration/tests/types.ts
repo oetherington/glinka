@@ -60,7 +60,7 @@ console.log(yetAnotherObject);
 
 // Class
 class MyClass {
-	static protected readonly aValue: number = 123456;
+	static public readonly aValue: number = 123456;
 }
 
 class MyOtherClass extends MyClass {

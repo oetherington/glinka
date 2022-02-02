@@ -56,7 +56,7 @@
    - [ ] Member functions
    - [ ] `readonly`
    - [ ] `static`
-   - [ ] `public`/`protected`/`private`
+   - [x] `public`/`protected`/`private`
    - [ ] ECMAscript private fields with '#'
    - [ ] Parameter properties
    - [ ] `constructor`
