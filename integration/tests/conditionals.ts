@@ -1,5 +1,5 @@
 /*
- * Branchinng statements
+ * Branching statements
  */
 
 // Declarations
