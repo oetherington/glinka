@@ -16,5 +16,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 comptime {
-    @import("std").testing.refAllDecls(@import("src/main.zig"));
+    // This seems to be broken in Zig 0.0.10: perhaps commit 75bbc74?
+    // @import("std").testing.refAllDecls(@import("src/main.zig"));
+
+    // For now, we have a hacky temporary workaround...
+    _ = @import("src/main.zig").main;
 }
