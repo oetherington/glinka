@@ -355,7 +355,6 @@ test "class member types must be valid" {
         .code = "class A { private a: SomeType; }",
         .check = (struct {
             pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
-                try cmp.reportErrors();
                 try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
                 const err = cmp.getError(0);
                 try case.expectEqual(err.getType(), .GenericError);
