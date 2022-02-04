@@ -12,8 +12,11 @@ jobs:
           version: master
       - name: Run linter
         run: make lint
-  memory-check-valgrind:
-    runs-on: ubuntu-latest
+  memory-check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{matrix.os}}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -21,43 +24,31 @@ jobs:
         uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
-      - name: Install Valgrind
-        run: sudo apt-get install -y valgrind
       - name: Build Glinka debug binary
+        shell: bash
         run: |
           sed -i 's/exe\.install/exe.linkLibC();exe.install/' build.zig
           sed -i 's/gpa.allocator()/std.heap.c_allocator/' src/main.zig
           make debug
-      - name: Run memory check
+      - name: Install packages
+        shell: bash
         run: |
-          cd integration/tests
-          for file in *.ts
-          do
-            valgrind  --leak-check=full --track-origins=yes --show-leak-kinds=all --error-exitcode=1 ../../zig-out/bin/glinka $file
-          done
-  memory-check-drmemory:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v2
-      - name: Setup Zig compiler
-        uses: goto-bus-stop/setup-zig@v1
-        with:
-          version: master
-      - name: Install DrMemory
-        run: choco install drmemory --no-progress
-      - name: Build Glinka debug binary
-        run: |
-          sed -i 's/exe\.install/exe.linkLibC();exe.install/' build.zig
-          sed -i 's/gpa.allocator()/std.heap.c_allocator/' src/main.zig
-          make debug
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            choco install drmemory --no-progress
+          else
+            sudo apt-get install -y valgrind
+          fi
       - name: Run memory check
         shell: bash
         run: |
           cd integration/tests
           for file in *.ts
           do
-            'C:\Program Files (x86)\Dr. Memory\bin64\drmemory.exe' -results_to_stderr -exit_code_if_errors 1 -- ../../zig-out/bin/glinka.exe $file
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              'C:\Program Files (x86)\Dr. Memory\bin64\drmemory.exe' -results_to_stderr -exit_code_if_errors 1 -- ../../zig-out/bin/glinka.exe $file
+            else
+              valgrind  --leak-check=full --track-origins=yes --show-leak-kinds=all --error-exitcode=1 ../../zig-out/bin/glinka $file
+            fi
           done
   unit-tests:
     strategy:
