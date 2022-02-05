@@ -197,7 +197,7 @@ pub const TypeBook = struct {
         const tys = flattened.items;
         std.sort.insertionSort(Type.Ptr, tys, Context{}, Context.lessThan);
 
-        const un = Type{ .Union = Type.UnionType{ .tys = tys } };
+        const un = Type.newUnion(Type.UnionType.new(tys));
 
         const existing = self.tyMap.get(un);
         if (existing) |ty| {

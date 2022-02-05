@@ -85,7 +85,34 @@ pub const Type = union(This.Type) {
     }
 
     pub fn eql(self: This, other: Ptr) bool {
-        return genericEql(self, other.*);
+        // We can't just do genericEql(self, other.*) here because
+        // dereferencing the pointer reads uninitialized memory from the
+        // inactive union fields. Linux and OSX don't seem to care, but it
+        // makes Windows REALLY unhappy...
+
+        if (self.getType() != other.getType())
+            return false;
+
+        return switch (self) {
+            .Unknown => |t| genericEql(t, other.Unknown),
+            .Any => |t| genericEql(t, other.Any),
+            .Void => |t| genericEql(t, other.Void),
+            .Null => |t| genericEql(t, other.Null),
+            .Undefined => |t| genericEql(t, other.Undefined),
+            .Never => |t| genericEql(t, other.Never),
+            .Number => |t| genericEql(t, other.Number),
+            .String => |t| genericEql(t, other.String),
+            .Boolean => |t| genericEql(t, other.Boolean),
+            .Object => |t| genericEql(t, other.Object),
+            .Tuple => |t| genericEql(t, other.Tuple),
+            .Array => |t| genericEql(t, other.Array),
+            .Class => |t| genericEql(t, other.Class),
+            .Enum => |t| genericEql(t, other.Enum),
+            .Function => |t| genericEql(t, other.Function),
+            .Union => |t| genericEql(t, other.Union),
+            .Alias => |t| genericEql(t, other.Alias),
+            .Interface => |t| genericEql(t, other.Interface),
+        };
     }
 
     pub fn hash(self: This) usize {
