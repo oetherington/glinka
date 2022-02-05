@@ -45,7 +45,8 @@ jobs:
           for file in *.ts
           do
             if [ "$RUNNER_OS" == "Windows" ]; then
-              'C:\Program Files (x86)\Dr. Memory\bin64\drmemory.exe' -results_to_stderr -exit_code_if_errors 1 -show_reachable -- ../../zig-out/bin/glinka.exe $file
+              # 'C:\Program Files (x86)\Dr. Memory\bin64\drmemory.exe' -results_to_stderr -exit_code_if_errors 1 -show_reachable -- ../../zig-out/bin/glinka.exe $file
+              'C:\Program Files (x86)\Dr. Memory\bin64\drmemory.exe' -results_to_stderr -show_reachable -- ../../zig-out/bin/glinka.exe $file
             else
               valgrind  --leak-check=full --track-origins=yes --show-leak-kinds=all --error-exitcode=1 ../../zig-out/bin/glinka $file
             fi
