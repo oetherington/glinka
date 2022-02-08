@@ -22,30 +22,60 @@ const Cursor = @import("../cursor.zig").Cursor;
 const putInd = @import("indenter.zig").putInd;
 const DumpTestCase = @import("dump_test_case.zig").DumpTestCase;
 const Visibility = @import("../visibility.zig").Visibility;
+const Function = @import("function.zig").Function;
 const nodeImp = @import("../node.zig");
 const Node = nodeImp.Node;
 const NodeList = nodeImp.NodeList;
 const makeNode = nodeImp.makeNode;
 
 pub const ClassTypeMember = struct {
+    pub const Variant = enum {
+        Var,
+        Func,
+    };
+
+    pub const Var = struct {
+        isReadOnly: bool,
+        name: []const u8,
+        ty: ?Node,
+        value: ?Node,
+    };
+
+    pub const Data = union(Variant) {
+        Var: Var,
+        Func: Function,
+
+        pub fn getType(self: Data) Variant {
+            return @as(Variant, self);
+        }
+    };
+
     isStatic: bool,
-    isReadOnly: bool,
     visibility: Visibility,
-    name: []const u8,
-    ty: ?Node,
-    value: ?Node,
+    data: Data,
+
+    pub fn getType(self: ClassTypeMember) Variant {
+        return self.data.getType();
+    }
 
     pub fn dump(self: ClassTypeMember, writer: anytype, indent: usize) !void {
-        try putInd(writer, indent, "ClassTypeMember '{s}' (", .{self.name});
+        try putInd(writer, indent, "ClassTypeMember (", .{});
         if (self.isStatic)
             try writer.print("Static ", .{});
-        if (self.isReadOnly)
-            try writer.print("ReadOnly ", .{});
         try writer.print("{s})\n", .{@tagName(self.visibility)});
-        if (self.ty) |ty|
-            try ty.dumpIndented(writer, indent + 2);
-        if (self.value) |value|
-            try value.dumpIndented(writer, indent + 2);
+
+        switch (self.data) {
+            .Var => |v| {
+                try putInd(writer, indent + 2, "'{s}\n", .{v.name});
+                if (v.isReadOnly)
+                    try putInd(writer, indent + 2, "ReadOnly\n", .{});
+                if (v.ty) |ty|
+                    try ty.dumpIndented(writer, indent + 2);
+                if (v.value) |value|
+                    try value.dumpIndented(writer, indent + 2);
+            },
+            .Func => |func| try func.dump(writer, indent + 2),
+        }
     }
 };
 
@@ -71,14 +101,20 @@ test "can dump a ClassTypeMember" {
     try (DumpTestCase(ClassTypeMember, .ClassTypeMember){
         .value = ClassTypeMember{
             .isStatic = true,
-            .isReadOnly = true,
             .visibility = .Public,
-            .name = "SomeClassTypeMember",
-            .ty = nodes[0],
-            .value = nodes[1],
+            .data = .{
+                .Var = .{
+                    .isReadOnly = true,
+                    .name = "SomeClassTypeMember",
+                    .ty = nodes[0],
+                    .value = nodes[1],
+                },
+            },
         },
         .expected = 
-        \\ClassTypeMember 'SomeClassTypeMember' (Static ReadOnly Public)
+        \\ClassTypeMember (Static Public)
+        \\  'SomeClassTypeMember
+        \\  ReadOnly
         \\  TypeName Node (1:1)
         \\    TypeName: "number"
         \\  Int Node (1:1)

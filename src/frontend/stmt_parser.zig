@@ -1339,6 +1339,40 @@ test "can parse interface statement" {
     }).run();
 }
 
+fn parseMemberFunction(
+    psr: *TsParser,
+    csr: Cursor,
+    visibility: node.Visibility,
+    isStatic: bool,
+    name: []const u8,
+) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .LParen);
+
+    const res = psr.parseLongFunction(csr, name);
+    switch (res) {
+        .Success => |n| {
+            std.debug.assert(n.getType() == .Function);
+            return ParseResult.success(makeNode(
+                psr.getAllocator(),
+                csr,
+                .ClassTypeMember,
+                node.ClassTypeMember{
+                    .isStatic = isStatic,
+                    .visibility = visibility,
+                    .data = .{
+                        .Func = n.data.Function,
+                    },
+                },
+            ));
+        },
+        .NoMatch => return ParseResult.errMessage(
+            csr,
+            "Invalid class member function",
+        ),
+        .Error => return res,
+    }
+}
+
 fn parseClassMember(psr: *TsParser) ParseResult {
     const csr = psr.lexer.token.csr;
 
@@ -1365,6 +1399,15 @@ fn parseClassMember(psr: *TsParser) ParseResult {
     const name = psr.lexer.token.data;
 
     _ = psr.lexer.next();
+
+    if (psr.lexer.token.ty == .LParen) {
+        if (isReadOnly)
+            return ParseResult.errMessage(
+                csr,
+                "Class member function cannot be marked as 'readonly'",
+            );
+        return parseMemberFunction(psr, csr, visibility, isStatic, name);
+    }
 
     var ty: ?Node = null;
     if (psr.lexer.token.ty == .Colon) {
@@ -1402,11 +1445,15 @@ fn parseClassMember(psr: *TsParser) ParseResult {
         .ClassTypeMember,
         node.ClassTypeMember{
             .isStatic = isStatic,
-            .isReadOnly = isReadOnly,
             .visibility = visibility,
-            .name = name,
-            .ty = ty,
-            .value = value,
+            .data = .{
+                .Var = .{
+                    .isReadOnly = isReadOnly,
+                    .name = name,
+                    .ty = ty,
+                    .value = value,
+                },
+            },
         },
     ));
 }
@@ -1511,17 +1558,52 @@ test "can parse a class with a property" {
                 const members = cls.members.items;
                 try expectEqual(@intCast(usize, 1), members.len);
 
+                try expect(members[0].getType() == .ClassTypeMember);
                 const member = members[0].data.ClassTypeMember;
                 try expectEqual(true, member.isStatic);
-                try expectEqual(true, member.isReadOnly);
                 try expectEqual(node.Visibility.Public, member.visibility);
-                try expectEqualStrings("a", member.name);
-                try expect(member.ty != null);
-                try expectEqual(NodeType.TypeName, member.ty.?.getType());
-                try expectEqualStrings("number", member.ty.?.data.TypeName);
-                try expect(member.value != null);
-                try expectEqual(NodeType.Int, member.value.?.getType());
-                try expectEqualStrings("0", member.value.?.data.Int);
+                try expect(member.getType() == .Var);
+                const v = member.data.Var;
+                try expectEqual(true, v.isReadOnly);
+                try expectEqualStrings("a", v.name);
+                try expect(v.ty != null);
+                try expectEqual(NodeType.TypeName, v.ty.?.getType());
+                try expectEqualStrings("number", v.ty.?.data.TypeName);
+                try expect(v.value != null);
+                try expectEqual(NodeType.Int, v.value.?.getType());
+                try expectEqualStrings("0", v.value.?.data.Int);
+            }
+        }).check,
+    }).run();
+}
+
+test "can parse a class with a member function" {
+    try (StmtTestCase{
+        .code = "class MyClass { private static func(a: number) {} }",
+        .check = (struct {
+            fn check(value: Node) anyerror!void {
+                try expectEqual(NodeType.ClassType, value.getType());
+
+                const cls = value.data.ClassType;
+                try expectEqualStrings("MyClass", cls.name);
+                try expect(cls.extends == null);
+
+                const members = cls.members.items;
+                try expectEqual(@intCast(usize, 1), members.len);
+
+                try expect(members[0].getType() == .ClassTypeMember);
+                const member = members[0].data.ClassTypeMember;
+                _ = member;
+                // try expectEqual(true, member.isStatic);
+                // try expectEqual(true, member.isReadOnly);
+                // try expectEqual(node.Visibility.Public, member.visibility);
+                // try expectEqualStrings("a", member.name);
+                // try expect(member.ty != null);
+                // try expectEqual(NodeType.TypeName, member.ty.?.getType());
+                // try expectEqualStrings("number", member.ty.?.data.TypeName);
+                // try expect(member.value != null);
+                // try expectEqual(NodeType.Int, member.value.?.getType());
+                // try expectEqualStrings("0", member.value.?.data.Int);
             }
         }).check,
     }).run();

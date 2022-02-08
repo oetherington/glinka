@@ -88,6 +88,14 @@ pub const TsParser = struct {
         return stmtParser.parseBlock(self.getParser());
     }
 
+    pub fn parseLongFunction(
+        self: *TsParser,
+        csr: Cursor,
+        name: []const u8,
+    ) ParseResult {
+        return exprParser.parseLongFunction(self, csr, name);
+    }
+
     pub fn parseStmt(self: *TsParser) ParseResult {
         return stmtParser.parseStmt(self.getParser());
     }

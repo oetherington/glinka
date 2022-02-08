@@ -238,7 +238,7 @@ fn resolveMemberType(
     cmp: *Compiler,
     csr: Cursor,
     className: []const u8,
-    member: node.ClassTypeMember,
+    member: node.ClassTypeMember.Var,
 ) Type.Ptr {
     if (member.ty) |tyNode| {
         if (cmp.findType(tyNode)) |ty| {
@@ -281,13 +281,20 @@ pub fn processClass(cmp: *Compiler, nd: Node) void {
 
     for (clsNd.members.items) |memberNd, index| {
         std.debug.assert(memberNd.getType() == .ClassTypeMember);
-        const member = memberNd.data.ClassTypeMember;
 
-        cls.members[index] = Type.ClassType.Member{
-            .name = member.name,
-            .ty = resolveMemberType(cmp, memberNd.csr, cls.name, member),
-            .visibility = member.visibility,
-        };
+        const member = memberNd.data.ClassTypeMember;
+        switch (member.data) {
+            .Var => |v| cls.members[index] = Type.ClassType.Member{
+                .name = v.name,
+                .ty = resolveMemberType(cmp, memberNd.csr, cls.name, v),
+                .visibility = member.visibility,
+            },
+            .Func => |f| {
+                // TODO
+                _ = f;
+                unreachable;
+            },
+        }
     }
 
     cmp.typebook.putClass(clsT);

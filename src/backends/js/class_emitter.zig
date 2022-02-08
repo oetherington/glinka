@@ -24,6 +24,27 @@ const Backend = @import("../../common/backend.zig").Backend;
 const JsBackend = @import("js_backend.zig").JsBackend;
 const EmitTestCase = @import("emit_test_case.zig").EmitTestCase;
 
+fn emitMember(
+    self: *JsBackend,
+    className: []const u8,
+    mem: node.ClassTypeMember,
+) Backend.Error!void {
+    switch (mem.data) {
+        .Var => |v| {
+            if (v.value) |value| {
+                try self.out.print(" {s}.{s} = ", .{ className, v.name });
+                try self.emitExpr(value);
+                try self.out.print(";\n", .{});
+            }
+        },
+        .Func => |f| {
+            // TODO
+            _ = f;
+            unreachable;
+        },
+    }
+}
+
 pub fn emitClass(self: *JsBackend, class: node.ClassType) Backend.Error!void {
     try self.out.print(
         "var {s} = /** @class */ (function (_super) {{\n",
@@ -36,18 +57,14 @@ pub fn emitClass(self: *JsBackend, class: node.ClassType) Backend.Error!void {
     try self.out.print(" function {s}() {{\n", .{class.name});
     if (class.extends != null)
         try self.out.print(
-            "  return _super !== null && _super.apply(this, arguments) || this;\n",
+            "  return _super!==null&&_super.apply(this,arguments)||this;\n",
             .{},
         );
     try self.out.print(" }}\n", .{});
 
     for (class.members.items) |member| {
-        const mem = member.data.ClassTypeMember;
-        if (mem.value) |value| {
-            try self.out.print(" {s}.{s} = ", .{ class.name, mem.name });
-            try self.emitExpr(value);
-            try self.out.print(";\n", .{});
-        }
+        std.debug.assert(member.data.getType() == .ClassTypeMember);
+        try emitMember(self, class.name, member.data.ClassTypeMember);
     }
 
     try self.out.print(" return {s};\n", .{class.name});
@@ -82,7 +99,7 @@ test "JsBackend can emit class with superclass" {
         \\var MyClass = /** @class */ (function (_super) {
         \\ __extends(MyClass, _super);
         \\ function MyClass() {
-        \\  return _super !== null && _super.apply(this, arguments) || this;
+        \\  return _super!==null&&_super.apply(this,arguments)||this;
         \\ }
         \\ return MyClass;
         \\}(SomeOtherClass));
@@ -98,11 +115,15 @@ test "JsBackend can emit class with initialized members" {
         .items = &[_]node.Node{
             EmitTestCase.makeNode(.ClassTypeMember, node.ClassTypeMember{
                 .isStatic = false,
-                .isReadOnly = false,
                 .visibility = .Public,
-                .name = "aClassMember",
-                .ty = null,
-                .value = EmitTestCase.makeNode(.Int, "3"),
+                .data = .{
+                    .Var = .{
+                        .isReadOnly = false,
+                        .name = "aClassMember",
+                        .ty = null,
+                        .value = EmitTestCase.makeNode(.Int, "3"),
+                    },
+                },
             }),
         },
     };
@@ -121,7 +142,7 @@ test "JsBackend can emit class with initialized members" {
         .cleanup = (struct {
             pub fn cleanup(alloc: Allocator, nd: Node) void {
                 const members = nd.data.ClassType.members.items;
-                alloc.destroy(members[0].data.ClassTypeMember.value.?);
+                alloc.destroy(members[0].data.ClassTypeMember.data.Var.value.?);
                 alloc.destroy(members[0]);
             }
         }).cleanup,

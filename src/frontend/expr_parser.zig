@@ -240,29 +240,23 @@ test "can parse object literal primary expression" {
     }).run();
 }
 
-fn parseFunctionExpr(psr: *TsParser) ParseResult {
-    std.debug.assert(psr.lexer.token.ty == .Function);
-
-    const csr = psr.lexer.token.csr;
-
-    _ = psr.lexer.next();
-
-    var func: node.Function = undefined;
-    func.isArrow = false;
-
-    if (psr.lexer.token.ty == .Ident) {
-        func.name = psr.lexer.token.data;
-        _ = psr.lexer.next();
-    } else {
-        func.name = null;
-    }
+pub fn parseLongFunction(
+    psr: *TsParser,
+    csr: Cursor,
+    name: ?[]const u8,
+) ParseResult {
+    var func = node.Function{
+        .isArrow = false,
+        .name = name,
+        .retTy = null,
+        .args = node.Function.ArgList{},
+        .body = undefined,
+    };
 
     if (psr.lexer.token.ty != .LParen)
         return ParseResult.expected("function argument list", psr.lexer.token);
 
     _ = psr.lexer.next();
-
-    func.args = node.Function.ArgList{};
 
     while (psr.lexer.token.ty != .RParen) {
         const arg = psr.lexer.token;
@@ -308,8 +302,6 @@ fn parseFunctionExpr(psr: *TsParser) ParseResult {
             return retTy;
 
         func.retTy = retTy.Success;
-    } else {
-        func.retTy = null;
     }
 
     switch (psr.parseBlock()) {
@@ -327,6 +319,20 @@ fn parseFunctionExpr(psr: *TsParser) ParseResult {
         .Function,
         func,
     ));
+}
+
+fn parseFunctionExpr(psr: *TsParser) ParseResult {
+    std.debug.assert(psr.lexer.token.ty == .Function);
+    const csr = psr.lexer.token.csr;
+    _ = psr.lexer.next();
+
+    var name: ?[]const u8 = null;
+    if (psr.lexer.token.ty == .Ident) {
+        name = psr.lexer.token.data;
+        _ = psr.lexer.next();
+    }
+
+    return parseLongFunction(psr, csr, name);
 }
 
 test "can parse function definition" {

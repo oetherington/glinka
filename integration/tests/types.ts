@@ -65,6 +65,12 @@ class MyClass {
 
 class MyOtherClass extends MyClass {
 	private recursiveChild: MyOtherClass;
+
+	/*
+	memberFn() {
+		console.log('Calling a member function');
+	}
+	*/
 }
 
 console.log(MyClass);
