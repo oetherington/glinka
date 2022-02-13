@@ -89,8 +89,3 @@
  - [ ] GCC style command line interface
  - [ ] Strict flag
  - [ ] `strictNullChecks`
-
-### Bugs
-
- - [ ] `var` declarations currently have block scoping, not function scoping
- - [ ] Multiple declarations of the same interface are not merged
