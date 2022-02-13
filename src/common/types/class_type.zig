@@ -22,10 +22,11 @@ const Visibility = @import("../visibility.zig").Visibility;
 
 pub const ClassType = struct {
     pub const Member = struct {
-        // TODO: static, readonly, initialization values
+        // TODO: static and initialization values
         name: []const u8,
         ty: Type.Ptr,
         visibility: Visibility,
+        isReadOnly: bool,
 
         pub fn eql(a: Member, b: Member) bool {
             return genericEql(a, b);
@@ -108,26 +109,31 @@ test "can check ClassType.Member equality" {
         .name = "a",
         .ty = &number,
         .visibility = .Public,
+        .isReadOnly = false,
     };
     const b = ClassType.Member{
         .name = "a",
         .ty = &number,
         .visibility = .Public,
+        .isReadOnly = false,
     };
     const c = ClassType.Member{
         .name = "b",
         .ty = &number,
         .visibility = .Public,
+        .isReadOnly = false,
     };
     const d = ClassType.Member{
         .name = "a",
         .ty = &boolean,
         .visibility = .Public,
+        .isReadOnly = false,
     };
     const e = ClassType.Member{
         .name = "a",
         .ty = &number,
         .visibility = .Protected,
+        .isReadOnly = false,
     };
 
     try std.testing.expect(a.eql(a));
@@ -142,28 +148,83 @@ test "can hash a ClassType" {
     const str = Type.newString();
 
     const a = Type.ClassType.new(null, "A", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "b", .ty = &str, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "b",
+            .ty = &str,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
     const b = Type.ClassType.new(null, "A", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "b", .ty = &str, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "b",
+            .ty = &str,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
     const super = Type.newClass(a);
     const c = Type.ClassType.new(&super, "A", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "b", .ty = &str, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "b",
+            .ty = &str,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
     const d = Type.ClassType.new(null, "B", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "b", .ty = &str, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "b",
+            .ty = &str,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
     const e = Type.ClassType.new(null, "B", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
     const f = Type.ClassType.new(null, "B", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "b", .ty = &num, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "b",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
 
     try std.testing.expectEqual(a.hash(), a.hash());
@@ -179,13 +240,33 @@ test "can retrieve ClassType member by name" {
     const str = Type.newString();
 
     const c0 = Type.ClassType.new(null, "A", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "a", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "b", .ty = &str, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "a",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "b",
+            .ty = &str,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
     const super = Type.newClass(c0);
     const c1 = Type.ClassType.new(&super, "B", &[_]Type.ClassType.Member{
-        Type.ClassType.Member{ .name = "c", .ty = &num, .visibility = .Public },
-        Type.ClassType.Member{ .name = "d", .ty = &str, .visibility = .Public },
+        Type.ClassType.Member{
+            .name = "c",
+            .ty = &num,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
+        Type.ClassType.Member{
+            .name = "d",
+            .ty = &str,
+            .visibility = .Public,
+            .isReadOnly = false,
+        },
     });
 
     const a = c0.getNamedMember("a");

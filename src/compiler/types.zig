@@ -288,6 +288,7 @@ pub fn processClass(cmp: *Compiler, nd: Node) void {
                 .name = v.name,
                 .ty = resolveMemberType(cmp, memberNd.csr, cls.name, v),
                 .visibility = member.visibility,
+                .isReadOnly = v.isReadOnly,
             },
             .Func => |f| {
                 // TODO
@@ -395,3 +396,34 @@ test "classes share scope with variables" {
         }).check,
     }).run();
 }
+
+test "can assign to class members" {
+    try (CompilerTestCase{
+        .code = 
+        \\class A { public a: number; }
+        \\const a = new A;
+        \\a.a = 0;
+        ,
+    }).run();
+}
+
+// test "cannot assign to readonly class members" {
+// try (CompilerTestCase{
+// .code =
+// \\class A { readonly public a: number; }
+// \\const a = new A;
+// \\a.a = 0;
+// ,
+// .check = (struct {
+// pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+// try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+// const err = cmp.getError(0);
+// try case.expectEqual(err.getType(), .GenericError);
+// try case.expectEqualStrings(
+// "Superclass 'number' is not a class",
+// err.GenericError.msg,
+// );
+// }
+// }).check,
+// }).run();
+// }

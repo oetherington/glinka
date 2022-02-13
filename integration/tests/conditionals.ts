@@ -5,7 +5,7 @@
 // Declarations
 let aString: string = "string";
 var aNumber: number = 2;
-const aBool: boolean = !false;
+let aBool: boolean = !false;
 
 // If statements
 if (aNumber)

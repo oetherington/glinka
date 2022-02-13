@@ -45,7 +45,6 @@ fn declWithAssign(cmp: *Compiler, csr: Cursor, decl: node.Decl) void {
 
                 cmp.scope.put(decl.name, annotation, isConst, csr);
             } else {
-                annotationNode.dump();
                 cmp.errors.append(CompileError.genericError(
                     GenericError.new(csr, "Invalid type annotation"),
                 )) catch allocate.reportAndExit();
@@ -229,5 +228,51 @@ test "declarations cannot be redefined in the same scope" {
 test "declarations can be redefined in different scopes" {
     try (CompilerTestCase{
         .code = "let a = 3; { let a = 4; }",
+    }).run();
+}
+
+test "'var' declarations can be assign to" {
+    try (CompilerTestCase{
+        .code = "var a = 0; a = 1;",
+    }).run();
+}
+
+test "'let' declarations can be assign to" {
+    try (CompilerTestCase{
+        .code = "let a = 0; a = 1;",
+    }).run();
+}
+
+test "'const' declarations cannot be assign to" {
+    try (CompilerTestCase{
+        .code = "const a = 0; a = 1",
+        .check = (struct {
+            fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+
+                // const err = cmp.getError(0);
+                // try case.expectEqual(
+                // CompileError.Type.RedefinitionError,
+                // err.getType(),
+                // );
+                // try case.expectEqualStrings("a", err.RedefinitionError.name);
+                // try case.expectEqual(
+                // @intCast(u32, 1),
+                // err.RedefinitionError.firstDefined.ln,
+                // );
+                // try case.expectEqual(
+                // @intCast(u32, 1),
+                // err.RedefinitionError.firstDefined.ch,
+                // );
+                // try case.expectEqual(
+                // @intCast(u32, 1),
+                // err.RedefinitionError.secondDefined.ln,
+                // );
+                // try case.expectEqual(
+                // @intCast(u32, 12),
+                // err.RedefinitionError.secondDefined.ch,
+                // );
+            }
+        }).check,
     }).run();
 }

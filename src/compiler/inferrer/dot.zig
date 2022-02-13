@@ -155,6 +155,7 @@ test "can infer type of a dot expression with a class" {
                     .name = "member",
                     .ty = typebook.getNumber(),
                     .visibility = .Public,
+                    .isReadOnly = false,
                 };
 
                 var ty = allocate.create(std.testing.allocator, Type);

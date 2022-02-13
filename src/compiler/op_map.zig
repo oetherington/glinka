@@ -34,6 +34,7 @@ pub const OpEntry = union(Variant) {
     Binary: struct {
         input: Type.Ptr,
         output: ?Type.Ptr,
+        isAssign: bool,
     },
 
     pub fn getType(self: OpEntry) Variant {
@@ -54,6 +55,17 @@ pub const OpEntry = union(Variant) {
             .Binary = .{
                 .input = input,
                 .output = output,
+                .isAssign = false,
+            },
+        };
+    }
+
+    pub fn assign(input: Type.Ptr, output: ?Type.Ptr) OpEntry {
+        return OpEntry{
+            .Binary = .{
+                .input = input,
+                .output = output,
+                .isAssign = true,
             },
         };
     }
@@ -80,10 +92,10 @@ pub fn populateOpMap(b: *TypeBook) void {
 
     h.put(.Delete, OpEntry.un(&b.anyTy, &b.booleanTy));
 
-    h.put(.Nullish, OpEntry.un(&b.anyTy, &b.anyTy)); // TODO: Fix output
+    h.put(.Nullish, OpEntry.un(&b.anyTy, &b.anyTy)); // TODO: Fix out
 
-    h.put(.Assign, OpEntry.bin(&b.anyTy, null));
-    h.put(.NullishAssign, OpEntry.bin(&b.anyTy, &b.anyTy)); // TODO: Fix output
+    h.put(.Assign, OpEntry.assign(&b.anyTy, null));
+    h.put(.NullishAssign, OpEntry.assign(&b.anyTy, &b.anyTy)); // TODO: Fix out
 
     h.put(.TypeOf, OpEntry.un(&b.anyTy, &b.stringTy));
 
@@ -93,7 +105,7 @@ pub fn populateOpMap(b: *TypeBook) void {
     );
     h.put(
         .AddAssign,
-        OpEntry.bin(b.getUnion(&.{ &b.numberTy, &b.stringTy }), null),
+        OpEntry.assign(b.getUnion(&.{ &b.numberTy, &b.stringTy }), null),
     );
 
     h.put(.Sub, OpEntry.bin(&b.numberTy, null));
@@ -101,18 +113,18 @@ pub fn populateOpMap(b: *TypeBook) void {
     h.put(.Pow, OpEntry.bin(&b.numberTy, null));
     h.put(.Div, OpEntry.bin(&b.numberTy, null));
     h.put(.Mod, OpEntry.bin(&b.numberTy, null));
-    h.put(.SubAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.MulAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.DivAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ModAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.PowAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitAndAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitOrAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitNotAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.BitXorAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftRightAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftRightUnsignedAssign, OpEntry.bin(&b.numberTy, null));
-    h.put(.ShiftLeftAssign, OpEntry.bin(&b.numberTy, null));
+    h.put(.SubAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.MulAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.DivAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.ModAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.PowAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.BitAndAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.BitOrAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.BitNotAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.BitXorAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.ShiftRightAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.ShiftRightUnsignedAssign, OpEntry.assign(&b.numberTy, null));
+    h.put(.ShiftLeftAssign, OpEntry.assign(&b.numberTy, null));
     h.put(.BitAnd, OpEntry.bin(&b.numberTy, null));
     h.put(.BitOr, OpEntry.bin(&b.numberTy, null));
     h.put(.BitXor, OpEntry.bin(&b.numberTy, null));
@@ -131,6 +143,6 @@ pub fn populateOpMap(b: *TypeBook) void {
     h.put(.CmpStrictNotEq, OpEntry.bin(&b.anyTy, &b.booleanTy));
     h.put(.LogicalAnd, OpEntry.bin(&b.anyTy, &b.booleanTy));
     h.put(.LogicalOr, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.LogicalAndAssign, OpEntry.bin(&b.anyTy, &b.booleanTy));
-    h.put(.LogicalOrAssign, OpEntry.bin(&b.anyTy, &b.booleanTy));
+    h.put(.LogicalAndAssign, OpEntry.assign(&b.anyTy, &b.booleanTy));
+    h.put(.LogicalOrAssign, OpEntry.assign(&b.anyTy, &b.booleanTy));
 }
