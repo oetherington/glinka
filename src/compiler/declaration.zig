@@ -249,29 +249,15 @@ test "'const' declarations cannot be assign to" {
         .check = (struct {
             fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
                 try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
-
-                // const err = cmp.getError(0);
-                // try case.expectEqual(
-                // CompileError.Type.RedefinitionError,
-                // err.getType(),
-                // );
-                // try case.expectEqualStrings("a", err.RedefinitionError.name);
-                // try case.expectEqual(
-                // @intCast(u32, 1),
-                // err.RedefinitionError.firstDefined.ln,
-                // );
-                // try case.expectEqual(
-                // @intCast(u32, 1),
-                // err.RedefinitionError.firstDefined.ch,
-                // );
-                // try case.expectEqual(
-                // @intCast(u32, 1),
-                // err.RedefinitionError.secondDefined.ln,
-                // );
-                // try case.expectEqual(
-                // @intCast(u32, 12),
-                // err.RedefinitionError.secondDefined.ch,
-                // );
+                const err = cmp.getError(0);
+                try case.expectEqual(
+                    CompileError.Type.GenericError,
+                    err.getType(),
+                );
+                try case.expectEqualStrings(
+                    "Invalid assignment - 'a' is const",
+                    err.GenericError.msg,
+                );
             }
         }).check,
     }).run();

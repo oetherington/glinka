@@ -29,12 +29,51 @@ const InferTestCase = @import("infer_test_case.zig").InferTestCase;
 const inferExprType = @import("inferrer.zig").inferExprType;
 const Scope = @import("../scope.zig").Scope;
 const TypeBook = @import("../typebook.zig").TypeBook;
+const Type = @import("../../common/types/type.zig").Type;
 
-fn isLValue(nd: node.Node) bool {
-    return switch (nd.getType()) {
-        .Ident, .Dot, .ArrayAccess => true,
-        else => false,
-    };
+fn checkAssignability(
+    cmp: *Compiler,
+    csr: Cursor,
+    op: node.BinaryOp,
+) ?CompileError {
+    std.debug.assert(op.left.ty != null);
+
+    switch (op.left.data) {
+        .Ident => |ident| {
+            const sym = cmp.scope.get(ident);
+            std.debug.assert(sym != null);
+            if (sym.?.isConst) {
+                return CompileError.genericError(GenericError.new(
+                    csr,
+                    cmp.fmt("Invalid assignment - '{s}' is const", .{ident}),
+                ));
+            }
+        },
+        .Dot => |dot| if (dot.expr.ty.?.getType() == .Class) {
+            const cls = dot.expr.ty.?.Class;
+            const member = cls.getNamedMember(dot.ident);
+
+            // If member is null then an error will already have been generated
+            // when processing the sub-node
+            if (member) |mem| if (mem.isReadOnly)
+                return CompileError.genericError(GenericError.new(
+                    csr,
+                    cmp.fmt(
+                        "Cannot assign to readonly member '{s}' of class '{s}'",
+                        .{ mem.name, cls.name },
+                    ),
+                ));
+        },
+        .ArrayAccess => {
+            // TODO: Validate class members and check for readonly
+        },
+        else => return CompileError.genericError(GenericError.new(
+            csr,
+            "Invalid assignment - target expression is not an l-value",
+        )),
+    }
+
+    return null;
 }
 
 pub fn inferBinaryOpType(
@@ -72,32 +111,9 @@ pub fn inferBinaryOpType(
             left,
         )));
 
-    if (entry.?.Binary.isAssign) {
-        if (!isLValue(op.left)) {
-            return InferResult.err(
-                CompileError.genericError(GenericError.new(
-                    nd.csr,
-                    "Invalid assignment - target expression is not an l-value",
-                )),
-            );
-        }
-
-        if (op.left.getType() == .Ident) {
-            const sym = cmp.scope.get(op.left.data.Ident);
-            std.debug.assert(sym != null);
-            if (sym.?.isConst) {
-                return InferResult.err(
-                    CompileError.genericError(GenericError.new(
-                        nd.csr,
-                        cmp.fmt(
-                            "Invalid assignment - {s} is const",
-                            .{op.left.data.Ident},
-                        ),
-                    )),
-                );
-            }
-        }
-    }
+    if (entry.?.Binary.isAssign)
+        if (checkAssignability(cmp, nd.csr, op)) |err|
+            return InferResult.err(err);
 
     nd.ty = if (entry.?.Binary.output) |out| out else left;
     return InferResult.success(nd.ty.?);

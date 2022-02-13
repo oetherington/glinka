@@ -54,7 +54,9 @@
    - [x] `new`
    - [x] Member variables
    - [ ] Member functions
-   - [ ] `readonly`
+   - [x] Property access with '.'
+   - [ ] Property access with '[]'
+   - [x] `readonly`
    - [ ] `static`
    - [x] `public`/`protected`/`private`
    - [ ] ECMAscript private fields with '#'
@@ -62,11 +64,11 @@
    - [ ] `constructor`
    - [ ] `destructor`
    - [ ] Accessors with `get`/`set`
-   - [ ] `extends` for classes
+   - [x] `extends` for classes
    - [ ] `abstract class`
    - [ ] `implements`
  - [ ] Generics
- - [ ] Recursive types
+ - [x] Recursive types
  - [ ] Modules/`import`/`export`
  - [ ] `declare`
  - [ ] `namespace`
@@ -91,4 +93,4 @@
 ### Bugs
 
  - [ ] `var` declarations currently have block scoping, not function scoping
- - [ ] Multiple declarations of the same interface are not merged (maybe this should be hidden behind a feature flag?)
+ - [ ] Multiple declarations of the same interface are not merged

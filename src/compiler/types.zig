@@ -407,23 +407,23 @@ test "can assign to class members" {
     }).run();
 }
 
-// test "cannot assign to readonly class members" {
-// try (CompilerTestCase{
-// .code =
-// \\class A { readonly public a: number; }
-// \\const a = new A;
-// \\a.a = 0;
-// ,
-// .check = (struct {
-// pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
-// try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
-// const err = cmp.getError(0);
-// try case.expectEqual(err.getType(), .GenericError);
-// try case.expectEqualStrings(
-// "Superclass 'number' is not a class",
-// err.GenericError.msg,
-// );
-// }
-// }).check,
-// }).run();
-// }
+test "cannot assign to readonly class members" {
+    try (CompilerTestCase{
+        .code = 
+        \\class A { readonly public a: number; }
+        \\const a = new A;
+        \\a.a = 0;
+        ,
+        .check = (struct {
+            pub fn check(case: CompilerTestCase, cmp: Compiler) anyerror!void {
+                try case.expectEqual(@intCast(usize, 1), cmp.errors.count());
+                const err = cmp.getError(0);
+                try case.expectEqual(err.getType(), .GenericError);
+                try case.expectEqualStrings(
+                    "Cannot assign to readonly member 'a' of class 'A'",
+                    err.GenericError.msg,
+                );
+            }
+        }).check,
+    }).run();
+}
