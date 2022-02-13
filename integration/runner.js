@@ -4,9 +4,11 @@ const process = require("process");
 const child_process = require("child_process");
 const ts = require("typescript");
 
+const isWindows = process.platform === "win32";
+
 const testDir = __dirname + "/tests";
 const nodeExe = "node";
-const glinkaExe = process.platform === "win32"
+const glinkaExe = isWindows
 	? __dirname + "\\..\\zig-out\\bin\\glinka.exe"
 	: __dirname + "/../zig-out/bin/glinka";
 
@@ -111,7 +113,7 @@ function showSummaryAndExit(tests) {
 
 	console.log(`Glinka integration tests complete ${withWithout} errors\n`);
 
-	process.exit(errors.length > 0 ? 1 : 0);
+	process.exit(errors.length > 0 && !isWindows ? 1 : 0);
 }
 
 async function run() {
